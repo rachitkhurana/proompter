@@ -1,0 +1,297 @@
+# Proompter: design spec (v1)
+
+Proompter is a review layer that developers turn on over their own app. You pick any element, on any
+viewport, and write what's wrong. Proompter records where it lives in the source, what the console and
+network were doing, and a snapshot. It saves all of that as a markdown file in the repo, which a human
+can read and an AI agent can act on. Later it can open a GitHub issue too.
+
+- **npm:** `@rachitkay/proompter`. The bare `proompter` name and the `@proompter` scope are taken.
+- **Repo:** https://github.com/rachitkhurana/proompter · **License:** MIT
+- **Visual reference:** [`design/prototype.html`](design/prototype.html), the approved interactive
+  prototype, also published at https://claude.ai/artifact/LqcaXYUe3EH6UcdHkkgyEc.
+  **It is the source of truth for look, spacing, motion and interaction.** When this spec and the
+  prototype disagree on anything visual, the prototype wins. When they disagree on behaviour, ask.
+- **First consumer:** Gamorite (`website-nextjs`, Next 16, React 19, Tailwind 4, Turbopack).
+
+---
+
+## 1. Principles
+
+1. **Zero cost when off.** With the flag unset, nothing from Proompter is in the production bundle.
+   No CSS leaks, no globals, no listeners.
+2. **Never touch the host's styles, and never let the host touch ours.** All UI renders inside one
+   shadow root, with its own CSS.
+3. **Point at code, not pixels.** Every entry carries `file:line`. An inherited source is labelled as
+   inherited, and a missing source is labelled as missing. A guess is never shown as a fact.
+4. **Files first.** An entry is a markdown file in the repo. GitHub and every other sink are mirrors
+   of that file.
+5. **Fast, not flashy.** Motion is under 300ms, with custom ease-out curves and springs only where a
+   gesture carried momentum (see `.agents` design skills: emil-design-eng, apple-design).
+
+## 2. Package layout
+
+```
+src/
+  index.ts              → `Proompter` component + types   (import "@rachitkay/proompter")
+  next/index.ts         → withProompter(), createProompterRoute()  ("@rachitkay/proompter/next")
+  next/loader.ts        → Turbopack/webpack loader that stamps data-src
+  core/                 → framework-free engine: surface, resolver, capture, store, serializer
+  ui/                   → React UI rendered into the shadow root
+  ui/primitives/        → Button, IconButton, Chip, Menu, Tooltip, Kbd, Segmented, Sheet (vendored shadcn/Radix, restyled)
+  ui/styles.css         → Tailwind 4 source → compiled to a string at build time
+examples/playground/    → Next 16 app with a Gamorite-like mock page (the prototype's host markup)
+```
+
+- **Exports:** `.` (client), `./next` (server and config). `./github` and the `proompter` bin are v2/v3;
+  reserve the export names now.
+- **Build:** tsup (ESM and CJS, d.ts). The `"use client"` banner goes on the client entry only. CSS is
+  inlined as a string export, so there's no CSS file for the host to import.
+- **Peer dependencies:** `react >=19`, `react-dom >=19`, `next >=15.3` (optional, only for `./next`).
+- **Dependencies:**
+  - `html-to-image` (snapshots)
+  - `bippy` (dev owner stack, optional)
+  - `motion` (springs)
+  - `@radix-ui/*` primitives
+  - `@babel/parser`, `magic-string` (loader)
+
+  Keep the client bundle small: lazy-load the UI chunk on first open.
+
+## 3. Turning it on
+
+```ts
+// next.config.ts
+import { withProompter } from "@rachitkay/proompter/next";
+export default withProompter(nextConfig, { enabled: process.env.NEXT_PUBLIC_PROOMPTER === "true" });
+
+// app/layout.tsx (inside <body>)
+import { Proompter } from "@rachitkay/proompter";
+{process.env.NEXT_PUBLIC_PROOMPTER === "true" && <Proompter session={{ reviewer: "rachit" }} />}
+
+// app/__proompter/route.ts   (dev-only file writer)
+export { POST, GET } from "@rachitkay/proompter/next/route";
+```
+
+- `enabled: false` makes `withProompter` return the config untouched. No loader, no route.
+- At runtime, `⌘⇧.` or `window.__proompter.open()` / `.close()` / `.toggle()` show or hide the kit.
+- **Frame mode:** when the URL has `?__proompter_frame=1`, the kit renders nothing and only exposes
+  its capture hooks to the parent (used by the viewports, §6).
+
+## 4. Source mapping
+
+`resolveTarget(el) → { el, selector, source, inherited, label, crumb, query? }`
+
+1. **Compile-time stamping:** `next/loader.ts` parses each `.tsx`/`.jsx` file in the app (not
+   `node_modules`) and adds `data-src="<repo-relative path>:<line>:<col>"` to **every intrinsic JSX
+   element** (lowercase tag), plus `data-comp="<ComponentName>"` on the root element each component
+   returns.
+   - It runs through Turbopack `rules` (Next ≥15.3) and webpack as a fallback.
+   - It's active in dev and in preview builds when enabled, and never when `enabled: false`.
+   - It must keep source maps working: use magic-string and pass the map on.
+2. **Pick targets the deepest element under the cursor** (≥6×6 px), never a component boundary.
+   - Source = the element's own `data-src`, or else the nearest stamped ancestor's (`inherited: true`).
+   - The UI shows an inherited source with a `↳` prefix.
+3. **Selector:** the shortest unique path. Use a unique `data-src` if there is one; otherwise an
+   `nth-of-type` chain anchored at the nearest unique stamped ancestor. It's stored on the entry, and
+   used for pins, "Show on page" and snapshots.
+4. **Label:** the component name if stamped. Otherwise the tag plus a hint (`img · avatar`,
+   `button “Share”`, `p “Clutched a 1v4…”`). `crumb` is the component chain down to the element.
+5. **Dev only:** the bippy owner stack, if available, adds the component chain for unstamped trees.
+6. **Tree walk while picking:** `↑` or `[` goes to the parent, `↓` or `]` goes back down the walked
+   path. Alt plus wheel does the same.
+
+## 5. Capture (in-memory ring buffers, only while the kit is enabled)
+
+- **Console:** the last 50 `error` and `warn` entries (timestamp, level, message, first stack frame).
+- **Network:** the last 50 `fetch` and XHR calls (method, URL, status, duration, a request/response
+  excerpt of ≤2 KB). Patched on enable, restored on disable.
+- **Redaction** runs before anything is stored. It strips:
+  - `authorization`, `cookie` and `set-cookie` headers
+  - values matching email, JWT and `token|secret|password|api[_-]?key`
+  - anything a host-supplied `redact(entry)` hook removes
+
+  It's on by default and can't be turned off for prod-data sessions.
+- **Query cache (optional adapter):** `queries: () => Array<{ key, status, updatedAt }>`. Gamorite
+  passes its TanStack Query client.
+- **Snapshot:** `html-to-image` of the surface document, giving an element crop (with padding) and the
+  visible viewport, both as PNG. Fonts are embedded where same-origin; otherwise it falls back to
+  system fonts and records that it did.
+
+## 6. Surfaces and viewports
+
+A **surface** is what the kit reviews: `{ doc, win, toScreen(rect), scale }`.
+
+- **Responsive (default):** the surface is the live page itself. Pins and overlays sit on top of it.
+- **Desktop 1440×900, Tablet 834×1194, Mobile 390×844, plus rotate:**
+  - The surface is a same-origin `<iframe>` of the current URL with `?__proompter_frame=1`, scaled
+    to fit inside a device bezel.
+  - Only **one viewport is shown at a time.**
+  - **Every tool works inside the frame:** the kit attaches its listeners to the frame's document.
+- **Entries record their viewport and exact size.** Pins only show on the viewport an entry was filed
+  on. "Show on page" switches to it first.
+- If a page refuses to be framed (X-Frame-Options or CSP), show an inline notice.
+
+## 7. UI (match the prototype exactly)
+
+- **Dock:**
+  - Its parts, in order:
+    - grip
+    - brand (click to collapse or expand)
+    - Pick, Multi, Box, Text and Note
+    - Freeze
+    - the viewport segmented control
+    - Rotate
+    - the command menu
+    - Entries, with an open-count badge
+  - **Dragging:**
+    - It stays 1:1 under the pointer from where it was grabbed, and resists softly past the window edge.
+    - On release it projects the drag speed: landing within 72px of the left or right edge snaps it
+      there as a vertical bar.
+    - `↑` `↓` `←` `→` on the grip move it in steps, and a double-click resets it.
+    - Position and collapsed state are saved in `localStorage` under the keys `proompter.dock` and
+      `proompter.collapsed`.
+  - **Collapsed:** only the grip and the logo show, plus the open count as a corner badge in vertical
+    mode.
+  - Tooltips take 350ms the first time, then appear instantly while warm, and always open away from
+    the screen edge.
+- **Composer:** anchored to the target, growing out of it. Contents:
+  - a header with the target, the source chip (copy) and the viewport size
+  - title (required) and description
+  - property chips with menus: Intent, Priority, Tags, Test plan, plus a read-only Task chip from a plugin
+  - a collapsible "Context attached" block
+  - `⌘↵` creates the entry. Esc, or clicking outside, discards it.
+- **Pins:** numbered, coloured by priority; resolved pins turn grey. A hover card shows the title and
+  priority. Pins pop in only once.
+- **Sheet:** slides in from the right, or from the left when the dock is docked to the right edge. It
+  switches sides by fading out and back in, never by sliding across the screen. Two tabs:
+  - **Entries:** grouped Open / In progress / Resolved, with rows of priority, ID, status, title, a
+    viewport icon and the time.
+  - **Publish:** the files that will be written, and (v2) the issues that will be opened.
+- **Ticket**, the entry detail view:
+  - a breadcrumb and the title
+  - description
+  - **Properties**, each editable: Status, Priority, Intent, Viewport, Tags, Test plan, GitHub
+  - **Where:** crumb, Source (↳ if inherited, copy), Element (copy the selector), Task, Route, and a
+    snapshot with an Element/Viewport toggle
+  - **Captured context:** Console and Network tabs
+  - **Activity**
+  - **File:** a markdown preview
+  - **Footer:** Show on page, Copy for agent, Resolve
+- **Command menu (`⌘K`):** tools, viewports, open entries, all entries, publish. Searchable, fully
+  keyboard-driven.
+- **Shortcuts:**
+  - `P` `M` `B` `T` `N` pick tools
+  - `F` freeze
+  - `R` rotate
+  - `1`–`4` viewports
+  - `E` entries
+  - `⌘K` command menu
+  - `⌘⇧.` show or hide the kit
+  - `Esc` closes things in order: menu, composer, command menu, current mode, ticket, sheet
+- **Tokens:** take every colour, radius, shadow, type size and easing from the prototype's `:root`
+  block. Font: Geist / Geist Mono. Respect `prefers-reduced-motion`, `prefers-reduced-transparency`
+  and `prefers-contrast`.
+
+## 8. Storage and the file format (v1: files)
+
+**Sessions:** one folder per review session, created on the first save.
+
+```
+reviews/<YYYY-MM-DD>_<session-slug>/
+  session.md                     # title, reviewer, branch, sha, env, started, entry index
+  entries/<NNN>-<title-slug>.md  # one per entry
+  assets/<NNN>-<viewport>.png    # element crop;  <NNN>-<viewport>-full.png = viewport
+```
+
+- **In dev, entries are written straight away** through `createProompterRoute()`.
+  - It only exists when `NODE_ENV=development` and `enabled`.
+  - It writes only inside `<repo>/reviews/`, so path traversal is refused.
+  - It doesn't use git; the developer commits the files.
+- **The client also keeps everything in IndexedDB.** If the route is unavailable (preview or prod),
+  entries stay local until published (v2).
+
+**Entry file:**
+
+```markdown
+---
+id: PRO-5
+session: 2026-10-10_manual-test-pass
+status: open            # open | progress | resolved
+intent: fix             # fix | change | question | approve
+priority: important     # blocking | important | minor
+viewport: mobile 390x844
+route: /feeds
+source: src/app/(app)/feeds/_components/post-card.tsx:48:7
+source_inherited: true
+selector: '[data-src="…post-card.tsx:48:7"] > div:nth-of-type(1) > div:nth-of-type(1)'
+component: FeedPage › FeedList › PostCard › PostHeader › Avatar
+task: T-feed-home       # from a plugin, else omitted
+test_plan: §2 Feed and posts
+tags: [ui]
+issue: null
+created: 2026-10-10T12:42:07Z
+---
+
+# Avatar is cropped on mobile
+
+Description as written.
+
+## Context
+- Console: 2 lines, 1 error
+  - error GET /api/v1/feeds/trending 500
+- Network: 1 failed of 4
+  - GET /api/v1/feeds/trending → 500 (911 ms)
+- Build: migrate/main@611df0b
+
+![mobile](../assets/005-mobile.png)
+```
+
+- The format is **stable and versioned** (`proompter: 1` in `session.md`).
+- "Copy for agent" copies exactly this text.
+
+## 9. Plugins (host-side, nothing host-specific in the package)
+
+```ts
+<Proompter plugins={[gamoriteTasks()]} />
+type ProompterPlugin = {
+  name: string;
+  taskFor?(t: { source?: string; route: string }): string | null;  // e.g. route → T-*.md
+  context?(): Record<string, unknown>;                                // extra frontmatter fields
+  testPlan?: string[];                                                // sections for the Test plan menu
+  redact?(entry: Entry): Entry;
+};
+```
+
+Gamorite's plugin lives in Gamorite's own repo. It maps routes to tasks using the `routes:` field in
+the frontmatter of `migration/_tasks/T-*.md`.
+
+## 10. Roadmap
+
+- **v1 (this spec):** everything in §3–§9, with the files sink and the playground.
+- **v2:**
+  - IndexedDB sync to a `reviews` branch through the GitHub Contents API
+  - issues opened and synced both ways (status, close on resolve), via `./github` with a
+    server-only token
+  - preview-build support
+  - the Gamorite plugin
+- **v3:**
+  - the `proompter` CLI: `list`, `show`, `task`, `resolve`, `import`
+  - an MCP server, so agents can list, reply and resolve
+  - npm publishing through CI with provenance
+
+## 11. Acceptance (v1)
+
+1. With the flag unset, `next build` output is identical in route table and size, and no
+   `data-src` appears in the HTML.
+2. In the playground in dev: picking the avatar inside the post card writes
+   `reviews/<session>/entries/001-*.md` with the right `source`, `source_inherited`, `selector` and a
+   PNG.
+3. The same flow works on Mobile and Tablet viewports, and the pin shows only on that viewport.
+4. Host CSS can't change the kit, and the kit's CSS can't change the host. A Playwright visual test
+   proves both.
+5. axe is clean on the kit UI. Everything works keyboard-only. Reduced-motion is respected.
+6. Unit tests cover:
+   - the resolver
+   - the selector's uniqueness
+   - redaction
+   - serializer round-trips (parse(serialize(e)) == e)
+   - the loader's output on fixture files, including source maps
