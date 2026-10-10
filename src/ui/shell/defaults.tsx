@@ -14,7 +14,7 @@ const HYDRATE_WAIT_MS = 2000;
 
 /**
  * T07's store as the root's `EntryStore`: same data, `update`/`resolve` fire and forget.
- * INTEGRATION(T09): with a files sink, `pending` is the sink's list and `write` flushes it; without one
+ * With a files sink, `pending` is the sink's list and `write` flushes it; without one
  * nothing is pending and `write` is absent (the Publish button stays disabled).
  */
 export function adaptStore(store: CoreStore, sink?: FilesSink): EntryStore {
