@@ -10,9 +10,8 @@ export interface SegmentedItem<V extends string> {
   icon?: ReactNode;
   /** Trailing count, text variant only. */
   count?: ReactNode;
-  /** Tooltip content. Icon-only items usually want one. */
+  /** Tooltip content (needs a `<TooltipProvider>` above). Icon-only items usually want one. */
   tooltip?: ReactNode;
-  disabled?: boolean;
 }
 
 export interface SegmentedProps<V extends string> {
@@ -44,19 +43,12 @@ export function Segmented<V extends string>({
   className,
 }: SegmentedProps<V>) {
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
-  const enabled = items.map((it, i) => (it.disabled ? -1 : i)).filter((i) => i >= 0);
 
   function move(from: number, delta: number | "first" | "last") {
-    if (enabled.length === 0) return;
-    let next: number | undefined;
-    if (delta === "first") next = enabled[0];
-    else if (delta === "last") next = enabled[enabled.length - 1];
-    else {
-      const pos = enabled.indexOf(from);
-      next = enabled[(pos + delta + enabled.length) % enabled.length];
-    }
-    const item = next === undefined ? undefined : items[next];
-    if (next === undefined || !item) return;
+    const n = items.length;
+    const next = delta === "first" ? 0 : delta === "last" ? n - 1 : (from + delta + n) % n;
+    const item = items[next];
+    if (!item) return;
     onValueChange(item.value);
     refs.current[next]?.focus();
   }
@@ -74,9 +66,8 @@ export function Segmented<V extends string>({
     if (handled) e.preventDefault();
   }
 
-  const selectedIndex = items.findIndex((it) => it.value === value);
-  // Roving tabindex: the selected item, or the first enabled one if nothing is selected.
-  const tabStop = selectedIndex >= 0 && !items[selectedIndex]?.disabled ? selectedIndex : enabled[0];
+  // Roving tabindex: the selected item, or the first one if nothing is selected.
+  const tabStop = Math.max(0, items.findIndex((it) => it.value === value));
 
   return (
     <div
@@ -97,12 +88,9 @@ export function Segmented<V extends string>({
             role="radio"
             aria-checked={on}
             aria-label={variant === "icon" ? it.label : undefined}
-            aria-disabled={it.disabled || undefined}
             tabIndex={i === tabStop ? 0 : -1}
             className={cx(variant === "icon" ? "ib" : "seg-t", on && "on")}
-            onClick={() => {
-              if (!it.disabled) onValueChange(it.value);
-            }}
+            onClick={() => onValueChange(it.value)}
             onKeyDown={(e) => onKeyDown(e, i)}
           >
             {it.icon}
