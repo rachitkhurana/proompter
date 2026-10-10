@@ -1,65 +1,62 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
-import { DesktopIcon, MobileIcon, ResponsiveIcon, TabletIcon } from "../icons";
+import { Icon } from "../icons";
 import { Segmented } from "./segmented";
 import { expect, userEvent, waitFor, within } from "storybook/test";
 import { Row, Stack, shadowOf } from "./story-frame";
+import { TooltipProvider } from "./tooltip";
 
 const meta: Meta = { title: "Primitives/Segmented", component: Segmented };
 export default meta;
 type Story = StoryObj;
 
 const viewports = [
-  { value: "responsive", label: "Responsive", icon: <ResponsiveIcon />, tooltip: "Responsive  1" },
-  { value: "desktop", label: "Desktop", icon: <DesktopIcon />, tooltip: "Desktop  2" },
-  { value: "tablet", label: "Tablet", icon: <TabletIcon />, tooltip: "Tablet  3" },
-  { value: "mobile", label: "Mobile", icon: <MobileIcon />, tooltip: "Mobile  4", disabled: false },
+  { value: "responsive", label: "Responsive", icon: <Icon name="responsive" />, tooltip: "Responsive  1" },
+  { value: "desktop", label: "Desktop", icon: <Icon name="desktop" />, tooltip: "Desktop  2" },
+  { value: "tablet", label: "Tablet", icon: <Icon name="tablet" />, tooltip: "Tablet  3" },
+  { value: "mobile", label: "Mobile", icon: <Icon name="mobile" />, tooltip: "Mobile  4" },
 ] as const;
 
 function Demo() {
   const [vp, setVp] = useState<string>("responsive");
   const [tab, setTab] = useState<string>("entries");
   return (
-    <Stack>
-      <Row>
-        <Segmented
-          label="Viewport"
-          items={viewports}
-          value={vp}
-          onValueChange={setVp}
-          tooltipSide="top"
-        />
-        <Segmented
-          label="Viewport (vertical)"
-          orientation="vertical"
-          items={viewports}
-          value={vp}
-          onValueChange={setVp}
-          tooltipSide="right"
-        />
-        <Segmented
-          label="Viewport (one disabled)"
-          items={viewports.map((v) => (v.value === "tablet" ? { ...v, disabled: true } : v))}
-          value={vp}
-          onValueChange={setVp}
-        />
-      </Row>
-      <div style={{ width: 300 }}>
-        <Segmented
-          label="Sheet"
-          variant="text"
-          items={[
-            { value: "entries", label: "Entries", count: 4 },
-            { value: "publish", label: "Publish" },
-          ]}
-          value={tab}
-          onValueChange={setTab}
-        />
-      </div>
-      <div style={{ font: "12px var(--sans)", color: "var(--fg-3)" }}>
-        Tab to the group, then use the arrow keys. Home and End jump to the ends.
-      </div>
-    </Stack>
+    <TooltipProvider>
+      <Stack>
+        <Row>
+          <Segmented
+            label="Viewport"
+            items={viewports}
+            value={vp}
+            onValueChange={setVp}
+            tooltipSide="top"
+          />
+          <Segmented
+            label="Viewport (vertical)"
+            orientation="vertical"
+            items={viewports}
+            value={vp}
+            onValueChange={setVp}
+            tooltipSide="right"
+          />
+        </Row>
+        <div style={{ width: 300 }}>
+          <Segmented
+            label="Sheet"
+            variant="text"
+            items={[
+              { value: "entries", label: "Entries", count: 4 },
+              { value: "publish", label: "Publish" },
+            ]}
+            value={tab}
+            onValueChange={setTab}
+          />
+        </div>
+        <div style={{ font: "12px var(--sans)", color: "var(--fg-3)" }}>
+          Tab to the group, then use the arrow keys. Home and End jump to the ends.
+        </div>
+      </Stack>
+    </TooltipProvider>
   );
 }
 
