@@ -18,6 +18,7 @@ beforeEach(() => {
   page = mountMockPage();
   surface = createPageSurface(window);
   toast.clear();
+  vi.stubGlobal("matchMedia", () => ({ matches: true })); // reduced motion: the exit animation takes no time
 });
 afterEach(async () => {
   await m?.unmount();
@@ -25,6 +26,7 @@ afterEach(async () => {
   page.dispose();
   toast.clear();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 const sleep = (ms: number) => act(async () => void (await new Promise((r) => setTimeout(r, ms))));
@@ -74,7 +76,6 @@ async function open(setup: Setup = {}) {
         capture={capture}
         store={store}
         plugins={setup.plugins}
-        exitMs={0}
         onClose={(r) => results.push(r)}
         {...setup.props}
       />
@@ -196,7 +197,7 @@ describe("<Composer> title validation", () => {
 });
 
 describe("<Composer> saving with ⌘↵", () => {
-  it("files the entry with everything the composer knows, and toasts", async () => {
+  it("files the entry with everything the composer knows", async () => {
     const { store, results, events } = await open();
     await type(q("textarea")!, "  The crop cuts the top of the face.  ");
     await fileEntry();
@@ -232,7 +233,7 @@ describe("<Composer> saving with ⌘↵", () => {
 
     expect(events).toEqual([{ type: "entry:created", entry: e }]);
     expect(results).toEqual([{ type: "saved", entry: e }]);
-    expect(shadow().querySelector(".toast")?.textContent).toBe("PRO-1 saved on mobile · entries/001-avatar-is-cropped-on-mobile.md");
+    expect(shadow().querySelector(".toast")).toBeNull(); // the root toasts, not the composer
   });
 
   it("Ctrl+Enter works too, and from the description", async () => {
@@ -312,21 +313,18 @@ describe("<Composer> saving with ⌘↵", () => {
 });
 
 describe("<Composer> discarding", () => {
-  it("Esc discards", async () => {
-    const { store, results } = await open();
+  it("the root discards through the ref; Esc alone is the root's, not the composer's", async () => {
+    const ref = createRef<ComposerHandle>();
+    const { store, results } = await open({ props: { ref } });
     await type(q("input")!, "Half written");
     await key(q("input")!, "Escape");
+    await sleep(10);
+    expect(results).toEqual([]);
+    await act(async () => void ref.current!.discard());
     await sleep(10);
     expect(results).toEqual([{ type: "discarded" }]);
     expect(store.getState().entries).toHaveLength(0);
     expect(q(".pm-comp")?.classList.contains("on")).toBe(false); // leaving
-  });
-
-  it("Esc works from anywhere in the document, not only from the fields", async () => {
-    const { results } = await open();
-    await act(async () => void document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })));
-    await sleep(10);
-    expect(results).toEqual([{ type: "discarded" }]);
   });
 
   it("a click outside discards; a click inside does not", async () => {
@@ -353,20 +351,23 @@ describe("<Composer> discarding", () => {
   });
 
   it("closes once, however many ways are used", async () => {
-    const { results } = await open();
-    await key(q("input")!, "Escape");
+    const ref = createRef<ComposerHandle>();
+    const { results } = await open({ props: { ref } });
+    await act(async () => void ref.current!.discard());
     await click(button(/^cancel$/i));
     await sleep(10);
     expect(results).toHaveLength(1);
   });
 
   it("onClose waits for the exit animation", async () => {
-    const { results } = await open({ props: { exitMs: 80 } });
-    await key(q("input")!, "Escape");
+    vi.unstubAllGlobals(); // motion is reduced for every other test here
+    const ref = createRef<ComposerHandle>();
+    const { results } = await open({ props: { ref } });
+    await act(async () => void ref.current!.discard());
     expect(results).toEqual([]);
-    await sleep(20);
+    await sleep(60);
     expect(results).toEqual([]);
-    await sleep(120);
+    await sleep(200);
     expect(results).toEqual([{ type: "discarded" }]);
   });
 });
@@ -426,7 +427,7 @@ describe("<Composer> property menus", () => {
     expect(store.getState().entries[0]?.tags).toEqual(["data"]);
   });
 
-  it("Esc closes the open menu first and leaves the composer open", async () => {
+  it("Esc closes the open menu and leaves the composer open", async () => {
     const { results } = await open();
     await openMenu(/^Fix$/);
     expect(items().length).toBeGreaterThan(0);
@@ -434,9 +435,6 @@ describe("<Composer> property menus", () => {
     await settle();
     expect(items()).toHaveLength(0);
     expect(results).toEqual([]);
-    await key(q("input")!, "Escape"); // the next Esc discards
-    await sleep(10);
-    expect(results).toEqual([{ type: "discarded" }]);
   });
 
   it("a click on a menu item is not an outside click", async () => {
@@ -485,12 +483,6 @@ describe("<Composer> property menus", () => {
     expect(chip(/^Test plan$/)).toBeTruthy();
     await fileEntry();
     expect(store.getState().entries[0]?.testPlan).toBeUndefined();
-  });
-
-  it("custom tag choices", async () => {
-    await open({ props: { tags: ["alpha", "beta"] } });
-    await openMenu(/^Tags$/);
-    expect(items().map((i) => i.textContent)).toEqual(["alpha", "beta"]);
   });
 });
 
@@ -547,35 +539,6 @@ describe("<Composer> context block", () => {
   it("uses singular for one", async () => {
     await open({ capture: createStubCapture({ context: { console: [createStubCapture().context().console[0]!], network: [] } }) });
     expect(q(".pm-ctx summary")?.textContent).toBe("Context attached: 1 console line, 0 requests, 0 failed");
-  });
-});
-
-describe("<Composer> integration props", () => {
-  it("handleEscape={false}: Esc is left to the root, which discards through the ref", async () => {
-    const ref = createRef<ComposerHandle>();
-    const { results } = await open({ props: { handleEscape: false, ref } });
-    await key(q("input")!, "Escape");
-    await sleep(10);
-    expect(results).toEqual([]);
-    await act(async () => void ref.current!.discard());
-    await sleep(10);
-    expect(results).toEqual([{ type: "discarded" }]);
-  });
-
-  it("handleEscape defaults to true", async () => {
-    const { results } = await open();
-    await key(q("input")!, "Escape");
-    await sleep(10);
-    expect(results).toEqual([{ type: "discarded" }]);
-  });
-
-  it("toast={false}: saves and reports through onClose without a toast", async () => {
-    const { store, results } = await open({ props: { toast: false } });
-    await fileEntry();
-    expect(store.getState().entries).toHaveLength(1);
-    expect(results).toHaveLength(1);
-    expect(results[0]).toMatchObject({ type: "saved" });
-    expect(shadow().querySelector(".toast")).toBeNull();
   });
 });
 
