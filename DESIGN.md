@@ -87,7 +87,7 @@ examples/playground/    → Next 16 app with a Gamorite-like mock page (the prot
   private in Next). The client's `endpoint` is configurable and defaults to `/api/proompter`.
 - **D7. Contrast beats the prototype (2026-10-10):** WCAG AA is the floor (§11.5). The prototype's
   `--fg-3` (#71717a, about 3.7:1) and white-on-coral primary button (about 2.9:1) fail axe, so:
-  - `--fg-3` is #8f8f98;
+  - `--fg-3` is #9a9aa3, which passes on every surface including the `--fill-3` hover fill;
   - text that used `--fg-4` now uses `--fg-3`, and `--fg-4` is only for decorative strokes and dots;
   - the ticket's section headings are `h3` (heading order);
   - **Primary buttons, final (Rachit):** white text (`--acc-fg: #fff`) on a deeper coral,

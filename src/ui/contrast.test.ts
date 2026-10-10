@@ -47,6 +47,7 @@ describe("colour tokens meet WCAG AA (4.5:1)", () => {
     "mat-1 over canvas": mat1,
     "mat-2 over canvas": mat2,
     "fill-2 over mat-1": over(token("fill-2"), mat1),
+    "fill-3 (hover) over mat-2": over(token("fill-3"), mat2),
   };
 
   for (const text of ["fg", "fg-2", "fg-3"]) {
