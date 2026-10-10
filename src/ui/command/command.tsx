@@ -92,9 +92,9 @@ export function Command({ open, onOpenChange, items, defaultQuery = "", animated
                     e.preventDefault();
                     e.currentTarget.querySelector<HTMLElement>("input")?.focus({ preventScroll: true });
                   } else if (e.key === "Escape") {
-                    // Mark it handled: the state update flushes before the event reaches the root's document
+                    // Stop it here: the state update flushes before the event would reach the root's document
                     // listener, which would otherwise see "menu closed" and go on to leave the pick mode too.
-                    e.preventDefault();
+                    e.stopPropagation();
                     onOpenChange(false);
                   }
                 }}
