@@ -41,7 +41,7 @@ export const DOCK_CSS = /* css */ `
 .pp .dock.v .seg{flex-direction:column}
 .pp .dock.v .nm-w{display:none}
 .pp .dock.v .brand{height:30px;padding:0;width:30px;justify-content:center}
-.pp .dock.v .lbadge{position:absolute;top:-4px;right:-6px;margin:0;min-width:16px;height:16px;padding:0 4px;background:var(--acc);color:#fff;font-size:9.5px;line-height:16px;box-shadow:0 0 0 2px #1d1d21}
+.pp .dock.v .lbadge{position:absolute;top:-4px;right:-6px;margin:0;min-width:16px;height:16px;padding:0 4px;background:var(--acc);color:var(--acc-fg);font-size:9.5px;line-height:16px;box-shadow:0 0 0 2px #1d1d21}
 .pp .dock.v .grip{width:30px;height:16px}
 .pp .dock.v .grip svg{rotate:90deg}
 @media (max-width:760px){
