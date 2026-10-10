@@ -42,6 +42,7 @@ function page() {
 }
 
 const pin = (over: Partial<PinModel> & Pick<PinModel, "id">): PinModel => ({
+  ref: `PRO-${over.id}`,
   title: "Avatar is cropped",
   priority: "important",
   status: "open",
