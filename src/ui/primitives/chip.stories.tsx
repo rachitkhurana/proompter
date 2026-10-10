@@ -42,7 +42,7 @@ export const KbdKeys: Story = {
     <Row>
       <Kbd>P</Kbd>
       <Kbd>⌘</Kbd>
-      <Kbd>⌘K</Kbd>
+      <Kbd>⌘⇧K</Kbd>
       <Kbd>Esc</Kbd>
     </Row>
   ),
