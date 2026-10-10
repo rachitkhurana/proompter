@@ -15,22 +15,6 @@ import type {
   CaptureQuery,
 } from "./types.ts";
 
-export type {
-  Capture,
-  CaptureConsoleEntry,
-  CaptureContext,
-  CaptureEntry,
-  CaptureInternalError,
-  CaptureNetworkEntry,
-  CaptureOptions,
-  CaptureQuery,
-  Rect,
-  SnapshotResult,
-  Surface,
-} from "./types.ts";
-export { REDACTED, excerpt, redactHeaders, redactString, redactText, redactUrl } from "./redact.ts";
-export { RING_CAP } from "./ring.ts";
-
 function redactConsole(e: CaptureConsoleEntry): CaptureConsoleEntry {
   return {
     ...e,
@@ -100,9 +84,6 @@ export function createCapture(opts: CaptureOptions): Capture {
   ];
 
   return {
-    get enabled() {
-      return enabled;
-    },
     enable() {
       if (enabled) return;
       try {
@@ -137,10 +118,6 @@ export function createCapture(opts: CaptureOptions): Capture {
         queries,
         internalErrors: errorRing.toArray(),
       };
-    },
-    clear() {
-      consoleRing.clear();
-      networkRing.clear();
     },
     snapshot: (surface, el) => takeSnapshot(surface, el, fail),
   };
