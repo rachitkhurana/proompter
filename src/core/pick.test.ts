@@ -672,15 +672,24 @@ describe("Escape", () => {
     }
   });
 
-  it("leaves it to the app while the composer is open, or when it came from the kit's UI", () => {
+  it("leaves it to the kit's UI when it came from there", () => {
     setup();
+    engine!.setMode("pick");
+    key($("proompter-root"), "Escape");
+    expect(engine!.mode).toBe("pick");
+  });
+
+  it("while busy (composer open or exiting) goes to the ladder, never to the app", () => {
+    const forwardKey = vi.fn();
+    const host = vi.fn();
+    setup({ escapeExits: false, forwardKey });
+    window.addEventListener("keydown", host);
     engine!.setMode("pick");
     engine!.setBusy(true);
     key(document.body, "Escape");
-    expect(engine!.mode).toBe("pick");
-    engine!.setBusy(false);
-    key($("proompter-root"), "Escape");
-    expect(engine!.mode).toBe("pick");
+    expect(forwardKey).toHaveBeenCalledOnce();
+    expect(host).not.toHaveBeenCalled();
+    window.removeEventListener("keydown", host);
   });
 
   it("can be turned off for a central Esc handler", () => {
