@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
+import { withProompter } from "@rachitkay/proompter/next";
 
-// T10 wires withProompter() here.
-const nextConfig: NextConfig = {};
+const enabled = process.env.NEXT_PUBLIC_PROOMPTER === "true";
 
-export default nextConfig;
+const nextConfig: NextConfig = {
+  // The e2e production check (DESIGN 11.1) builds into its own folder, so it never fights the dev server.
+  distDir: process.env.PLAYGROUND_DIST_DIR || ".next",
+};
+
+export default withProompter(nextConfig, { enabled });
