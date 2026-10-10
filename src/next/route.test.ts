@@ -472,3 +472,68 @@ describe("assets and reads", () => {
     expect(r.sessions[0]?.entries.map((e) => e.path)).toEqual(["entries/005-avatar-is-cropped-on-mobile.md"]);
   });
 });
+
+describe("round 3: scopes, env hosts, context summary, locked reads", () => {
+  const lanReq = (init: RequestInit = {}) =>
+    new Request("http://192.168.1.20:3000/api/proompter", {
+      ...init,
+      headers: { "content-type": "application/json", "x-proompter": "1" },
+    });
+
+  it("PROOMPTER_ALLOWED_HOSTS lets a LAN host through (comma-separated, spaces ignored)", async () => {
+    expect((await route.GET(lanReq())).status).toBe(403);
+    expect((await route.POST(lanReq({ method: "POST", body: body() }))).status).toBe(403);
+    vi.stubEnv("PROOMPTER_ALLOWED_HOSTS", "other.test, 192.168.1.20 ,");
+    expect((await route.GET(lanReq())).status).toBe(200);
+    expect((await route.POST(lanReq({ method: "POST", body: body() }))).status).toBe(200);
+    vi.stubEnv("PROOMPTER_ALLOWED_HOSTS", "");
+    expect((await route.GET(lanReq())).status).toBe(403);
+  });
+
+  it("error bodies say whether the whole request or only the entry was refused", async () => {
+    const scope = async (r: Response) => ((await r.json()) as { scope: string }).scope;
+    expect(await scope(await route.GET(lanReq()))).toBe("request"); // 403
+    expect(await scope(await post(body(), { "content-type": "text/plain" }))).toBe("request"); // 415
+    expect(await scope(await post({ session: { id: "x" }, entry: makeEntry() }))).toBe("request"); // bad session
+    expect(await scope(await post("{nope"))).toBe("request");
+    expect(await scope(await post({ session: makeSession(), entry: { ...makeEntry(), kind: "pin" } }))).toBe("entry"); // 400
+    expect(await scope(await post("x".repeat(MAX_BODY_BYTES + 1)))).toBe("entry"); // 413: the sink sends one entry per request, so this entry alone is too big
+  });
+
+  it("keeps context.summary (an entry adopted from a file) so a re-post does not wipe the Context lines", async () => {
+    const e = makeEntry();
+    const adopted = parse(serialize(e)); // empty arrays + summary
+    expect(adopted.context.summary?.consoleLines).toBe(2);
+    const res = await post({ session: makeSession(), entry: { ...adopted, status: "progress" } });
+    expect(res.status).toBe(200);
+    const md = await fs.readFile(path.join(reviews(), "entries", "005-avatar-is-cropped-on-mobile.md"), "utf8");
+    expect(md).toContain("- Console: 2 lines, 1 error");
+    expect(md).toContain("status: progress");
+  });
+
+  it.each([
+    ["not an object", "x"],
+    ["negative count", { consoleLines: -1, consoleErrors: 0, consoleItems: [], networkTotal: 0, networkFailed: 0, networkItems: [] }],
+    ["string count", { consoleLines: "2", consoleErrors: 0, consoleItems: [], networkTotal: 0, networkFailed: 0, networkItems: [] }],
+    ["items not strings", { consoleLines: 1, consoleErrors: 0, consoleItems: [1], networkTotal: 0, networkFailed: 0, networkItems: [] }],
+    ["missing field", { consoleLines: 1 }],
+  ])("rejects a bad context.summary: %s", async (_n, summary) => {
+    const e = makeEntry();
+    const res = await post({ session: makeSession(), entry: { ...e, context: { ...e.context, summary } } });
+    expect(res.status).toBe(400);
+  });
+
+  it("GET runs under the session lock: it never sees both files of a concurrent rename", async () => {
+    for (let round = 1; round <= 20; round++) {
+      const a = makeEntry({ id: `PRO-${round}`, n: round, title: `Name A ${round}` });
+      const [, , g] = await Promise.all([
+        post({ session: makeSession(), entry: a }),
+        post({ session: makeSession(), entry: { ...a, title: `Name B ${round}` } }),
+        get(),
+      ]);
+      const seen = (await g.json()) as { sessions: { entries: { entry: { n: number } }[] }[] };
+      const files = seen.sessions[0]?.entries.filter((x) => x.entry.n === round) ?? [];
+      expect(files.length).toBeLessThanOrEqual(1);
+    }
+  });
+});
