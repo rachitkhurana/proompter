@@ -11,6 +11,9 @@ importers:
       '@babel/parser':
         specifier: 8.0.7
         version: 8.0.7
+      '@jridgewell/remapping':
+        specifier: 2.3.5
+        version: 2.3.5
       bippy:
         specifier: 0.7.3
         version: 0.7.3(@types/react@19.3.0)(react@19.3.0)
@@ -24,6 +27,9 @@ importers:
       '@eslint/js':
         specifier: 10.0.1
         version: 10.0.1(eslint@10.12.0(jiti@2.7.0))
+      '@jridgewell/trace-mapping':
+        specifier: 0.3.31
+        version: 0.3.31
       '@playwright/test':
         specifier: 1.64.0
         version: 1.64.0
