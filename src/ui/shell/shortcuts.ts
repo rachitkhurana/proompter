@@ -4,9 +4,12 @@
  * to keys forwarded from the viewport iframe (PickEngine `forwardKey`).
  */
 import type { PickMode } from "../../core/pick";
+import { eventElement } from "../../core/resolve";
 import type { ViewportId } from "../../core/surface";
 import { VIEWPORT_ORDER } from "../../core/surface";
-import { isTypingTarget } from "./chord";
+
+/** Same selector as the pick engine's own typing check (`core/pick`, not exported). */
+const TYPING = "input,textarea,select,[contenteditable]";
 
 export interface KeyState {
   /** A dropdown menu is open (it closes itself when it saw the key; see `closeMenu`). */
@@ -34,26 +37,18 @@ export interface KeyActions {
   toggleSheet(): void;
 }
 
-export type EscapeStep = "menu" | "composer" | "command" | "mode" | "ticket" | "sheet";
-
-/** Esc closes one thing: menu, composer, command menu, current mode, ticket, sheet. */
-export function escapeStep(s: KeyState): EscapeStep | null {
-  if (s.menuOpen) return "menu";
-  if (s.composerOpen) return "composer";
-  if (s.commandOpen) return "command";
-  if (s.mode !== "idle") return "mode";
-  if (s.sheetOpen && s.ticketOpen) return "ticket";
-  if (s.sheetOpen) return "sheet";
-  return null;
-}
-
-const TOOL_KEYS: Record<string, Exclude<PickMode, "idle">> = {
-  p: "pick",
-  m: "multi",
-  b: "box",
-  t: "text",
-  n: "note",
-};
+/** Letter and number shortcuts, by lower-case key. */
+const SHORTCUTS = new Map<string, (a: KeyActions) => void>([
+  ["p", (a) => a.toggleTool("pick")],
+  ["m", (a) => a.toggleTool("multi")],
+  ["b", (a) => a.toggleTool("box")],
+  ["t", (a) => a.toggleTool("text")],
+  ["n", (a) => a.toggleTool("note")],
+  ["f", (a) => a.toggleFreeze()],
+  ["r", (a) => a.rotate()],
+  ["e", (a) => a.toggleSheet()],
+  ...VIEWPORT_ORDER.map((v, i): [string, (a: KeyActions) => void] => [String(i + 1), (a) => a.setViewport(v)]),
+]);
 
 /**
  * Handle one keydown. Returns true when the key was used (and its default prevented).
@@ -73,68 +68,36 @@ export function handleKeydown(ev: KeyboardEvent, state: KeyState, actions: KeyAc
     return true;
   }
 
+  // Esc closes one thing: menu, composer, command menu, current mode, ticket, sheet.
   if (key === "Escape") {
-    const step = escapeStep(state);
-    if (!step) return false;
+    const close: keyof KeyActions | null = state.menuOpen
+      ? "closeMenu"
+      : state.composerOpen
+        ? "closeComposer"
+        : state.commandOpen
+          ? "closeCommand"
+          : state.mode !== "idle"
+            ? "exitMode"
+            : state.sheetOpen
+              ? state.ticketOpen
+                ? "backToList"
+                : "closeSheet"
+              : null;
+    if (!close) return false;
     ev.preventDefault();
-    switch (step) {
-      case "menu":
-        actions.closeMenu();
-        break;
-      case "composer":
-        actions.closeComposer();
-        break;
-      case "command":
-        actions.closeCommand();
-        break;
-      case "mode":
-        actions.exitMode();
-        break;
-      case "ticket":
-        actions.backToList();
-        break;
-      case "sheet":
-        actions.closeSheet();
-        break;
-    }
+    actions[close]();
     return true;
   }
 
-  if (mod || ev.altKey || ev.repeat || isTypingTarget(ev)) return false;
+  if (mod || ev.altKey || ev.repeat || eventElement(ev)?.closest(TYPING)) return false;
   // The command menu, an open menu and the composer own the keyboard while they are open: only Esc and ⌘K
   // (above) and the toggle chord (handled elsewhere) act. Otherwise `e` in a menu would toggle the sheet,
   // and `p` on a composer chip would discard the draft.
   if (state.commandOpen || state.menuOpen || state.composerOpen) return false;
 
-  const k = key.toLowerCase();
-  const tool = TOOL_KEYS[k];
-  if (tool) {
-    ev.preventDefault();
-    actions.toggleTool(tool);
-    return true;
-  }
-  if (k === "f") {
-    ev.preventDefault();
-    actions.toggleFreeze();
-    return true;
-  }
-  if (k === "r") {
-    ev.preventDefault();
-    actions.rotate();
-    return true;
-  }
-  if (k === "e") {
-    ev.preventDefault();
-    actions.toggleSheet();
-    return true;
-  }
-  if (k >= "1" && k <= "4" && k.length === 1) {
-    const v = VIEWPORT_ORDER[Number(k) - 1];
-    if (v) {
-      ev.preventDefault();
-      actions.setViewport(v);
-      return true;
-    }
-  }
-  return false;
+  const run = SHORTCUTS.get(key.toLowerCase());
+  if (!run) return false;
+  ev.preventDefault();
+  run(actions);
+  return true;
 }
