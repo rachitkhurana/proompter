@@ -134,7 +134,7 @@ function PortalProbe() {
   const [report, setReport] = useState("Open the menu to check where it renders.");
   const check = (open: boolean) => {
     if (!open) return;
-    // Radix mounts the content on the next tick.
+    // The content mounts after the open state commits.
     setTimeout(() => {
       const el = container?.querySelector('[role="menu"]');
       const inLight = document.querySelector('[role="menu"]');
