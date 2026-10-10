@@ -4,22 +4,27 @@
  * on first open, so nothing here (fonts included) is in the entry chunk.
  */
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { createCapture, type Capture } from "../../core/capture";
+import { createCapture } from "../../core/capture";
+import type { Capture } from "../../core/capture/types";
 import type { Entry } from "../../core/entry";
 import { PickEngine, type PickCommit, type PickMode } from "../../core/pick";
 import { findBySelector } from "../../core/resolve";
 import type { PickSurface, ViewportId } from "../../core/surface";
 import { buildCommandItems } from "../command/items";
 import { Command } from "../command/command";
-import { Dock, DockedToaster, useDockPlacement, type DockTool } from "../dock";
+import { Dock, type DockTool } from "../dock/dock";
 import { loadCollapsed, saveCollapsed } from "../dock/dock-storage";
-import { Overlay, useFreeze, usePickSnapshot, type PinModel, type PulseRequest } from "../overlay";
+import { DockedToaster, useDockPlacement } from "../dock/placement";
+import { useFreeze, usePickSnapshot } from "../overlay/hooks";
+import { Overlay } from "../overlay/overlay";
+import type { PinModel } from "../overlay/pin-layout";
+import type { PulseRequest } from "../overlay/pins";
 import { toast } from "../primitives/toast";
 import type { ProompterDeps, ProompterProps } from "../proompter-deps";
 import { ShadowRoot, useShadowContainer } from "../shadow-root";
-import { Sheet, type SheetTab, type SheetTicketProps } from "../sheet";
+import { Sheet, type SheetTab, type SheetTicketProps } from "../sheet/sheet";
 import { DEFAULT_TAGS } from "../ticket/labels";
-import { ViewportStage } from "../viewports";
+import { ViewportStage } from "../viewports/viewport-stage";
 import { createDefaultDeps } from "./defaults";
 import type { DepsBox } from "./deps-box";
 import { isToggleChord } from "./chord";
