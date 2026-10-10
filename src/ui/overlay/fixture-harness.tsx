@@ -15,7 +15,7 @@ import { ViewportStage } from "../viewports";
 // The handful of kit tokens the overlay and stage use (the real kit gets these from `.pp` in styles.css).
 const TOKENS = `
 .pm-harness{--canvas:#09090b;--mat-1:rgba(30,30,34,.72);--blur-1:blur(20px) saturate(1.8);--edge:inset 0 1px 0 rgba(255,255,255,.07);
---fg:#f4f4f5;--fg-2:#a1a1aa;--fg-3:#8f8f98;--fg-4:#52525b;--acc:#ff6363;--acc-fg:#09090b;--acc-soft:rgba(255,99,99,.13);--acc-line:rgba(255,99,99,.4);
+--fg:#f4f4f5;--fg-2:#a1a1aa;--fg-3:#8f8f98;--fg-4:#52525b;--acc:#ff6363;--acc-solid:#d63c3c;--acc-fg:#fff;--acc-soft:rgba(255,99,99,.13);--acc-line:rgba(255,99,99,.4);
 --p-blocking:#ff5c5c;--sans:system-ui,sans-serif;--mono:ui-monospace,monospace;--ease:cubic-bezier(.23,1,.32,1);--ease-drawer:cubic-bezier(.32,.72,0,1);
 --sh-2:0 0 0 1px rgba(255,255,255,.12),0 16px 40px -8px rgba(0,0,0,.6);font:13px/20px var(--sans);color:var(--fg)}
 .pm-harness .mono{font-family:var(--mono)}
