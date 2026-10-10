@@ -11,6 +11,9 @@ export const HOST_TAG = "proompter-root";
 /** Interaction events that must not reach the host page's listeners once they leave our shadow root. */
 const SEALED = ["pointerdown", "pointerup", "mousedown", "mouseup", "click", "touchstart", "touchend", "touchmove", "wheel", "focusin", "focusout"];
 
+/** An app modal: the focus trap of these is what the kit must not trip. */
+const MODAL = '[aria-modal="true"],[role="dialog"],[role="alertdialog"]';
+
 const shielded = new WeakSet<Event>();
 
 /** True when `ev` was default-prevented only by the shield (an Esc inside the kit), not by a handler of ours. */
@@ -22,7 +25,7 @@ export function isShielded(ev: Event): boolean {
  * Keep the host app's modal machinery (Radix, Headless UI...) from treating the kit as "outside" (D11).
  * - Our interaction events stop at the host element, so document-level outside-click, focus-outside and
  *   scroll-lock listeners never see them. Our own document listeners are capture-phase or keydown, so they still run.
- * - Focus leaving an app dialog for the kit: its focusout is stopped, so a focus trap doesn't pull focus back.
+ * - Focus leaving an app dialog (`aria-modal` or `role="dialog"`) for the kit: its focusout is stopped, so a focus trap doesn't pull focus back.
  * - Esc inside the kit is default-prevented before the app's capture listeners, which skip handled events.
  * - A modal's `aria-hidden` on its siblings is taken off the host, so the kit stays visible to assistive tech.
  */
@@ -30,7 +33,10 @@ function shield(host: HTMLElement): () => void {
   const stop = (e: Event) => e.stopPropagation();
   const focusOut = (e: Event) => {
     const { target, relatedTarget } = e as FocusEvent;
-    if (relatedTarget === host && target !== host) e.stopPropagation();
+    if (relatedTarget !== host || target === host || !(target instanceof Element)) return;
+    // Only an app modal's focus trap needs this; plain app inputs keep their blur handlers. Radix dialogs carry
+    // role="dialog" without aria-modal (they hide siblings with aria-hidden instead), so match both.
+    if (target.closest(MODAL)) e.stopPropagation();
   };
   const key = (e: Event) => {
     const ev = e as KeyboardEvent;
