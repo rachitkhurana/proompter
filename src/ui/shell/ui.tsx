@@ -262,8 +262,8 @@ function Kit({ options, box, onToggleKit }: ShellProps) {
   });
   const keyActions: KeyActions = {
     closeMenu: () => {
-      // Radix closes its own menu on a real Esc (and marks it handled). This covers a key forwarded from a frame.
-      const menu = container?.querySelector('[role="menu"]');
+      // The menu closes itself on a real Esc (and marks it handled). This covers a key forwarded from a frame.
+      const menu = container?.querySelector('[role="menu"]:not([data-state="closed"])');
       menu?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true, composed: true }));
     },
     closeComposer: discardComposer,

@@ -1,13 +1,20 @@
-import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactElement, type ReactNode } from "react";
+import {
+  cloneElement,
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactElement,
+  type ReactNode,
+  type Ref,
+} from "react";
+import { createPortal } from "react-dom";
 import { CheckMarkIcon } from "../icons";
 import { useShadowContainer } from "../shadow-root";
-
-const bodyGuards = () => Array.from(document.body.children).filter((c) => c.hasAttribute("data-radix-focus-guard"));
-
-function enabledItems(content: HTMLElement): HTMLElement[] {
-  return Array.from(content.querySelectorAll<HTMLElement>('[role^="menuitem"]:not([data-disabled])'));
-}
 
 export interface MenuItem {
   /** Stable id, passed to `onSelect`. */
@@ -43,11 +50,93 @@ export interface MenuProps {
   label?: string;
 }
 
+type Side = NonNullable<MenuProps["side"]>;
+type Align = NonNullable<MenuProps["align"]>;
+
+const GAP = 6; // trigger to menu (prototype)
+const PAD = 8; // viewport edge (prototype)
+const EXIT_FALLBACK_MS = 250;
+const TYPEAHEAD_MS = 500;
+const OPPOSITE: Record<Side, Side> = { top: "bottom", bottom: "top", left: "right", right: "left" };
+
+const clamp = (n: number, lo: number, hi: number) => Math.min(Math.max(n, lo), Math.max(lo, hi));
+
+function enabledItems(menu: HTMLElement): HTMLElement[] {
+  return Array.from(menu.querySelectorAll<HTMLElement>('[role^="menuitem"]:not([data-disabled])'));
+}
+
 /**
- * Dropdown menu on `@radix-ui/react-dropdown-menu`, restyled to the prototype. Arrow keys move
- * (looping), type-ahead jumps, Enter/Space selects, Esc closes and returns focus to the trigger.
- * It scales in from the trigger (Radix exposes the transform origin) and portals into the shadow root.
- * Non-modal, so the host page keeps working (no scroll lock, no `pointer-events` on `body`).
+ * Position `menu` (fixed) next to `anchor`: on `side`, flipped to the opposite side when it would overflow the
+ * viewport and the opposite fits, clamped to the viewport edge. Sets `--menu-origin` so the scale-in grows out
+ * of the trigger (prototype: x at the trigger's aligned point, y at the edge nearest the trigger).
+ */
+function place(menu: HTMLElement, anchor: HTMLElement, side: Side, align: Align) {
+  const r = anchor.getBoundingClientRect();
+  // The viewport without scrollbars (`innerWidth` includes them).
+  const vw = document.documentElement.clientWidth;
+  const vh = document.documentElement.clientHeight;
+  if (!vw || !vh) return; // no layout (tests, detached): nothing to measure against
+  menu.style.maxHeight = "";
+  menu.style.overflowY = "";
+  const w = menu.offsetWidth;
+  let h = menu.offsetHeight;
+  const room: Record<Side, number> = {
+    bottom: vh - r.bottom - GAP - PAD,
+    top: r.top - GAP - PAD,
+    right: vw - r.right - GAP - PAD,
+    left: r.left - GAP - PAD,
+  };
+  const fits: Record<Side, boolean> = {
+    bottom: h <= room.bottom,
+    top: h <= room.top,
+    right: w <= room.right,
+    left: w <= room.left,
+  };
+  // Flip when the wanted side overflows and the opposite fits; when neither fits, take the roomier one.
+  const opp = OPPOSITE[side];
+  const s = fits[side] ? side : fits[opp] ? opp : room[opp] > room[side] ? opp : side;
+  // Taller than the space available: cap the height and scroll.
+  const cap = s === "top" || s === "bottom" ? room[s] : vh - 2 * PAD;
+  if (h > cap) {
+    menu.style.maxHeight = `${Math.max(cap, 0)}px`;
+    menu.style.overflowY = "auto";
+    h = menu.offsetHeight;
+  }
+  let left: number;
+  let top: number;
+  let ox: number | string;
+  let oy: number | string;
+  if (s === "top" || s === "bottom") {
+    top = s === "bottom" ? r.bottom + GAP : r.top - GAP - h;
+    const wanted = align === "start" ? r.left : align === "center" ? r.left + (r.width - w) / 2 : r.right - w;
+    left = clamp(wanted, PAD, vw - w - PAD);
+    const ref = align === "start" ? r.left + 12 : align === "center" ? r.left + r.width / 2 : r.right - 12;
+    ox = clamp(ref - left, 0, w);
+    oy = s === "bottom" ? "0" : "100%";
+  } else {
+    left = s === "right" ? r.right + GAP : r.left - GAP - w;
+    const wanted = align === "start" ? r.top : align === "center" ? r.top + (r.height - h) / 2 : r.bottom - h;
+    top = clamp(wanted, PAD, vh - h - PAD);
+    const ref = align === "start" ? r.top + 12 : align === "center" ? r.top + r.height / 2 : r.bottom - 12;
+    ox = s === "right" ? "0" : "100%";
+    oy = clamp(ref - top, 0, h);
+  }
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
+  menu.style.setProperty("--menu-origin", `${typeof ox === "number" ? `${ox}px` : ox} ${typeof oy === "number" ? `${oy}px` : oy}`);
+}
+
+function setRef<T>(ref: Ref<T> | undefined, value: T | null) {
+  if (typeof ref === "function") ref(value);
+  else if (ref) (ref as { current: T | null }).current = value;
+}
+
+/**
+ * Dropdown menu, hand-built to the prototype (no Radix: its menu inserts focus guards into the host body).
+ * Arrow keys move (looping), Home/End, type-ahead, Enter/Space select, Esc and Tab close and return focus to
+ * the trigger. It is positioned on `side` with a flip, scales in from the trigger (`--menu-origin`), and
+ * portals into the shadow root. Non-modal: no scroll lock, nothing touches the host document. The outside
+ * `pointerdown` listener exists only while the menu is open.
  */
 export function Menu({
   trigger,
@@ -63,150 +152,309 @@ export function Menu({
   label,
 }: MenuProps) {
   const container = useShadowContainer();
-  const contentRef = useRef<HTMLDivElement>(null);
+  const [openState, setOpenState] = useState(!!defaultOpen);
+  const isOpen = open ?? openState;
+  // Mounted while open and for the exit animation after.
+  const [present, setPresent] = useState(isOpen);
+  if (isOpen && !present) setPresent(true);
+  const [highlighted, setHighlighted] = useState<string | null>(null);
 
-  // Radix's MenuContent calls `useFocusGuards()` unconditionally, which appends two
-  // `<span data-radix-focus-guard tabindex="0">` to the HOST `document.body` (there is no prop to turn it off,
-  // and it ignores `container`). Non-modal menus have no use for them, and the kit must leave the host document
-  // untouched (DESIGN §1.2), so remove the ones this menu caused. If the host already had guards (its own
-  // Radix dialog), they are left alone.
-  const [isOpenState, setIsOpen] = useState(!!defaultOpen);
-  const isOpen = open ?? isOpenState;
-  const hadGuards = useRef(false);
-  useLayoutEffect(() => {
-    // Layout effects run before any passive effect of the commit, so before Radix inserts the guards.
-    if (isOpen) hadGuards.current = bodyGuards().length > 0;
-  }, [isOpen]);
-  useEffect(() => {
-    // Runs after the content's own effects (this component is its ancestor).
-    if (!isOpen || hadGuards.current) return;
-    bodyGuards().forEach((g) => g.remove());
-  }, [isOpen]);
-  const checkedKey = items.find((i) => i.checked)?.key ?? "";
+  const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
+  const typed = useRef({ text: "", timer: 0 });
+  const menuId = useId();
+  const autoTriggerId = useId();
 
-  const renderBody = (item: MenuItem) => (
-    <>
-      {item.icon}
-      <span>{item.label}</span>
-      {selection === "none" ? (
-        item.shortcut
-      ) : (
-        <DropdownMenu.ItemIndicator className="ck">
-          <CheckMarkIcon size="s" />
-        </DropdownMenu.ItemIndicator>
-      )}
-    </>
+  const triggerProps = trigger.props as {
+    id?: string;
+    ref?: Ref<HTMLElement>;
+    disabled?: boolean;
+    onPointerDown?: (e: ReactPointerEvent<HTMLElement>) => void;
+    onKeyDown?: (e: ReactKeyboardEvent<HTMLElement>) => void;
+  };
+  const triggerId = triggerProps.id ?? autoTriggerId;
+
+  const setOpen = useCallback(
+    (next: boolean) => {
+      if (open === undefined) setOpenState(next);
+      if (next !== isOpen) onOpenChange?.(next);
+    },
+    [open, isOpen, onOpenChange],
   );
 
-  const list = items.map((item) => {
-    if (selection === "multiple") {
-      return (
-        <DropdownMenu.CheckboxItem
-          key={item.key}
-          className="mi"
-          checked={!!item.checked}
-          disabled={item.disabled}
-          onSelect={(e) => {
-            e.preventDefault(); // keep the menu open for multi-select
-            onSelect(item.key);
-          }}
-        >
-          {renderBody(item)}
-        </DropdownMenu.CheckboxItem>
-      );
+  const setOpenRef = useRef(setOpen);
+  setOpenRef.current = setOpen;
+
+  const close = (returnFocus: boolean) => {
+    setOpen(false);
+    if (!returnFocus) return;
+    const t = triggerRef.current;
+    if (t?.isConnected) {
+      t.focus({ preventScroll: true });
+    } else if (container) {
+      // The trigger is gone: park focus on the kit's container (so on the shadow host), not the page body.
+      if (!container.hasAttribute("tabindex")) container.tabIndex = -1;
+      container.focus({ preventScroll: true });
     }
-    if (selection === "single") {
-      return (
-        <DropdownMenu.RadioItem
-          key={item.key}
-          className="mi"
-          value={item.key}
-          disabled={item.disabled}
-          onSelect={() => onSelect(item.key)}
-        >
-          {renderBody(item)}
-        </DropdownMenu.RadioItem>
-      );
+  };
+
+  // Place and focus the first item once the content is in the DOM (same commit as `isOpen`).
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    const menu = menuRef.current;
+    const anchor = triggerRef.current;
+    if (!menu) return;
+    if (anchor) place(menu, anchor, side, align);
+    // Prototype: item 0 is focused however the menu was opened.
+    (enabledItems(menu)[0] ?? menu).focus({ preventScroll: true });
+    setHighlighted(enabledItems(menu)[0]?.dataset.key ?? null);
+  }, [isOpen, side, align]);
+
+  // While open: keep it anchored, and dismiss on a pointerdown outside the menu and the trigger.
+  useEffect(() => {
+    if (!isOpen) return;
+    const reposition = () => {
+      const menu = menuRef.current;
+      const anchor = triggerRef.current;
+      if (menu && anchor) place(menu, anchor, side, align);
+    };
+    const outside = (ev: PointerEvent) => {
+      const path = ev.composedPath();
+      if ((menuRef.current && path.includes(menuRef.current)) || (triggerRef.current && path.includes(triggerRef.current)))
+        return;
+      setOpenRef.current(false);
+    };
+    // Scroll events do not cross the shadow boundary, so listen on the shadow root as well as the window.
+    const menuEl = menuRef.current;
+    const root = menuEl?.getRootNode();
+    const onRootScroll = (ev: Event) => {
+      if (menuEl && ev.target instanceof Node && menuEl.contains(ev.target)) return; // the menu's own scroll
+      reposition();
+    };
+    const ro = menuEl && typeof ResizeObserver !== "undefined" ? new ResizeObserver(reposition) : null;
+    if (menuEl) ro?.observe(menuEl);
+    document.addEventListener("pointerdown", outside, true);
+    window.addEventListener("resize", reposition);
+    window.addEventListener("scroll", reposition, true);
+    if (root && root !== document) root.addEventListener("scroll", onRootScroll, true);
+    return () => {
+      document.removeEventListener("pointerdown", outside, true);
+      window.removeEventListener("resize", reposition);
+      window.removeEventListener("scroll", reposition, true);
+      if (root && root !== document) root.removeEventListener("scroll", onRootScroll, true);
+      ro?.disconnect();
+    };
+  }, [isOpen, side, align]);
+
+  // Unmount after the exit animation (or at once when there is none, e.g. reduced motion or no CSS).
+  useEffect(() => {
+    if (isOpen || !present) return;
+    const el = menuRef.current;
+    const name = el ? getComputedStyle(el).animationName : "none";
+    if (!el || !name || name === "none") {
+      setPresent(false);
+      return;
     }
+    const done = () => setPresent(false);
+    const onEnd = (e: AnimationEvent) => {
+      if (e.target === el) done();
+    };
+    el.addEventListener("animationend", onEnd);
+    const t = window.setTimeout(done, EXIT_FALLBACK_MS);
+    return () => {
+      el.removeEventListener("animationend", onEnd);
+      window.clearTimeout(t);
+    };
+  }, [isOpen, present]);
+
+  useEffect(() => () => window.clearTimeout(typed.current.timer), []);
+
+  const choose = (item: MenuItem) => {
+    if (item.disabled) return;
+    onSelect(item.key);
+    if (selection !== "multiple") close(true);
+  };
+
+  const onMenuKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    const menu = e.currentTarget;
+    const { key } = e;
+    if (key === "Escape") {
+      e.preventDefault(); // handled: the shell's Esc ladder skips defaultPrevented keys
+      e.stopPropagation();
+      close(true);
+      return;
+    }
+    if (key === "Tab") {
+      // APG: close and focus the trigger, but let the default Tab run. The menu is portalled, so the browser
+      // then moves focus to the element after (Shift+Tab: before) the trigger instead of trapping the user.
+      e.stopPropagation();
+      close(true);
+      return;
+    }
+    const list = enabledItems(menu);
+    const active = (menu.getRootNode() as Document | ShadowRoot).activeElement;
+    const i = list.findIndex((el) => el === active);
+    const n = list.length;
+    if (key === "ArrowDown" || key === "ArrowUp" || key === "Home" || key === "End") {
+      e.preventDefault();
+      e.stopPropagation();
+      if (n === 0) return;
+      const next =
+        key === "Home"
+          ? 0
+          : key === "End"
+            ? n - 1
+            : key === "ArrowDown"
+              ? i < 0
+                ? 0
+                : (i + 1) % n
+              : i < 0
+                ? n - 1
+                : (i - 1 + n) % n;
+      list[next]?.focus({ preventScroll: true });
+      return;
+    }
+    if (key === "Enter" || (key === " " && !typed.current.text)) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.repeat) return; // holding the key must not select again
+      // The item the key was sent to wins over focus (a key event is addressed to its target).
+      const targetItem = (e.target as Element | null)?.closest?.<HTMLElement>('[role^="menuitem"]:not([data-disabled])');
+      const k = targetItem?.dataset.key ?? (i >= 0 ? list[i]?.dataset.key : undefined);
+      const item = items.find((it) => it.key === k);
+      if (item) choose(item);
+      return;
+    }
+    if (key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      // Type-ahead: a growing prefix, or the same letter repeated to cycle.
+      if (key === " ") {
+        // A space inside a type-ahead run (or one that finds nothing) must not scroll the host page.
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      const t = typed.current;
+      window.clearTimeout(t.timer);
+      t.text += key.toLowerCase();
+      t.timer = window.setTimeout(() => (t.text = ""), TYPEAHEAD_MS);
+      const labelOf = (el: HTMLElement) => items.find((it) => it.key === el.dataset.key)?.label.toLowerCase() ?? "";
+      const find = (): HTMLElement | undefined => {
+        const cycle = t.text.split("").every((c) => c === t.text[0]);
+        const needle = cycle ? t.text[0]! : t.text;
+        const from = cycle ? i + 1 : Math.max(i, 0);
+        for (let step = 0; step < n; step++) {
+          const el = list[(from + step) % n];
+          if (el && labelOf(el).startsWith(needle)) return el;
+        }
+        return undefined;
+      };
+      let hit = find();
+      if (!hit && t.text.length > 1) {
+        // The prefix went nowhere: start over with just this key.
+        t.text = key.toLowerCase();
+        hit = find();
+      }
+      if (hit) {
+        e.preventDefault();
+        e.stopPropagation();
+        hit.focus({ preventScroll: true });
+      }
+    }
+  };
+
+  const renderItem = (item: MenuItem) => {
+    const role = selection === "multiple" ? "menuitemcheckbox" : selection === "single" ? "menuitemradio" : "menuitem";
     return (
-      <DropdownMenu.Item
+      <div
         key={item.key}
         className="mi"
-        disabled={item.disabled}
-        onSelect={() => onSelect(item.key)}
+        role={role}
+        tabIndex={-1}
+        data-key={item.key}
+        aria-checked={selection === "none" ? undefined : !!item.checked}
+        aria-disabled={item.disabled || undefined}
+        data-disabled={item.disabled ? "" : undefined}
+        data-highlighted={highlighted === item.key ? "" : undefined}
+        onFocus={() => setHighlighted(item.key)}
+        onPointerMove={(e) => {
+          if (item.disabled) return;
+          const root = e.currentTarget.getRootNode() as Document | ShadowRoot;
+          if (root.activeElement !== e.currentTarget) e.currentTarget.focus({ preventScroll: true });
+        }}
+        onClick={() => choose(item)}
       >
-        {renderBody(item)}
-      </DropdownMenu.Item>
+        {item.icon}
+        <span>{item.label}</span>
+        {selection === "none" ? (
+          item.shortcut
+        ) : item.checked ? (
+          <span className="ck">
+            <CheckMarkIcon size="s" />
+          </span>
+        ) : null}
+      </div>
     );
+  };
+
+  const openFromTrigger = () => {
+    if (!isOpen) setOpen(true);
+  };
+
+  const triggerEl = cloneElement(trigger as ReactElement<Record<string, unknown>>, {
+    id: triggerId,
+    ref: (node: HTMLElement | null) => {
+      triggerRef.current = node;
+      setRef(triggerProps.ref, node);
+    },
+    "aria-haspopup": "menu",
+    "aria-expanded": isOpen,
+    "aria-controls": present ? menuId : undefined,
+    "data-state": isOpen ? "open" : "closed",
+    onPointerDown: (e: ReactPointerEvent<HTMLElement>) => {
+      triggerProps.onPointerDown?.(e);
+      if (e.defaultPrevented || triggerProps.disabled || e.button !== 0 || e.ctrlKey) return;
+      if (isOpen) {
+        setOpen(false);
+      } else {
+        e.preventDefault(); // keep focus where the menu puts it
+        setOpen(true);
+      }
+    },
+    onKeyDown: (e: ReactKeyboardEvent<HTMLElement>) => {
+      triggerProps.onKeyDown?.(e);
+      if (e.defaultPrevented || triggerProps.disabled) return;
+      if (e.key === "Enter" || e.key === " " || e.key === "ArrowDown") {
+        e.preventDefault();
+        if (e.repeat) return; // a held key must not reopen what the menu just closed
+        openFromTrigger();
+      }
+    },
   });
 
+  const portalTarget = container ?? (typeof document === "undefined" ? null : document.body);
+
   return (
-    <DropdownMenu.Root
-      modal={false}
-      open={open}
-      defaultOpen={defaultOpen}
-      onOpenChange={(o) => {
-        setIsOpen(o);
-        onOpenChange?.(o);
-      }}
-    >
-      <DropdownMenu.Trigger asChild>{trigger}</DropdownMenu.Trigger>
-      <DropdownMenu.Portal container={container}>
-        <DropdownMenu.Content
-          className="menu"
-          side={side}
-          align={align}
-          sideOffset={6}
-          collisionPadding={8}
-          loop
-          aria-label={label}
-          // Radix's roving focus compares `document.activeElement` before and after `focus()`. Inside a
-          // shadow root that is always the host, so it keeps going and lands on the LAST item. We move
-          // focus ourselves: initial focus here, arrows/Home/End below.
-          // (`onOpenAutoFocus` exists at runtime but DropdownMenu.Content's types omit it.)
-          {...{
-            onOpenAutoFocus: (e: Event) => {
-              e.preventDefault();
-              const el = contentRef.current;
-              el?.focus({ preventScroll: true });
-              // Prototype: item 0 is focused and highlighted however the menu was opened.
-              if (el) enabledItems(el)[0]?.focus({ preventScroll: true });
-            },
-          }}
-          ref={contentRef}
-          onKeyDownCapture={(e: KeyboardEvent<HTMLDivElement>) => {
-            const { key } = e;
-            if (key !== "ArrowDown" && key !== "ArrowUp" && key !== "Home" && key !== "End") return;
-            const list = enabledItems(e.currentTarget);
-            if (list.length === 0) return;
-            e.preventDefault();
-            e.stopPropagation();
-            const active = (e.currentTarget.getRootNode() as Document | ShadowRoot).activeElement;
-            const i = list.findIndex((el) => el === active);
-            const n = list.length;
-            const next =
-              key === "Home"
-                ? 0
-                : key === "End"
-                  ? n - 1
-                  : key === "ArrowDown"
-                    ? i < 0
-                      ? 0
-                      : (i + 1) % n
-                    : i < 0
-                      ? n - 1
-                      : (i - 1 + n) % n;
-            list[next]?.focus({ preventScroll: true });
-          }}
-        >
-          {header ? <DropdownMenu.Label className="mh">{header}</DropdownMenu.Label> : null}
-          {selection === "single" ? (
-            <DropdownMenu.RadioGroup value={checkedKey}>{list}</DropdownMenu.RadioGroup>
-          ) : (
-            list
-          )}
-        </DropdownMenu.Content>
-      </DropdownMenu.Portal>
-    </DropdownMenu.Root>
+    <>
+      {triggerEl}
+      {present && portalTarget
+        ? createPortal(
+            <div
+              ref={menuRef}
+              id={menuId}
+              className="menu"
+              role="menu"
+              tabIndex={-1}
+              aria-orientation="vertical"
+              aria-label={label}
+              aria-labelledby={label ? undefined : triggerId}
+              data-state={isOpen ? "open" : "closed"}
+              onKeyDown={onMenuKeyDown}
+            >
+              {header ? <div className="mh" role="presentation">{header}</div> : null}
+              {items.map(renderItem)}
+            </div>,
+            portalTarget,
+          )
+        : null}
+    </>
   );
 }
