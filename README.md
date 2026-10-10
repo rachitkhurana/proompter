@@ -193,6 +193,25 @@ Things to know before you turn it on:
   titles and bodies have `@` broken with a zero-width space, so a synced entry cannot ping people or teams;
   the files on the branch are unchanged.
 
+## CLI
+
+`proompter` works the `reviews/` folder from the terminal, with no UI. Run it in your repo (or pass `--dir <path>`).
+
+```sh
+npx proompter list --status open        # <ref>  <status>  <priority>  <title>  <source>
+npx proompter show PRO-5                # the entry markdown, as on disk (--json for the parsed entry)
+npx proompter task PRO-5                # an agent-ready task: source, selector, description, context, snapshots
+npx proompter resolve PRO-5 --note "Cropped the avatar" [--require-test]
+```
+
+- `list` takes `--status open|progress|resolved`, `--priority`, `--route <glob>`, `--session <id>` and `--json`.
+- `<ref>` is `<session>/PRO-n`, or `PRO-n` when only one session has it.
+- `resolve` sets `status: resolved`, writes the note under `## Resolution`, and rebuilds `session.md`.
+  `--require-test` refuses unless `test_plan` names a file (for example `e2e/feed.spec.ts`) that exists in the repo.
+- Exit codes: 0 ok, 1 not found, 2 usage or ambiguous ref.
+
+The agent loop: `list` -> `task` -> fix -> `resolve`.
+
 ## Shortcuts
 
 | Key | Does |
