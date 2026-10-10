@@ -40,11 +40,13 @@ src/
   index.ts              → `Proompter` component + types   (import "@rachitkay/proompter")
   next/index.ts         → withProompter(), createProompterRoute()  ("@rachitkay/proompter/next")
   next/loader.ts        → Turbopack/webpack loader that stamps data-src
+  vite/index.ts         → proompter() Vite plugin: stamps data-src, serves the dev route (D14) ("@rachitkay/proompter/vite")
   core/                 → framework-free engine: surface, resolver, capture, store, serializer
   ui/                   → React UI rendered into the shadow root
   ui/primitives/        → Button, IconButton, Chip, Menu, Tooltip, Kbd, Segmented, Sheet (all hand-built; no Radix — see D5)
   ui/styles.css         → Tailwind 4 source → compiled to a string at build time
 examples/playground/    → Next 16 app with a Gamorite-like mock page (the prototype's host markup)
+examples/vite/          → plain React app on Vite 8 with @vitejs/plugin-react (D14)
 ```
 
 - **Exports:** `.` (client), `./next` (server and config). `./github` and the `proompter` bin are v2/v3;
@@ -134,7 +136,21 @@ examples/playground/    → Next 16 app with a Gamorite-like mock page (the prot
   build had set the flag to `""`, which hid this. `withProompter` now defines the flag as `""` when it is
   unset. `scripts/e2e-servers.mjs` builds the 11.1 app with the variable removed, and that check failed before
   the fix.
-- **Peer dependencies:** `react >=19`, `react-dom >=19`, `next >=15.3` (optional, only for `./next`).
+- **D14. Plain React on Vite (2026-10-10, Rachit):** `@rachitkay/proompter/vite` exports `proompter()`, one Vite
+  plugin that does what `withProompter` and the route do in Next. It reuses the same stamping code and the same
+  route, so the guards and the file format are identical.
+  - The flag is `VITE_PROOMPTER`, from the shell or `.env*`, or `proompter({ enabled })`. The plugin defines
+    `import.meta.env.VITE_PROOMPTER` as `"true"` or `""` from that one decision.
+  - Stamping is a `pre` transform on the app's `.tsx`/`.jsx`, never node_modules.
+  - The route is mounted with `configureServer` at `/api/proompter`, on the dev server only.
+    `createProompterRoute` gained `enabled`, so the Vite plugin can skip the Next env check.
+  - The app renders `<Proompter />` through a `lazy` import inside the flag check.
+  - `vite` is an optional peer dependency (>=5). `examples/vite` is the standard template plus the plugin.
+    `e2e/vite.spec.ts` picks an element in dev and finds the file on disk with its source. It also checks that a
+    flag-unset build ships no kit, no stamps and no route.
+  - Other bundlers (webpack without Next, Parcel) aren't supported yet.
+- **Peer dependencies:** `react >=19`, `react-dom >=19`, `next >=15.3` (optional, only for `./next`), `vite >=5`
+  (optional, only for `./vite`, D14).
 - **Dependencies:**
   - `html-to-image` (snapshots)
   - `bippy` (dev owner stack, optional)
@@ -426,6 +442,6 @@ tasks yet.
    - serializer round-trips (parse(serialize(e)) == e)
    - the loader's output on fixture files, including source maps
 7. **Published exports are exact.** With `PROOMPTER_RELEASE=1`, `package.json` `exports` keys are exactly
-   `.`, `./next`, `./next/route` and the reserved `./github`. The test-only `./internal/fixtures` export
+   `.`, `./next`, `./next/route`, `./vite` (D14) and the reserved `./github`. The test-only `./internal/fixtures` export
    (used by the playground's `/fixtures/*` e2e routes) must be removed or gated out of the release build.
    A unit test asserts this, and it passes in CI.
