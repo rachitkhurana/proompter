@@ -8,7 +8,7 @@ import { shadowOf } from "../primitives/story-frame";
 import { BoxCatcher } from "./box-catcher";
 import { HoverBox, HoverLabel } from "./hover";
 import { MultiBar } from "./multi-bar";
-import { Overlay, OverlayStyles, SelectionBox } from "./overlay";
+import { Overlay, SelectionBox } from "./overlay";
 import type { PinModel } from "./pin-layout";
 import { createPlayed, PinMarker } from "./pins";
 
@@ -20,7 +20,6 @@ type Story = StoryObj;
 function Backdrop({ children, rect }: { children?: ReactNode; rect?: { left: number; top: number; width: number; height: number } }) {
   return (
     <>
-      <OverlayStyles />
       <div style={{ position: "fixed", inset: 0, background: "#18181b" }} />
       {rect ? (
         <div
