@@ -11,6 +11,7 @@ visual source of truth (open it in a browser, and read its CSS and JS for exact 
 | 1 | T02 ui-kit, T03 loader, T06 capture | Disjoint folders, can run in parallel |
 | 2 | T04 surface+pick, T05 dock | T04 needs T02; T05 needs T02 |
 | 3 | T07 composer+store, T08 sheet+ticket+cmd | Need T04 + T05 |
+| 3b | T02b hand-built Menu | After batch 3 merges; drops Radix (DESIGN §2 D5) |
 | 4 | T09 next route + files sink, T10 playground e2e + docs | Close-out |
 
 ## Rules for every task
