@@ -51,7 +51,9 @@ test("picks an avatar inside a card on Responsive", async ({ page }) => {
   const p = await picked(page);
   expect(p).toMatchObject({ kind: "element", viewport: "responsive", inherited: false, label: "img · avatar" });
   expect(p.source).toMatch(/pick\/page\.tsx:24:11$/);
-  expect(p.crumb).toBe("PickFixture › PostCard › Avatar › img · avatar");
+  // The playground now runs the loader (withProompter), which stamps the root layout's <body> with
+  // data-comp="RootLayout": the real chain starts there, like any app's would.
+  expect(p.crumb).toBe("RootLayout › PickFixture › PostCard › Avatar › img · avatar");
 
   // Two cards share every data-src, so the selector has to count: it must hit the second card's avatar, only.
   expect(p.selector).toContain("article:nth-of-type(2)");
