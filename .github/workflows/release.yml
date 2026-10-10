@@ -1,0 +1,42 @@
+name: Release
+
+# Push a tag `vX.Y.Z` that matches package.json. Publishing uses npm trusted publishing (OIDC): no NPM_TOKEN.
+# See RELEASING.md for the one-time setup.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24 # ships npm 11, which trusted publishing needs (>=11.5.1)
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - name: Tag matches package.json
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} does not match package.json version ${version}"
+            exit 1
+          fi
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
+      - name: Release exports
+        run: |
+          node scripts/release-exports.mjs strip
+          PROOMPTER_RELEASE=1 pnpm exec vitest run src/internal/exports.test.ts
+          node scripts/release-exports.mjs restore
+      # prepack builds without the private fixtures entry and strips it from exports; postpack restores.
+      - run: npm publish
