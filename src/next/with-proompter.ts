@@ -139,11 +139,15 @@ function applyProompter<C extends Obj>(config: C, options: WithProompterOptions,
 }
 
 /**
+ * Always defines `NEXT_PUBLIC_PROOMPTER` (as "" when unset) so the layout's flag check is a build-time constant.
  * Disabled: returns `config` itself (same reference). Enabled: returns a new config with the
  * stamping loader registered for Turbopack (`turbopack.rules`) and webpack (composed with any
  * existing `webpack` function). Function-style and async configs are supported.
  */
 export function withProompter<T extends object>(config: T, options: WithProompterOptions = {}): T {
+  // Next only inlines NEXT_PUBLIC_* variables that exist at build time. Unset, the flag check in the layout stays a
+  // runtime read, the dead branch survives, and the kit's client chunks ship. Defined as "", it folds away (D13).
+  process.env.NEXT_PUBLIC_PROOMPTER ??= "";
   if (options.enabled !== true) return config;
   const root = options.root ?? findRepoRoot(process.cwd()); // once per call
 
