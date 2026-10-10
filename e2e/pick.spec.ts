@@ -3,10 +3,9 @@ import { expect, test, type Page } from "@playwright/test";
 /**
  * T04: pick an avatar inside a card, on Responsive (the live page) and on Mobile (a scaled iframe).
  *
- * The playground has no mock page yet (T10 ports it), so this runs against T04's own fixture route,
- * `examples/playground/app/fixtures/pick/page.tsx`: two identical hand-stamped cards plus a small harness that
- * mounts the pick engine, overlay and viewport stage from the package source. When T08's root component lands,
- * switch the spec to the real kit and the real dock.
+ * This runs against T04's own fixture route, `examples/playground/app/fixtures/pick/page.tsx`: two identical
+ * hand-stamped cards plus a small harness that mounts the pick engine, overlay and viewport stage from the
+ * package source. It pins the engine on its own; the full kit on the real mock feed is covered by flow.spec.ts.
  */
 
 const FIXTURE = "/fixtures/pick";
