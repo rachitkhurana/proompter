@@ -430,7 +430,12 @@ export class PickEngine {
       ev.stopImmediatePropagation();
     };
     if (ev.key === "Escape") {
-      if (this.opts.escapeExits === false || this.snap.mode === "idle" || this.snap.busy) return this.forward(ev, from);
+      if (this.snap.mode === "idle" || this.snap.busy) return this.forward(ev, from);
+      if (this.opts.escapeExits === false) {
+        // The root owns Esc: hand it over here, so a host modal's document listener never sees it (D11).
+        ev.stopImmediatePropagation();
+        return this.opts.forwardKey?.(ev);
+      }
       consume();
       this.setMode("idle");
       return;
