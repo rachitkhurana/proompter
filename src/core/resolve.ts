@@ -136,7 +136,7 @@ const splitComp = (v: string) =>
 const lastComp = (v: string) => splitComp(v).pop() ?? v.trim();
 
 /** Component chain (outermost first) from the `data-comp` ancestors, then the element's own label if it is not a component root. */
-export function crumbPartsOf(el: Element): string[] {
+function crumbPartsOf(el: Element): string[] {
   const chain: string[] = [];
   for (let n: Element | null = el; n; n = n.parentElement) {
     const c = attr(n, "data-comp");
@@ -250,9 +250,6 @@ export interface ResolvedTarget extends TargetInfo {
   selector: string;
   /** Component chain down to the element, joined with ` › `. */
   crumb: string;
-  crumbParts: string[];
-  /** Reserved for the query-cache adapter. */
-  query?: string;
 }
 
 export function describeTarget(el: Element): TargetInfo {
@@ -260,9 +257,8 @@ export function describeTarget(el: Element): TargetInfo {
   return { el, source: a ? attr(a, "data-src") : null, inherited: !!a && a !== el, label: labelOf(el) };
 }
 
-/** `resolveTarget(el) -> { el, selector, source, inherited, label, crumb, query? }` (DESIGN §4). */
+/** `resolveTarget(el) -> { el, selector, source, inherited, label, crumb }` (DESIGN §4). */
 export function resolveTarget(target: Element): ResolvedTarget {
   const el = retarget(target);
-  const parts = crumbPartsOf(el);
-  return { ...describeTarget(el), selector: selectorFor(el), crumb: parts.join(" › "), crumbParts: parts };
+  return { ...describeTarget(el), selector: selectorFor(el), crumb: crumbPartsOf(el).join(" › ") };
 }
