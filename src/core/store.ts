@@ -56,6 +56,12 @@ export interface StoreOptions {
   /** IndexedDB database name. Default `proompter`. */
   dbName?: string;
   now?: () => Date;
+  /**
+   * T09: `create` waits for this (after `ready`) before it picks an entry number. The files sink passes its
+   * `hydrated` promise so numbers already on disk are adopted first. Errors are ignored; a hung promise is the
+   * caller's to time out.
+   */
+  beforeCreate?: () => Promise<unknown> | undefined;
 }
 
 export type Persistence = "pending" | "indexeddb" | "memory";
@@ -481,6 +487,7 @@ export function createStore(opts: StoreOptions): EntryStore {
 
     async create(draft, o = {}) {
       await ready;
+      await Promise.resolve(opts.beforeCreate?.()).catch(() => {});
       const plugins = o.plugins ?? opts.plugins;
       const created = isoSeconds(draft.created ?? now());
       const targets = draft.targets.length ? draft.targets : draft.target ? [draft.target] : [];
