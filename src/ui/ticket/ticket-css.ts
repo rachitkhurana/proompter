@@ -15,8 +15,8 @@ export const TICKET_CSS = /* css */ `
 .pp .pm-sheet .tk-title{margin:0;font:600 18px/26px var(--sans);letter-spacing:-.016em;text-wrap:balance}
 .pp .pm-sheet .tk-desc{margin:0;font:400 13.5px/22px var(--sans);color:var(--fg-2);max-width:62ch;white-space:pre-wrap}
 .pp .pm-sheet .tk-sec{padding:16px 20px;display:grid;gap:10px;box-shadow:inset 0 1px 0 var(--line)}
-.pp .pm-sheet .tk-sec>h4{margin:0;display:flex;align-items:center;gap:8px;font:500 12px/16px var(--sans);color:var(--fg-3)}
-.pp .pm-sheet .tk-sec>h4 .sp{flex:1}
+.pp .pm-sheet .tk-sec>h3{margin:0;display:flex;align-items:center;gap:8px;font:500 12px/16px var(--sans);color:var(--fg-3)}
+.pp .pm-sheet .tk-sec>h3 .sp{flex:1}
 .pp .pm-sheet .kv{display:grid;grid-template-columns:96px minmax(0,1fr);row-gap:2px;column-gap:12px;align-items:center;margin:0}
 .pp .pm-sheet .kv dt{font:400 12.5px/30px var(--sans);color:var(--fg-3)}
 .pp .pm-sheet .kv dd{margin:0;min-width:0;display:flex;flex-wrap:wrap;gap:4px;align-items:center}
@@ -49,12 +49,12 @@ export const TICKET_CSS = /* css */ `
 .pp .pm-sheet .log .e{color:var(--p-blocking)}
 .pp .pm-sheet .log .w{color:var(--p-important)}
 .pp .pm-sheet .log .g{color:var(--ok)}
-.pp .pm-sheet .log .m{color:var(--fg-4)}
+.pp .pm-sheet .log .m{color:var(--fg-3)}
 .pp .pm-sheet .log-none{font:400 12px/18px var(--sans);color:var(--fg-3)}
 .pp .pm-sheet .act{display:grid;gap:0;position:relative}
 .pp .pm-sheet .act>div{display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:10px;align-items:start;padding:5px 0;font:400 12.5px/20px var(--sans);color:var(--fg-2)}
 .pp .pm-sheet .act>div b{color:var(--fg);font-weight:500}
-.pp .pm-sheet .act>div time{font:400 11.5px/20px var(--sans);color:var(--fg-4)}
+.pp .pm-sheet .act>div time{font:400 11.5px/20px var(--sans);color:var(--fg-3)}
 .pp .pm-sheet .act .dot{width:20px;height:20px;display:grid;place-items:center;color:var(--fg-3)}
 .pp .pm-sheet .act .dot i{width:6px;height:6px;border-radius:50%;background:var(--fg-4);box-shadow:0 0 0 3px #1a1a1d}
 .pp .pm-sheet .md{margin:0;padding:12px 14px;border-radius:10px;background:rgba(0,0,0,.3);box-shadow:inset 0 0 0 1px var(--line);font:400 11px/18px var(--mono);color:var(--fg-2);white-space:pre-wrap;word-break:break-word;max-height:300px;overflow:auto}
