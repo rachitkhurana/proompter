@@ -9,7 +9,7 @@
 - Playwright: every scenario in DESIGN §11, plus visual snapshots of the dock, composer, ticket and
   sheet at 1440×900.
 - README:
-  - install
+  - install, with a requirements line: Node 22.18 or newer (DESIGN §2 D1.3)
   - three-step setup (config, component, route)
   - shortcuts
   - the file format

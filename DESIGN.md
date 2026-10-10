@@ -74,6 +74,11 @@ examples/playground/    → Next 16 app with a Gamorite-like mock page (the prot
      Never the umbrella `radix-ui` package. Tooltips, the segmented control, chips and the sheet are
      hand-built, as in the prototype. Every portal uses `container` = the shadow root.
   3. Any new runtime dependency needs sign-off.
+  4. **D1.3 (T03):** `@jridgewell/remapping` is a runtime dependency (the loader composes the incoming
+     source map, as webpack and Turbopack expect), and `@jridgewell/trace-mapping` is a dev dependency (for
+     the source-map tests). `engines.node` is `>=22.18`, because `dist/next/loader.cjs` `require()`s the
+     ESM-only `@babel/parser` and `magic-string`. The loader rethrows `ERR_REQUIRE_ESM` as
+     "@rachitkay/proompter/next needs Node 22.18 or newer (found vX)".
 
 ## 3. Turning it on
 
