@@ -6,14 +6,9 @@ import { BoxCatcher } from "./box-catcher";
 import { usePickSnapshot, useLast, useRelayout } from "./hooks";
 import { HoverBox, HoverLabel } from "./hover";
 import { MultiBar } from "./multi-bar";
-import { overlayCss } from "./overlay-styles";
 import type { PinModel } from "./pin-layout";
 import { Pins, type PulseRequest } from "./pins";
 
-/** Renders the overlay's CSS. Mount it once, inside the shadow root. */
-export function OverlayStyles() {
-  return <style data-proompter-overlay="">{overlayCss}</style>;
-}
 
 /** A multi-select box with its numbered badge. */
 export function SelectionBox({ rect, index }: { rect: Rect; index: number }) {
@@ -58,7 +53,6 @@ export function Overlay({ surface, engine, viewport, pins = [], route, pulse, on
 
   return (
     <>
-      <OverlayStyles />
       <div className="pm-ovl">
         {/* Keyboard picking (D8): each move of the target is announced as "<label>, <source or no source>". */}
         <div className="pm-sr" role="status" aria-live="polite">
