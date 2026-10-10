@@ -61,6 +61,7 @@ export default defineConfig([
       "next/route": "src/next/route.ts",
       "vite/index": "src/vite/index.ts",
       "github/index": "src/github/index.ts",
+      "plugins/index": "src/plugins/index.ts",
     },
     clean: false,
   },
