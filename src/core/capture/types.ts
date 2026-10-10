@@ -62,6 +62,8 @@ export interface SnapshotResult {
   /** False when font embedding failed (e.g. CORS) and system fonts were used instead. */
   fontsEmbedded: boolean;
   error?: string;
+  /** True when masking a PNG failed: that PNG was dropped (fails closed, D17). */
+  redactFailed?: boolean;
 }
 
 export interface CaptureOptions {
@@ -75,5 +77,6 @@ export interface Capture {
   enable(): void;
   disable(): void;
   context(): CaptureContext;
-  snapshot(surface: Surface, el?: Element): Promise<SnapshotResult>;
+  /** `redact`: extra CSS selectors to black out (plugins' `redactSnapshot`). */
+  snapshot(surface: Surface, el?: Element, redact?: readonly string[]): Promise<SnapshotResult>;
 }
