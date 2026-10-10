@@ -133,3 +133,30 @@ describe("Menu", () => {
     expect(onChange).toHaveBeenLastCalledWith(["data"]);
   });
 });
+
+describe("Menu and the host document", () => {
+  const guards = () => Array.from(document.body.children).filter((c) => c.hasAttribute("data-radix-focus-guard"));
+
+  it("leaves no Radix focus guards in the host body while open or after closing", async () => {
+    await mount(<Single onPick={() => {}} />);
+    await openWithKeyboard();
+    expect(menu()).not.toBeNull();
+    expect(guards()).toHaveLength(0);
+    await key(focused(), "Escape");
+    await settle();
+    expect(guards()).toHaveLength(0);
+  });
+
+  it("keeps guards that the host's own Radix components put there", async () => {
+    const hostGuard = document.createElement("span");
+    hostGuard.setAttribute("data-radix-focus-guard", "");
+    document.body.appendChild(hostGuard);
+    try {
+      await mount(<Single onPick={() => {}} />);
+      await openWithKeyboard();
+      expect(guards()).toContain(hostGuard);
+    } finally {
+      hostGuard.remove();
+    }
+  });
+});
