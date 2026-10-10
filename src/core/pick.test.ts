@@ -415,6 +415,27 @@ describe("keyboard picking (D8)", () => {
     expect(engine!.mode).toBe("idle");
   });
 
+  it("seeds on a frame surface that attaches after the shortcut, and not after a non-key entry", () => {
+    const frameLike = {
+      contentDocument: document,
+      contentWindow: window,
+      ownerDocument: document,
+      offsetWidth: 390,
+      offsetHeight: 844,
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: 390, height: 844 }) as DOMRect,
+    } as unknown as FrameLike;
+    setup();
+    engine!.attach(null);
+    engine!.setMode("pick", true); // P pressed while the device frame is still loading
+    expect(hoverEl()).toBeNull();
+    engine!.attach(createFrameSurface(frameLike, "mobile")!);
+    expect(hoverEl()).toBe($("main"));
+    engine!.setMode("idle");
+    engine!.setMode("pick");
+    engine!.attach(createFrameSurface(frameLike, "tablet")!);
+    expect(hoverEl()).toBeNull();
+  });
+
   it("works from a device frame: keys in the host document move and commit the target", () => {
     const hostDoc = document.implementation.createHTMLDocument("host");
     hostDoc.body.innerHTML = `<button id="host-btn"></button>`;
