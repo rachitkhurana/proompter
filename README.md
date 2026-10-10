@@ -122,6 +122,21 @@ Start with `VITE_PROOMPTER=true vite` (or put `VITE_PROOMPTER=true` in `.env.dev
 - The flag is the plugin's decision: it defines `import.meta.env.VITE_PROOMPTER` as `"true"` or `""`, so your
   check and the stamping always agree.
 
+## Preview builds
+
+A production build with the flag on (`NEXT_PUBLIC_PROOMPTER=true`, or `VITE_PROOMPTER=true`) ships the kit
+**dormant**: no capture, no UI code loaded, only `window.__proompter` and the `⌘⇧.` listener. Reviewers turn it
+on in the browser:
+
+- `window.__proompter.enable()` or `⌘⇧.` starts capture and opens the kit. The choice is kept in
+  `localStorage["proompter:enabled"]` for that origin, so a reload stays on.
+- `window.__proompter.disable()` closes the kit, stops capture and goes back to dormant.
+- `window.__proompter.enabled()` tells you which it is. While dormant, `open()` and `toggle()` do nothing.
+
+Dev is unchanged: always on. Entries stay in the reviewer's browser (IndexedDB) until GitHub sync. The files
+sink is a dev-only feature, and the dev route still answers 404 in a production build. With the flag unset,
+nothing ships at all.
+
 ## Shortcuts
 
 | Key | Does |
