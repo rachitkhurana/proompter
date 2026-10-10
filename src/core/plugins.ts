@@ -9,7 +9,7 @@
  * - Every `redact` receives a deep clone, so a plugin that mutates its argument and then throws cannot
  *   change the entry the caller holds.
  */
-import { excerpt, redactHeaders, redactString, redactText, redactUrl, redactValue } from "./capture/redact";
+import { redactConsoleEntry, redactNetworkEntry, redactString, redactText, redactUrl, redactValue } from "./capture/redact";
 import type { Entry, ProompterPlugin } from "./entry";
 
 export type Plugins = readonly ProompterPlugin[] | undefined;
@@ -63,11 +63,6 @@ export class RedactError extends Error {
     this.name = "RedactError";
     this.plugin = plugin;
   }
-}
-
-function clone<T>(v: T): T {
-  if (typeof structuredClone === "function") return structuredClone(v);
-  return JSON.parse(JSON.stringify(v)) as T;
 }
 
 /** The minimum a sink relies on. A plugin cannot re-address the entry (id, n, session) or break its shape. */
@@ -124,20 +119,8 @@ export function builtinRedact(e: Entry): Entry {
       ...ctx,
       ...(ctx.build !== undefined ? { build: redactText(ctx.build) } : {}),
       queries: ctx.queries.map((q) => ({ ...q, key: redactValue(q.key, 0), status: redactText(q.status) })),
-      console: ctx.console.map((c) => ({
-        ...c,
-        message: excerpt(redactText(c.message)),
-        ...(c.frame !== undefined ? { frame: redactUrl(c.frame) } : {}),
-      })),
-      network: ctx.network.map((n) => ({
-        ...n,
-        url: redactUrl(n.url),
-        ...(n.error !== undefined ? { error: redactString(n.error) } : {}),
-        ...(n.requestHeaders ? { requestHeaders: redactHeaders(n.requestHeaders) } : {}),
-        ...(n.responseHeaders ? { responseHeaders: redactHeaders(n.responseHeaders) } : {}),
-        ...(n.requestExcerpt !== undefined ? { requestExcerpt: excerpt(redactText(n.requestExcerpt)) } : {}),
-        ...(n.responseExcerpt !== undefined ? { responseExcerpt: excerpt(redactText(n.responseExcerpt)) } : {}),
-      })),
+      console: ctx.console.map(redactConsoleEntry),
+      network: ctx.network.map(redactNetworkEntry),
       ...(s
         ? { summary: { ...s, consoleItems: s.consoleItems.map(redactText), networkItems: s.networkItems.map(redactText) } }
         : {}),
@@ -159,7 +142,7 @@ export function applyRedact(plugins: Plugins, entry: Entry): RedactResult {
   for (const p of plugins ?? []) {
     if (!p.redact) continue;
     try {
-      const out: unknown = p.redact(clone(current));
+      const out: unknown = p.redact(structuredClone(current));
       if (!wellFormed(out, entry)) return { ok: false, plugin: p.name, error: "returned something that is not the same entry" };
       current = out;
     } catch (e) {
@@ -168,7 +151,7 @@ export function applyRedact(plugins: Plugins, entry: Entry): RedactResult {
   }
   // Hand back a copy no plugin still holds a reference to.
   try {
-    return { ok: true, entry: clone(current) };
+    return { ok: true, entry: structuredClone(current) };
   } catch (e) {
     return { ok: false, plugin: "(clone)", error: e instanceof Error ? e.message : String(e) };
   }
