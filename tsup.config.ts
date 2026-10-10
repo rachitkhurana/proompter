@@ -52,7 +52,7 @@ export default defineConfig([
     banner: { js: '"use client";' },
     clean: true,
   },
-  // Server / config entries. No banner. (`next/route` and `github` are reserved, see their stubs.)
+  // Server / config entries. No banner. (`github` is the GitHub sync route, D16.)
   {
     ...shared,
     entry: {
