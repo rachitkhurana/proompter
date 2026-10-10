@@ -60,6 +60,16 @@
         "default": "./dist/next/route.cjs"
       }
     },
+    "./vite": {
+      "import": {
+        "types": "./dist/vite/index.d.ts",
+        "default": "./dist/vite/index.js"
+      },
+      "require": {
+        "types": "./dist/vite/index.d.cts",
+        "default": "./dist/vite/index.cjs"
+      }
+    },
     "./github": {
       "import": {
         "types": "./dist/github/index.d.ts",
@@ -99,10 +109,14 @@
   "peerDependencies": {
     "next": ">=15.3",
     "react": ">=19",
-    "react-dom": ">=19"
+    "react-dom": ">=19",
+    "vite": ">=5"
   },
   "peerDependenciesMeta": {
     "next": {
+      "optional": true
+    },
+    "vite": {
       "optional": true
     }
   },
