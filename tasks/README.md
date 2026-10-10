@@ -13,6 +13,7 @@ visual source of truth (open it in a browser, and read its CSS and JS for exact 
 | 3 | T07 composer+store, T08 sheet+ticket+cmd | Need T04 + T05 |
 | 3b | T02b hand-built Menu | After batch 3 merges; drops Radix (DESIGN §2 D5) |
 | 4 | T09 next route + files sink, T10 playground e2e + docs | Close-out |
+| 4b | T04b keyboard picking | After T10 merges (DESIGN §2 D8) |
 
 ## Rules for every task
 - Own only the paths listed under **Owns**. Need something elsewhere? Write it in your hand-back, don't edit it.

@@ -89,6 +89,17 @@ examples/playground/    → Next 16 app with a Gamorite-like mock page (the prot
   - primary-button text is the `--acc-fg` token, currently `var(--canvas)` (dark on coral). This is
     provisional: Rachit may choose a darker coral with white text instead, which is a one-token swap.
   `design/prototype.html`'s tokens are updated to match, so the reference doesn't drift.
+- **D8. Keyboard picking (§11.5, 2026-10-10):** element picking also works with no pointer, as a full tree
+  navigator.
+  - Entering pick mode by keyboard (`P`) targets the surface's main landmark, or failing that body's first child.
+  - `Tab`/`Shift+Tab` move to the next or previous focusable element in the surface.
+  - `↑`/`[` go to the parent. `↓`/`]` go back down the walked path, or to the first child.
+  - `←`/`→` move to the previous or next sibling.
+  - `Enter`/`Space` commit, which opens the composer. `Esc` exits.
+  - Every one of these keys is `preventDefault`ed, so host focus and scroll never move.
+  - Each move is announced through an `aria-live` region (label plus source).
+  - An e2e runs the flow keyboard-only on Responsive and Mobile: `P` → navigate to the avatar → `Enter` → `⌘↵`
+    → file on disk. This is task T04b.
 - **Peer dependencies:** `react >=19`, `react-dom >=19`, `next >=15.3` (optional, only for `./next`).
 - **Dependencies:**
   - `html-to-image` (snapshots)
