@@ -15,7 +15,8 @@
     "node": ">=22.18"
   },
   "files": [
-    "dist"
+    "dist",
+    "licenses"
   ],
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
