@@ -7,6 +7,7 @@ import type { PickMode } from "../../core/pick";
 import { eventElement } from "../../core/resolve";
 import type { ViewportId } from "../../core/surface";
 import { VIEWPORT_ORDER } from "../../core/surface";
+import { isShielded } from "../shadow-root";
 
 /** Same selector as the pick engine's own typing check (`core/pick`, not exported). */
 const TYPING = "input,textarea,select,[contenteditable]";
@@ -53,10 +54,10 @@ const SHORTCUTS = new Map<string, (a: KeyActions) => void>([
 /**
  * Handle one keydown. Returns true when the key was used (and its default prevented).
  * Skips events something else already handled (`defaultPrevented`: the dock grip's arrows, a menu that
- * closed itself on Esc), and letter shortcuts typed into a text field.
+ * closed itself on Esc; not the shield's own mark, see `isShielded`), and letter shortcuts typed into a text field.
  */
 export function handleKeydown(ev: KeyboardEvent, state: KeyState, actions: KeyActions): boolean {
-  if (ev.defaultPrevented) return false;
+  if (ev.defaultPrevented && !isShielded(ev)) return false;
   // Keys that belong to an input method editor are not shortcuts.
   if (ev.isComposing || ev.keyCode === 229) return false;
   const key = typeof ev.key === "string" ? ev.key : "";
