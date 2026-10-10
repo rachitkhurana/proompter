@@ -44,7 +44,7 @@ export default defineConfig([
   // (No `treeshake: true`: the rollup pass strips module-level directives.)
   {
     ...shared,
-    entry: { index: "src/index.ts" },
+    entry: { index: "src/index.ts", "internal/fixtures": "src/internal/fixtures.ts" },
     banner: { js: '"use client";' },
     clean: true,
   },
