@@ -10,7 +10,4 @@ export class Ring<T> {
   toArray(): T[] {
     return this.items.slice();
   }
-  clear(): void {
-    this.items = [];
-  }
 }
