@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { createFilesSink } from "../../core/sinks/files";
 import type { NewEntry } from "../../core/store";
 import { createStore } from "../../core/store";
 import { serialize } from "../../core/serialize";
@@ -76,5 +77,83 @@ describe("createDefaultDeps", () => {
     expect(deps.entryPath(e, s)).toBe(`reviews/${s.id}/entries/001-avatar-is-cropped-on-mobile.md`);
     expect(s.reviewer).toBe("rachit");
     expect(s.title).toBe("Manual test pass");
+  });
+});
+
+describe("adaptStore with the files sink (INTEGRATION(T09))", () => {
+  async function withSink(status: number) {
+    const { core, entry } = await setup();
+    // The stub is injected: nothing here may reach a real server.
+    const fetchSpy = vi.fn<typeof fetch>(async () =>
+      status === 404
+        ? new Response("Not found", { status })
+        : new Response(JSON.stringify({ ok: true, files: [] }), { status, headers: { "content-type": "application/json" } }),
+    );
+    const sink = createFilesSink({ store: core, fetch: fetchSpy });
+    const store = adaptStore(core, sink);
+    return { core, entry, sink, store, fetchSpy };
+  }
+
+  it("exposes the sink's pending files and a write() that flushes them", async () => {
+    const { core, store, fetchSpy } = await withSink(200);
+    await core.create({ ...draft(), title: "Second" });
+    const snap = store.getSnapshot();
+    expect(snap.pending.map((f) => f.path)).toEqual(
+      expect.arrayContaining(["entries/002-second.md", "session.md"]),
+    );
+    expect(store.getSnapshot()).toBe(snap);
+    expect(store.write).toBeTypeOf("function");
+    await store.write?.();
+    expect(fetchSpy.mock.calls.at(-1)?.[1]?.method).toBe("POST");
+    expect(store.getSnapshot().pending).toEqual([]);
+  });
+
+  it("notifies subscribers when the pending list changes", async () => {
+    const { core, store } = await withSink(200);
+    let calls = 0;
+    const off = store.subscribe(() => calls++);
+    await core.create({ ...draft(), title: "Another" });
+    expect(calls).toBeGreaterThan(0);
+    off();
+  });
+
+  it("keeps entries pending when the route is missing (404)", async () => {
+    const { core, store } = await withSink(404);
+    await core.create({ ...draft(), title: "Unwritten" }); // something to keep pending
+    await store.write?.();
+    expect(store.getSnapshot().pending.length).toBeGreaterThan(0);
+  });
+
+  it("without a sink there is no write() and nothing is pending", async () => {
+    const { store } = await setup();
+    expect(store.write).toBeUndefined();
+  });
+
+  it("createDefaultDeps wires a sink: write is available and the endpoint is configurable", async () => {
+    const fetchSpy = vi.fn(async (_input: unknown) => new Response("{}", { status: 404 }));
+    vi.stubGlobal("fetch", fetchSpy);
+    vi.stubEnv("NODE_ENV", "development"); // the root only talks to the route in dev
+    try {
+      const deps = createDefaultDeps({ endpoint: "/custom/endpoint" });
+      expect(deps.store.write).toBeTypeOf("function");
+      await vi.waitFor(() => expect(fetchSpy).toHaveBeenCalled());
+      expect(String(fetchSpy.mock.calls[0]?.[0])).toContain("/custom/endpoint");
+    } finally {
+      vi.unstubAllGlobals();
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("outside dev the root makes no request on mount", async () => {
+    const fetchSpy = vi.fn(async (_input: unknown) => new Response("Not found", { status: 404 }));
+    vi.stubGlobal("fetch", fetchSpy);
+    try {
+      const deps = createDefaultDeps({});
+      await deps.store.getSnapshot();
+      await new Promise((r) => setTimeout(r, 20));
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

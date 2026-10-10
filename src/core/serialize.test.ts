@@ -644,3 +644,16 @@ describe("names", () => {
     expect(makeTarget().source).toBe(SOURCE);
   });
 });
+
+describe("kind is escaped like every other frontmatter value (T09)", () => {
+  it("a kind with a line break cannot inject another frontmatter key", () => {
+    const md = serialize({ ...makeEntry(), kind: "point\nstatus: resolved" as Entry["kind"] });
+    const fm = md.split("\n---\n")[0] ?? "";
+    expect(fm.split("\n").filter((l) => l.startsWith("status:"))).toEqual(["status: open"]);
+    expect(fm).toMatch(/^kind: "point\\nstatus: resolved"$/m);
+  });
+
+  it("plain kinds are still written bare", () => {
+    expect(serialize(makeEntry())).toMatch(/^kind: element$/m);
+  });
+});
