@@ -20,7 +20,7 @@ export interface CommandProps {
 const EXIT_MS = 200;
 
 /**
- * The command menu (`⌘K`): a search field over sections of tools, viewports, entries and session actions.
+ * The command menu (`⌘⇧K`): a search field over sections of tools, viewports, entries and session actions.
  * Fully keyboard-driven: type to filter, Up/Down to move (looping), Enter to run, Esc to close.
  *
  * It is non-modal on purpose: nothing outside the shadow root is touched (no scroll lock, no `aria-hidden`
