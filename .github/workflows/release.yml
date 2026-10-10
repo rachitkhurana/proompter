@@ -38,5 +38,7 @@ jobs:
           node scripts/release-exports.mjs strip
           PROOMPTER_RELEASE=1 pnpm exec vitest run src/internal/exports.test.ts
           node scripts/release-exports.mjs restore
-      # prepack builds without the private fixtures entry and strips it from exports; postpack restores.
+      # Strip first: npm records the registry metadata from package.json before prepack runs, so without this the
+      # npm page lists the private ./internal/fixtures export (0.0.1 did). prepack then builds without it.
+      - run: node scripts/release-exports.mjs strip
       - run: npm publish
