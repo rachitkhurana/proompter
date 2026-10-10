@@ -144,6 +144,38 @@ describe("files sink", () => {
     expect(store.getState().entries[0]?.status).toBe("resolved");
   });
 
+  it("a resolution note written to the file survives a later UI edit (T15)", async () => {
+    const a = await setup();
+    await a.store.create(draft());
+    await a.sink.idle();
+    const file = path.join(a.dir, "entries", "001-avatar-is-cropped-on-mobile.md");
+    const md = await fs.readFile(file, "utf8");
+    await fs.writeFile(file, md.replace("## Context", "## Resolution\n\nCropped it.\n\n## Context").replace("status: open", "status: resolved"));
+
+    const store = newStore(); // a reload: the store copy has no resolution
+    await store.ready;
+    const sink = sinkFor(store);
+    await store.create(draft());
+    await sink.rehydrate();
+    await sink.idle();
+    const id = store.getState().entries[0]!.id;
+    expect(store.get(id)?.resolution).toBe("Cropped it.");
+
+    const bodies: string[] = [];
+    const spy: typeof fetch = async (input, init) => {
+      if (init?.method === "POST" && typeof init.body === "string") bodies.push(init.body);
+      return routeFetch(input, init);
+    };
+    const sink2 = sinkFor(store, spy);
+    await sink2.rehydrate();
+    await store.update(id, { title: "Renamed after resolve" });
+    await sink2.idle();
+    expect(bodies.length).toBeGreaterThan(0);
+    expect(bodies.at(-1)).toContain("Cropped it.");
+    const names = await fs.readdir(path.join(a.dir, "entries"));
+    expect(parse(await fs.readFile(path.join(a.dir, "entries", names[0]!), "utf8")).resolution).toBe("Cropped it.");
+  });
+
   it("on 404 (preview/prod) entries stay pending and auto-posting stops until write()", async () => {
     vi.stubEnv("NODE_ENV", "production");
     const { store, sink, dir } = await setup();
@@ -376,6 +408,7 @@ describe("diskPatch", () => {
     const e = makeEntry();
     const disk = parse(serialize(e));
     expect(diskPatch(e, disk)).toEqual({});
+    expect(diskPatch(e, { ...disk, resolution: "done" })).toEqual({ resolution: "done" });
     expect(diskPatch(e, { ...disk, status: "resolved", testPlan: undefined, title: "New" })).toEqual({
       status: "resolved",
       testPlan: null,
