@@ -4,7 +4,7 @@ import { ShadowRoot } from "./shadow-root";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-// Radix leans on a few layout/pointer APIs that happy-dom leaves out.
+// A few layout/pointer APIs that happy-dom leaves out.
 const proto = Element.prototype as unknown as Record<string, unknown>;
 proto.scrollIntoView ??= () => {};
 proto.hasPointerCapture ??= () => false;
@@ -26,7 +26,7 @@ export interface Mounted {
 /**
  * Render `ui` inside a `<ShadowRoot>` in a fresh div on `document.body`.
  * Pass `css: ""` to skip the stylesheet: happy-dom would otherwise report CSS animations that never
- * fire `animationend`, and Radix's Presence would wait on them forever.
+ * fire `animationend`, and exiting content would wait on them forever.
  */
 export async function mountInShadow(ui: ReactNode, options: { css?: string } = {}): Promise<Mounted> {
   const el = document.createElement("div");
