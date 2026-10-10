@@ -55,7 +55,7 @@ describe("global shortcuts on a forwarded key", () => {
       [{ key: "f" }, "toggleFreeze"],
       [{ key: "r" }, "rotate"],
       [{ key: "e" }, "toggleSheet"],
-      [{ key: "k", metaKey: true }, "toggleCommand"],
+      [{ key: "K", metaKey: true, shiftKey: true }, "toggleCommand"],
     ];
     for (const [init, expected] of cases) {
       const { actions, calls } = recorder();
