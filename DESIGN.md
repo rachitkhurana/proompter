@@ -393,6 +393,9 @@ the frontmatter of `migration/_tasks/T-*.md`.
 
 ## 10. Roadmap
 
+The v2/v3 direction, with the known v1 gaps, is in [specs/ROADMAP-v2-v3.md](specs/ROADMAP-v2-v3.md). It's a brief, not
+tasks yet.
+
 - **v1 (this spec):** everything in §3–§9, with the files sink and the playground.
 - **v2:**
   - IndexedDB sync to a `reviews` branch through the GitHub Contents API
