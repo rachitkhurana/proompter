@@ -76,8 +76,6 @@ export interface CaptureOptions {
 export interface Capture {
   enable(): void;
   disable(): void;
-  readonly enabled: boolean;
   context(): CaptureContext;
-  clear(): void;
   snapshot(surface: Surface, el?: Element): Promise<SnapshotResult>;
 }
