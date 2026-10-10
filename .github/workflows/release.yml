@@ -38,7 +38,7 @@ jobs:
           node scripts/release-exports.mjs strip
           PROOMPTER_RELEASE=1 pnpm exec vitest run src/internal/exports.test.ts
           node scripts/release-exports.mjs restore
-      # Strip first: npm records the registry metadata from package.json before prepack runs, so without this the
-      # npm page lists the private ./internal/fixtures export (0.0.1 did). prepack then builds without it.
-      - run: node scripts/release-exports.mjs strip
-      - run: npm publish
+      # Same order as CI's dry-run pack check. prepack builds without the private ./internal/fixtures export and
+      # strips it; KEEP_STRIPPED stops postpack restoring it, because npm publish re-reads package.json after
+      # postpack and sends that to the registry (0.0.1 and 0.0.2 listed the export on the npm page).
+      - run: PROOMPTER_KEEP_STRIPPED=1 npm publish
