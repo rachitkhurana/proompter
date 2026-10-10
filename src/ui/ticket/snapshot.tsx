@@ -4,7 +4,8 @@ import { Icon } from "../icons";
 import { Button } from "../primitives/button";
 import { Chip } from "../primitives/chip";
 import { cx } from "../primitives/cx";
-import { sizeLabel, snapshotFile, viewportLabel } from "../shell/format";
+import { assetNames } from "../../core/serialize";
+import { sizeLabel, viewportLabel } from "../shell/format";
 
 type Mode = "element" | "viewport";
 
@@ -69,7 +70,7 @@ export function Snapshot({ entry, onShow }: SnapshotProps) {
         <Chip icon={<Icon name={entry.viewport} size="xs" />}>
           <span className="num">{sizeLabel(entry)}</span>
         </Chip>
-        <Chip mono>{snapshotFile(entry, mode)}</Chip>
+        <Chip mono>{assetNames(entry.n, entry.viewport)[mode]}</Chip>
       </div>
     </div>
   );
