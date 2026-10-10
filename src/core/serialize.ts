@@ -17,6 +17,7 @@
  * | `rotated`                          | derived from `viewport` + `size` (a device preset in landscape)           |
  * | `title`                            | one line (line breaks become spaces)                                      |
  * | target `label` (element, text)     | not written; read back as the last part of `component` (multi and box write it in the `###` heading, one line) |
+ * | `resolution`                       | a `## Resolution` section before `## Context`; blank edges dropped (T15)   |
  * | `description`                      | leading and trailing blank lines are dropped; `\r\n` becomes `\n`         |
  * | `extra` values that are not string / number / boolean / null / flat array | written as a JSON string and parsed back as that string |
  *
@@ -283,6 +284,7 @@ export function fileProjection(entry: Entry, session?: Session): Entry {
   if (entry.kind === "text") out.quote = norm(entry.quote ?? "");
   if (entry.task !== undefined) out.task = entry.task;
   if (entry.testPlan !== undefined) out.testPlan = entry.testPlan;
+  if (entry.resolution !== undefined && entry.resolution.trim() !== "") out.resolution = trimBlankLines(entry.resolution);
   if (hasImage) out.snapshot = { assets: { element: assetNames(n, entry.viewport).element } };
   if (extraList.length) out.extra = Object.fromEntries(extraList);
   return out;
@@ -349,6 +351,7 @@ export function serialize(entry: Entry, session?: Session): string {
   if (e.kind === "text") blocks.push(norm(e.quote ?? "").split("\n").map((l) => (l === "" ? ">" : `> ${l}`)));
   if (e.description) blocks.push(e.description.split("\n"));
   if ((e.kind === "multi" || e.kind === "box") && e.targets.length) blocks.push(targetBlock(e.targets));
+  if (e.resolution) blocks.push(["## Resolution", "", ...e.resolution.split("\n")]);
   blocks.push(contextBlock(e));
   if (e.snapshot?.assets?.element) blocks.push([`![${e.viewport}](../assets/${e.snapshot.assets.element})`]);
   return `${blocks.map((b) => b.join("\n")).join("\n\n")}\n`;
@@ -573,6 +576,15 @@ function parseEntry(markdown: string): Entry {
   }
   if (ctxAt < 0) head = imageSource;
 
+  // Resolution: the last '## Resolution' before '## Context' runs to the end of what is left.
+  let resolution: string | undefined;
+  for (let i = head.length - 1; i >= 0; i--) {
+    if (head[i] !== "## Resolution") continue;
+    resolution = trimBlankLines(head.slice(i + 1).join("\n"));
+    head = head.slice(0, i);
+    break;
+  }
+
   // Targets (multi, box): the last '## Targets' that is followed by a '### 1.' heading.
   let targets: EntryTarget[] = frontTarget ? [frontTarget] : [];
   if (kind === "multi" || kind === "box") {
@@ -636,6 +648,7 @@ function parseEntry(markdown: string): Entry {
   if (task !== undefined) entry.task = task;
   const testPlan = str(fields, "test_plan", false);
   if (testPlan !== undefined) entry.testPlan = testPlan;
+  if (resolution) entry.resolution = resolution;
   if (image) entry.snapshot = { assets: { element: image } };
   if (Object.keys(extra).length) entry.extra = { ...extra };
   return entry;
