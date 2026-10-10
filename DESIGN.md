@@ -285,6 +285,20 @@ Description as written.
 ```
 
 - The format is **stable and versioned** (`proompter: 1` in `session.md`).
+- **D3. Format v1 details (T07, 2026-10-10):**
+  1. `kind:` is always written (`element | note | text | multi | box`). The parser still accepts a
+     missing `kind` and infers element or note from whether `selector` is present.
+  2. `ref: <session-slug>/PRO-n` is the fully qualified reference. Numbering is per session, so two
+     sessions can both have `PRO-1`. Use `ref` wherever an entry leaves its session ("Copy for agent",
+     GitHub issue bodies). Toasts may stay short.
+  3. Multi and box entries add a `## Targets` section, and their frontmatter mirrors the first target. A
+     text entry's quote is a `> ` block under the title. Notes have `source: null`. Plugin `extra`
+     fields go after `created`. `session.md` has a `session:` line.
+  4. `## Context` lists every console line under the summary, as the prototype does.
+  5. The Test plan and Task chips are hidden when no plugin supplies them.
+  6. **Redaction fails closed.** The built-in redaction always runs first. If a plugin's `redact` throws
+     or returns a mismatched entry, nothing is stored or emitted, the number isn't used, and the
+     composer shows "Plugin <name> failed to redact this entry. Nothing was saved."
 - "Copy for agent" copies exactly this text.
 
 ## 9. Plugins (host-side, nothing host-specific in the package)
