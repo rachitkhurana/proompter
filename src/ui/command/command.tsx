@@ -4,8 +4,6 @@ import { Icon } from "../icons";
 import { cx } from "../primitives/cx";
 import { Kbd } from "../primitives/kbd";
 import { useShadowContainer } from "../shadow-root";
-import { SHEET_CSS } from "../sheet/sheet-css";
-import { COMMAND_CSS, COMMAND_MOTION_CSS } from "./command-css";
 import { filterCommands, type CommandItem } from "./items";
 
 export interface CommandProps {
@@ -77,8 +75,6 @@ export function Command({ open, onOpenChange, items, defaultQuery = "", animated
   const state = phase === "open" ? "open" : "closed";
   return (
     <>
-      <style>{SHEET_CSS}</style>
-      <style>{animated ? COMMAND_CSS + COMMAND_MOTION_CSS : COMMAND_CSS}</style>
       {container && phase !== "closed"
         ? createPortal(
             <>
