@@ -3,7 +3,7 @@ import { useState, useSyncExternalStore } from "react";
 import type { Entry } from "../../core/entry";
 import { DEFAULT_TAGS } from "../ticket/labels";
 import { toast } from "../primitives/toast";
-import { DockedToaster } from "../dock";
+import { DockedToaster } from "../dock/placement";
 import { createFakeDeps, seedEntries } from "../shell/fake";
 import { Sheet, type SheetTab } from "./sheet";
 
