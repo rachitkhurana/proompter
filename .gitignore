@@ -10,3 +10,6 @@ storybook-static
 # `reviews/` at the repo root is product output (committed). The playground's e2e runs write
 # throwaway entries into its own folder, so only that one is ignored.
 examples/playground/reviews/
+
+# Production check build (e2e, DESIGN 11.1)
+examples/playground/.next-prod/
