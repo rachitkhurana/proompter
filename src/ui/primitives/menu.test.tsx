@@ -10,12 +10,12 @@ afterEach(async () => {
 });
 
 const mount = async (ui: ReactNode) => {
-  // `css: ""`: no CSS animations, so Radix's Presence unmounts without waiting on `animationend`.
+  // `css: ""`: no CSS animations, so the menu unmounts at once instead of waiting on `animationend`.
   m = await mountInShadow(ui, { css: "" });
 };
 const key = (el: Element, k: string) =>
   act(async () => {
-    // `composed`, like real key events: Radix listens on `document`, outside the shadow root.
+    // `composed`, like real key events (the shell listens on `document`, outside the shadow root).
     el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, composed: true }));
   });
 const settle = () => act(async () => void (await new Promise((r) => setTimeout(r, 30))));
@@ -135,28 +135,136 @@ describe("Menu", () => {
 });
 
 describe("Menu and the host document", () => {
-  const guards = () => Array.from(document.body.children).filter((c) => c.hasAttribute("data-radix-focus-guard"));
-
-  it("leaves no Radix focus guards in the host body while open or after closing", async () => {
+  it("adds nothing to the host body while open or after closing", async () => {
     await mount(<Single onPick={() => {}} />);
+    const before = Array.from(document.body.children);
     await openWithKeyboard();
     expect(menu()).not.toBeNull();
-    expect(guards()).toHaveLength(0);
+    expect(Array.from(document.body.children)).toEqual(before);
     await key(focused(), "Escape");
     await settle();
-    expect(guards()).toHaveLength(0);
+    expect(Array.from(document.body.children)).toEqual(before);
+  });
+});
+
+describe("Menu behaviour", () => {
+  const trigger = () => m.shadow().querySelector("button")!;
+  const pointerdown = (el: Element) =>
+    act(async () => {
+      el.dispatchEvent(
+        new PointerEvent("pointerdown", { button: 0, bubbles: true, composed: true, pointerType: "mouse" }),
+      );
+    });
+
+  it("sets ARIA on the trigger and returns focus to it on Escape", async () => {
+    await mount(<Single onPick={() => {}} />);
+    expect(trigger().getAttribute("aria-haspopup")).toBe("menu");
+    expect(trigger().getAttribute("aria-expanded")).toBe("false");
+    await openWithKeyboard();
+    expect(trigger().getAttribute("aria-expanded")).toBe("true");
+    expect(trigger().getAttribute("aria-controls")).toBe(menu()!.id);
+    expect(menu()!.getAttribute("aria-labelledby")).toBe(trigger().id);
+    await key(focused(), "Escape");
+    await settle();
+    expect(m.shadow().activeElement).toBe(trigger());
+    expect(trigger().getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("keeps guards that the host's own Radix components put there", async () => {
-    const hostGuard = document.createElement("span");
-    hostGuard.setAttribute("data-radix-focus-guard", "");
-    document.body.appendChild(hostGuard);
+  it("closes on Tab and returns focus to the trigger", async () => {
+    await mount(<Single onPick={() => {}} />);
+    await openWithKeyboard();
+    await key(focused(), "Tab");
+    await settle();
+    expect(menu()).toBeNull();
+    expect(m.shadow().activeElement).toBe(trigger());
+  });
+
+  it("selecting closes a single menu and returns focus", async () => {
+    const pick = vi.fn();
+    await mount(<Single onPick={pick} />);
+    await openWithKeyboard();
+    await act(async () => (items()[1] as HTMLElement).click());
+    await settle();
+    expect(pick).toHaveBeenCalledWith("b");
+    expect(menu()).toBeNull();
+    expect(m.shadow().activeElement).toBe(trigger());
+  });
+
+  it("jumps with Home and type-ahead", async () => {
+    await mount(<Single onPick={() => {}} />);
+    await openWithKeyboard();
+    await key(focused(), "End");
+    await key(focused(), "Home");
+    expect(focusedIndex()).toBe(0);
+    await key(focused(), "g");
+    expect(focusedIndex()).toBe(2);
+    await key(focused(), "b");
+    expect(focusedIndex()).toBe(1);
+  });
+
+  it("skips disabled items", async () => {
+    const pick = vi.fn();
+    await mount(
+      <Menu
+        trigger={<Chip as="button">Open</Chip>}
+        items={[
+          { key: "a", label: "A" },
+          { key: "b", label: "B", disabled: true },
+          { key: "c", label: "C" },
+        ]}
+        onSelect={pick}
+      />,
+    );
+    await openWithKeyboard();
+    await key(focused(), "ArrowDown");
+    expect(focusedIndex()).toBe(2);
+    await act(async () => (items()[1] as HTMLElement).click());
+    expect(pick).not.toHaveBeenCalled();
+  });
+
+  it("dismisses on a pointerdown outside, in the shadow root and on the host page, and not before open", async () => {
+    await mount(<Single onPick={() => {}} />);
+    const outsideHost = document.createElement("div");
+    document.body.appendChild(outsideHost);
     try {
-      await mount(<Single onPick={() => {}} />);
+      const add = vi.spyOn(document, "addEventListener");
       await openWithKeyboard();
-      expect(guards()).toContain(hostGuard);
+      expect(add.mock.calls.some(([t]) => t === "pointerdown")).toBe(true);
+      add.mockRestore();
+
+      await pointerdown(menu()!); // inside: stays open
+      expect(menu()).not.toBeNull();
+      await pointerdown(outsideHost);
+      await settle();
+      expect(menu()).toBeNull();
+
+      await openWithKeyboard();
+      expect(menu()).not.toBeNull();
+      await pointerdown(m.shadow().querySelector(".pp, div") ?? trigger()); // shadow content outside the menu
+      await settle();
+      expect(menu()).toBeNull();
     } finally {
-      hostGuard.remove();
+      outsideHost.remove();
     }
+  });
+
+  it("removes its document listeners on close", async () => {
+    await mount(<Single onPick={() => {}} />);
+    await openWithKeyboard();
+    const remove = vi.spyOn(document, "removeEventListener");
+    await key(focused(), "Escape");
+    await settle();
+    expect(remove.mock.calls.some(([t]) => t === "pointerdown")).toBe(true);
+    remove.mockRestore();
+  });
+
+  it("a trigger pointerdown toggles it", async () => {
+    await mount(<Single onPick={() => {}} />);
+    await pointerdown(trigger());
+    await settle();
+    expect(menu()).not.toBeNull();
+    await pointerdown(trigger());
+    await settle();
+    expect(menu()).toBeNull();
   });
 });
