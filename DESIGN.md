@@ -107,6 +107,12 @@ examples/playground/    → Next 16 app with a Gamorite-like mock page (the prot
   - Each move is announced through an `aria-live` region (label plus source).
   - An e2e runs the flow keyboard-only on Responsive and Mobile: `P` → navigate to the avatar → `Enter` → `⌘↵`
     → file on disk. This is task T04b.
+- **D10. Solid surfaces (2026-10-10, Rachit):** the backdrop blur didn't render in the Gamorite trial, so
+  surfaces looked see-through. All surfaces are now solid: `--mat-1: #1e1e22` (small chrome) and
+  `--mat-2: #161619` (big surfaces), the values the reduced-transparency fallback used. Every
+  `backdrop-filter`, the `--blur-*` tokens and the `prefers-reduced-transparency` override are removed. Shadows,
+  the top-edge highlight and borders stay, so depth still reads. rgba fills on top of surfaces are unchanged.
+  The prototype uses the same tokens.
 - **Peer dependencies:** `react >=19`, `react-dom >=19`, `next >=15.3` (optional, only for `./next`).
 - **Dependencies:**
   - `html-to-image` (snapshots)
@@ -274,8 +280,8 @@ A **surface** is what the kit reviews: `{ doc, win, toScreen(rect), scale }`.
   - `⌘⇧.` show or hide the kit
   - `Esc` closes things in order: menu, composer, command menu, current mode, ticket, sheet
 - **Tokens:** take every colour, radius, shadow, type size and easing from the prototype's `:root`
-  block. Font: Geist / Geist Mono. Respect `prefers-reduced-motion`, `prefers-reduced-transparency`
-  and `prefers-contrast`.
+  block. Font: Geist / Geist Mono. Respect `prefers-reduced-motion`
+  and `prefers-contrast`. Surfaces are solid (D10), so there is no transparency to reduce.
 
 ## 8. Storage and the file format (v1: files)
 
