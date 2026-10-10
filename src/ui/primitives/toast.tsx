@@ -1,24 +1,22 @@
 import { useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
-import { CheckIcon } from "../icons";
-import { MAX_TOASTS, TOAST_DURATION_MS, TOAST_EXIT_MS } from "../tokens";
+import { Icon } from "../icons";
 import { cx } from "./cx";
 
+/** Visible time before a toast starts leaving, and the length of its exit animation. */
+const DURATION_MS = 2800;
+const EXIT_MS = 200;
+const MAX_TOASTS = 3;
+
 export interface ToastOptions {
-  /** Reuse an id to replace a toast in place. */
-  id?: string;
   /** Leading icon. Defaults to the green check. */
   icon?: ReactNode;
-  /** Visible time in ms before it starts leaving. */
-  duration?: number;
 }
 
 interface ToastData {
-  id: string;
-  /** Unique per `toast()` call. Keys and timers use this, so reusing an `id` starts a fresh toast. */
-  serial: number;
+  /** Unique per `toast()` call: keys and timers use it. */
+  id: number;
   message: ReactNode;
   icon: ReactNode;
-  duration: number;
   leaving: boolean;
 }
 
@@ -45,50 +43,37 @@ function subscribe(l: () => void) {
 }
 const getSnapshot = () => state;
 
-/** Mark toasts as leaving (exit animation), then remove them. Works on serials, never on ids. */
-function leave(serials: number[]) {
-  const targets = state.items.filter((t) => serials.includes(t.serial) && !t.leaving).map((t) => t.serial);
+/** Mark toasts as leaving (exit animation), then remove them. */
+function leave(ids: number[]) {
+  const targets = state.items.filter((t) => ids.includes(t.id) && !t.leaving).map((t) => t.id);
   if (targets.length === 0) return;
-  set({ items: state.items.map((t) => (targets.includes(t.serial) ? { ...t, leaving: true } : t)) });
-  setTimeout(() => set({ items: state.items.filter((t) => !targets.includes(t.serial)) }), TOAST_EXIT_MS);
+  set({ items: state.items.map((t) => (targets.includes(t.id) ? { ...t, leaving: true } : t)) });
+  setTimeout(() => set({ items: state.items.filter((t) => !targets.includes(t.id)) }), EXIT_MS);
 }
 
 /**
  * Show a toast. At most `MAX_TOASTS` (3) stay visible: a 4th pushes the oldest out, which leaves with
  * the exit animation.
  */
-export function toast(message: ReactNode, options: ToastOptions = {}): string {
-  const serial = ++seq;
-  const id = options.id ?? `toast-${serial}`;
+export function toast(message: ReactNode, options: ToastOptions = {}): void {
   const item: ToastData = {
-    id,
-    serial,
+    id: ++seq,
     message,
-    icon: options.icon === undefined ? <CheckIcon /> : options.icon,
-    duration: options.duration ?? TOAST_DURATION_MS,
+    icon: options.icon === undefined ? <Icon name="check" /> : options.icon,
     leaving: false,
   };
-  const items = [...state.items.filter((t) => t.id !== id), item];
+  const items = [...state.items, item];
   set({ items });
   const live = items.filter((t) => !t.leaving);
-  leave(live.slice(0, Math.max(0, live.length - MAX_TOASTS)).map((t) => t.serial));
-  return id;
+  leave(live.slice(0, Math.max(0, live.length - MAX_TOASTS)).map((t) => t.id));
 }
-
-/** Start the exit animation, then remove. With no id, dismisses all. */
-toast.dismiss = (id?: string) =>
-  leave(state.items.filter((t) => id === undefined || t.id === id).map((t) => t.serial));
 
 /** Remove everything immediately. For tests and teardown. */
 toast.clear = () => set({ items: [], paused: false });
 
-/** Current toasts, oldest first. For tests. */
-toast.list = (): ReadonlyArray<{ id: string; leaving: boolean }> =>
-  state.items.map(({ id, leaving }) => ({ id, leaving }));
-
 function ToastItem({ data, paused }: { data: ToastData; paused: boolean }) {
-  const { serial, duration, leaving } = data;
-  const remaining = useRef(duration);
+  const { id, leaving } = data;
+  const remaining = useRef(DURATION_MS);
   const startedAt = useRef(0);
 
   // One timer per toast. While paused it's cleared and the elapsed time is banked, so a paused toast
@@ -96,12 +81,12 @@ function ToastItem({ data, paused }: { data: ToastData; paused: boolean }) {
   useEffect(() => {
     if (paused || leaving) return;
     startedAt.current = Date.now();
-    const t = setTimeout(() => leave([serial]), Math.max(0, remaining.current));
+    const t = setTimeout(() => leave([id]), Math.max(0, remaining.current));
     return () => {
       clearTimeout(t);
       remaining.current -= Date.now() - startedAt.current;
     };
-  }, [paused, leaving, serial]);
+  }, [paused, leaving, id]);
 
   return (
     <div className={cx("toast", leaving && "out")}>
@@ -160,7 +145,7 @@ export function Toaster({ position = "bottom" }: ToasterProps) {
       onBlur={() => set({ paused: false })}
     >
       {items.map((t) => (
-        <ToastItem key={t.serial} data={t} paused={paused} />
+        <ToastItem key={t.id} data={t} paused={paused} />
       ))}
     </div>
   );
