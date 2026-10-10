@@ -63,6 +63,14 @@ examples/playground/    → Next 16 app with a Gamorite-like mock page (the prot
   5. **One priority vocabulary:** `blocking | important | minor` everywhere (UI keys, CSS classes,
      serializer), with no mapping layer.
   6. `@storybook/addon-a11y` is a dev dependency.
+- **D4. Root behaviour rulings (T08, 2026-10-10):**
+  1. The ticket's Viewport property is read-only: it records where the entry was filed. Clicking it does
+     "Show on page" on that viewport.
+  2. Capture starts when `<Proompter>` mounts (flag on), after idle, from its own small chunk, not on
+     the kit's first open. That way errors from before the reviewer opened the kit are still captured.
+     Everything patched is restored on unmount.
+  3. The command menu is non-modal with its own focus trap, so nothing touches the host document
+     (§1.2). `@radix-ui/react-dialog` is dropped if nothing else needs it.
 - **Peer dependencies:** `react >=19`, `react-dom >=19`, `next >=15.3` (optional, only for `./next`).
 - **Dependencies:**
   - `html-to-image` (snapshots)
@@ -138,7 +146,7 @@ export { POST, GET } from "@rachitkay/proompter/next/route";
 6. **Tree walk while picking:** `↑` or `[` goes to the parent, `↓` or `]` goes back down the walked
    path. Alt plus wheel does the same.
 
-## 5. Capture (in-memory ring buffers, only while the kit is enabled)
+## 5. Capture (in-memory ring buffers, while `<Proompter>` is mounted with the flag on; D4.2)
 
 - **Console:** the last 50 `error` and `warn` entries (timestamp, level, message, first stack frame).
 - **Network:** the last 50 `fetch` and XHR calls (method, URL, status, duration, a request/response
@@ -215,6 +223,7 @@ A **surface** is what the kit reviews: `{ doc, win, toScreen(rect), scale }`.
   - **Activity**
   - **File:** a markdown preview
   - **Footer:** Show on page, Copy for agent, Resolve
+  - The Viewport row is read-only, as in the prototype. Clicking it shows the entry on that viewport (D4.1).
 - **Command menu (`⌘K`):** tools, viewports, open entries, all entries, publish. Searchable, fully
   keyboard-driven.
 - **Shortcuts:**
