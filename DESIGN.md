@@ -81,6 +81,14 @@ examples/playground/    → Next 16 app with a Gamorite-like mock page (the prot
 - **D6. Route location (2026-10-10):** the dev file writer is mounted at `app/api/proompter/route.ts` and
   served at `/api/proompter`, a conventional place with no encoded folder names (`_`-prefixed app folders are
   private in Next). The client's `endpoint` is configurable and defaults to `/api/proompter`.
+- **D7. Contrast beats the prototype (2026-10-10):** WCAG AA is the floor (§11.5). The prototype's
+  `--fg-3` (#71717a, about 3.7:1) and white-on-coral primary button (about 2.9:1) fail axe, so:
+  - `--fg-3` is #8f8f98;
+  - text that used `--fg-4` now uses `--fg-3`, and `--fg-4` is only for decorative strokes and dots;
+  - the ticket's section headings are `h3` (heading order);
+  - primary-button text is the `--acc-fg` token, currently `var(--canvas)` (dark on coral). This is
+    provisional: Rachit may choose a darker coral with white text instead, which is a one-token swap.
+  `design/prototype.html`'s tokens are updated to match, so the reference doesn't drift.
 - **Peer dependencies:** `react >=19`, `react-dom >=19`, `next >=15.3` (optional, only for `./next`).
 - **Dependencies:**
   - `html-to-image` (snapshots)
@@ -119,9 +127,12 @@ examples/playground/    → Next 16 app with a Gamorite-like mock page (the prot
 import { withProompter } from "@rachitkay/proompter/next";
 export default withProompter(nextConfig, { enabled: process.env.NEXT_PUBLIC_PROOMPTER === "true" });
 
-// app/layout.tsx (inside <body>)
-import { Proompter } from "@rachitkay/proompter";
-{process.env.NEXT_PUBLIC_PROOMPTER === "true" && <Proompter session={{ reviewer: "rachit" }} />}
+// app/layout.tsx (a server layout). The flag check is constant-folded, so with the flag unset the
+// import is dropped and no Proompter chunk is referenced (§11.1). A static import would keep it.
+const Proompter = process.env.NEXT_PUBLIC_PROOMPTER === "true"
+  ? (await import("@rachitkay/proompter")).Proompter : null;
+// inside <body>:
+{Proompter && <Proompter session={{ reviewer: "rachit" }} />}
 
 // app/api/proompter/route.ts   (dev-only file writer, served at /api/proompter; D6)
 export { POST, GET } from "@rachitkay/proompter/next/route";
