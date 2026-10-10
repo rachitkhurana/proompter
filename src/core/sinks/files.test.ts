@@ -227,7 +227,7 @@ describe("files sink", () => {
   it("one rejected entry (400) does not block the others", async () => {
     const picky: typeof fetch = async (input, init) => {
       if (init?.method === "POST" && String(init.body).includes('"title":"Bad"')) {
-        return new Response(JSON.stringify({ ok: false, error: "nope" }), { status: 400, headers: { "content-type": "application/json" } });
+        return new Response(JSON.stringify({ ok: false, scope: "entry", error: "nope" }), { status: 400, headers: { "content-type": "application/json" } });
       }
       return routeFetch(input, init);
     };
@@ -381,5 +381,74 @@ describe("diskPatch", () => {
       testPlan: null,
       title: "New",
     });
+  });
+});
+
+describe("hardening, round 3", () => {
+  it("re-posting an adopted entry keeps its original Context lines", async () => {
+    const { store, sink, dir } = await setup();
+    await store.create(draft());
+    await sink.idle();
+    const file = path.join(dir, "entries", "001-avatar-is-cropped-on-mobile.md");
+    expect(await fs.readFile(file, "utf8")).toContain("- Console: 2 lines, 1 error");
+
+    const empty = newStore(); // IndexedDB cleared: the entry is adopted from the file (empty arrays + summary)
+    await empty.ready;
+    const fresh = sinkFor(empty);
+    expect((await fresh.rehydrate()).adopted).toHaveLength(1);
+    await empty.update("PRO-1", { status: "progress" });
+    await fresh.idle();
+    const md = await fs.readFile(file, "utf8");
+    expect(md).toContain("status: progress");
+    expect(md).toContain("- Console: 2 lines, 1 error");
+    expect(md).not.toContain("Console: 0 lines");
+  });
+
+  /** POSTs go to a LAN host, GETs to localhost (the rehydrate GET must not be what pauses the sink). */
+  const lan: typeof fetch = async (input, init) => {
+    const method = init?.method ?? "GET";
+    const url = new URL(String(input), method === "POST" ? "http://192.168.1.20:3000" : "http://localhost");
+    calls.push({ method, url: url.pathname, bytes: 0 });
+    const req = new Request(url, init);
+    return method === "POST" ? route.POST(req) : route.GET(req);
+  };
+
+  it("a route-level 403 stops and pauses at once: one POST for 5 entries, none on update; then allowedHosts via env works", async () => {
+    const { store, sink, dir } = await setup(lan);
+    for (let i = 1; i <= 5; i++) await store.create(draft({ title: `Entry ${i}` }));
+    await sink.idle();
+    expect(posts()).toBe(1);
+    expect(sink.paused()).toBe(true);
+    expect(sink.pending().length).toBeGreaterThan(5);
+
+    await store.update("PRO-2", { status: "progress" });
+    await sink.idle();
+    expect(posts()).toBe(1); // no re-send of every dirty entry on every event
+
+    vi.stubEnv("PROOMPTER_ALLOWED_HOSTS", "192.168.1.20");
+    const r = await sink.write();
+    expect(r.ok).toBe(true);
+    expect(sink.pending()).toEqual([]);
+    expect(await fs.readdir(path.join(dir, "entries"))).toHaveLength(5);
+  });
+
+  it("a new entry cannot take a number that is already on disk, even if create() starts before rehydrate()", async () => {
+    const a = await setup();
+    await a.store.create(draft({ title: "Disk one" }));
+    await a.sink.idle();
+
+    // eslint-disable-next-line prefer-const -- assigned after the store exists; the store's beforeCreate closure reads it
+    let gate: FilesSink | undefined;
+    const store = createStore({ session: { title: "Manual test pass", reviewer: "rachit", id: SID }, idb: null, beforeCreate: () => gate?.hydrated });
+    await store.ready;
+    const sink = sinkFor(store);
+    gate = sink;
+    const pendingCreate = store.create(draft({ title: "Brand new" })); // before the disk has been read
+    const r = await sink.rehydrate();
+    const created = await pendingCreate;
+    await sink.idle();
+    expect(r.adopted.map((e) => e.id)).toEqual(["PRO-1"]);
+    expect(created.n).toBe(2);
+    expect((await fs.readdir(path.join(a.dir, "entries"))).sort()).toEqual(["001-disk-one.md", "002-brand-new.md"]);
   });
 });
