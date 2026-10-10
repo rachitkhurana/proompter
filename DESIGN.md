@@ -21,6 +21,7 @@ can read and an AI agent can act on. Later it can open a GitHub issue too.
    No CSS leaks, no globals, no listeners.
 2. **Never touch the host's styles, and never let the host touch ours.** All UI renders inside one
    shadow root, with its own CSS.
+   The only change allowed to the host document is one `<style data-proompter-fonts>` tag (D2.2).
 3. **Point at code, not pixels.** Every entry carries `file:line`. An inherited source is labelled as
    inherited, and a missing source is labelled as missing. A guess is never shown as a fact.
 4. **Files first.** An entry is a markdown file in the repo. GitHub and every other sink are mirrors
@@ -48,6 +49,20 @@ examples/playground/    → Next 16 app with a Gamorite-like mock page (the prot
   inlined as a string export, so there's no CSS file for the host to import.
 - **TypeScript:** pinned to 5.9.x, not 7.x. tsup's dts build and typescript-eslint need the TS JS API,
   which the native 7.x port doesn't ship, and typescript-eslint requires TS <6.1.
+- **D2. UI kit rulings (T02, 2026-10-10):**
+  1. Tokens sit on a `.pp` wrapper inside the shadow root (with `all: initial`), not on `:root`.
+  2. **Fonts:** while the kit is enabled, inject one `<style data-proompter-fonts>` into `document.head`,
+     and remove it on disable. It declares the namespaced families "Proompter Sans" and "Proompter Mono",
+     so it never collides with a host that loads Geist. The files are Geist and Geist Mono variable woff2,
+     latin subset, as data URIs in the lazy UI chunk only, never the entry chunk. The system stack is the
+     fallback. Geist is OFL: ship `licenses/Geist-OFL.txt` and mention it in the README.
+  3. Tooltip and menu timings match the prototype exactly.
+  4. **Toasts pause on hover** (Sonner's rule, which beats the prototype here). The container is
+     `pointer-events: none` and each toast is `auto`. Hovering any toast pauses every timer, and a 4th
+     toast pushes the oldest out with the exit animation.
+  5. **One priority vocabulary:** `blocking | important | minor` everywhere (UI keys, CSS classes,
+     serializer), with no mapping layer.
+  6. `@storybook/addon-a11y` is a dev dependency.
 - **Peer dependencies:** `react >=19`, `react-dom >=19`, `next >=15.3` (optional, only for `./next`).
 - **Dependencies:**
   - `html-to-image` (snapshots)
