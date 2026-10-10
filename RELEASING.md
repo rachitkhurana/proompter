@@ -4,22 +4,15 @@
 publishing: no token is stored anywhere. npm only lets you set that up for a package that already exists, so the
 very first publish is manual.
 
-## First publish (0.0.1, once, by hand)
+## One-time setup (done for 0.0.1)
 
-From a clean `main` at the release commit, with Node 22.18 or newer:
-
-```sh
-pnpm install --frozen-lockfile
-npm login                                          # account rachitkay, with 2FA
-npm publish --access public --provenance=false     # prepack builds and strips the private export
-```
-
-`--provenance=false` is needed only here: `package.json` asks for provenance, which npm can only create in CI.
-
-Then on npmjs.com, open the package → **Settings** → **Trusted publishing** and add **GitHub Actions** with:
+0.0.1 was published by hand with `npm publish --access public --provenance=false`; provenance can only be made in
+CI. Trusted publishing is set up on npmjs.com → package → **Settings** → **Trusted publishing** → **GitHub Actions**:
 
 - Repository: `rachitkhurana/proompter`
 - Workflow: `release.yml`
+- Environment name: blank (the workflow uses no GitHub environment; a name here would have to match one)
+- Allowed actions: **Allow npm publish** on (the workflow runs `npm publish`), **Allow npm dist-tag** off
 
 ## Every release after that
 
