@@ -80,6 +80,16 @@
         "default": "./dist/github/index.cjs"
       }
     },
+    "./plugins": {
+      "import": {
+        "types": "./dist/plugins/index.d.ts",
+        "default": "./dist/plugins/index.js"
+      },
+      "require": {
+        "types": "./dist/plugins/index.d.cts",
+        "default": "./dist/plugins/index.cjs"
+      }
+    },
     "./package.json": "./package.json",
     "./internal/fixtures": {
       "import": {
