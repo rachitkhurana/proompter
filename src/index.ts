@@ -1,4 +1,4 @@
-export { Proompter } from "./ui/proompter";
+export { Proompter, inFrame as isProompterFrame } from "./ui/proompter";
 export type {
   ComposerSlot,
   ComposerSlotProps,
