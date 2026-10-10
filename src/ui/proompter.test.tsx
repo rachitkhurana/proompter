@@ -170,7 +170,7 @@ describe("window.__proompter", () => {
     same();
     await press("Escape", {}, shadow()!.activeElement ?? document.body);
     await wait(30);
-    await press("k", { metaKey: true });
+    await press("K", { metaKey: true, shiftKey: true });
     await until(() => dialog(), "the command menu");
     same();
     expect(document.querySelectorAll("[aria-hidden],[data-scroll-locked],[inert]")).toHaveLength(0);
@@ -319,14 +319,14 @@ describe("keyboard", () => {
     expect(sheetOpen()).toBe(true);
   });
 
-  it("⌘K opens the command menu in the shadow root, focuses its search, and toggles it", async () => {
+  it("⌘⇧K opens the command menu in the shadow root, focuses its search, and toggles it", async () => {
     await openKit();
-    await press("k", { metaKey: true });
+    await press("K", { metaKey: true, shiftKey: true });
     await until(() => dialog(), "the command menu");
     expect(document.querySelector('[role="dialog"]')).toBeNull();
     expect(shadow()?.activeElement?.getAttribute("role")).toBe("combobox");
     expect(sq('[aria-label="Command menu"][aria-pressed="true"]')).not.toBeNull();
-    await press("k", { metaKey: true });
+    await press("K", { metaKey: true, shiftKey: true });
     await wait(30);
     expect(dialog()).toBeNull();
   });
@@ -339,7 +339,7 @@ describe("keyboard", () => {
     await act(async () => row.click());
     expect(sq(".tk-title")).not.toBeNull();
     await press("p");
-    await press("k", { metaKey: true });
+    await press("K", { metaKey: true, shiftKey: true });
     await until(() => dialog(), "the command menu");
     const pick = () => sq('[aria-label="Pick element"]')?.getAttribute("aria-pressed");
     expect(pick()).toBe("true");
@@ -409,7 +409,7 @@ describe("keyboard", () => {
 describe("sheet from the keyboard and pins", () => {
   it("opens a ticket from the command menu, and Enter runs the highlighted command", async () => {
     await openKit();
-    await press("k", { metaKey: true });
+    await press("K", { metaKey: true, shiftKey: true });
     await until(() => dialog(), "the command menu");
     const search = shadow()!.activeElement as HTMLInputElement;
     await act(async () => {
@@ -441,7 +441,7 @@ describe("shortcuts keep working after things close", () => {
     await openKit();
     await press("p");
     expect(pickPressed()).toBe("true");
-    await press("k", { metaKey: true });
+    await press("K", { metaKey: true, shiftKey: true });
     await until(() => dialog(), "the command menu");
     await press("Escape", {}, shadow()!.activeElement as Element); // from the search field, as a user types it
     await wait(30);
