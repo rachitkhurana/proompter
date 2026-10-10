@@ -49,7 +49,8 @@ export function PublishPanel({ session, entries, pending, onWrite }: PublishPane
           <h3 id="pm-pub-files">Files</h3>
           <p>Each entry is a markdown file in the repo, one folder per session. Commit them with your branch.</p>
         </div>
-        <div className="tree" role="list" aria-label="Pending files">
+        {/* Focusable: long paths scroll sideways, and a scrollable region must be reachable by keyboard (axe). */}
+        <div className="tree" role="list" aria-label="Pending files" tabIndex={0}>
           {files > 0 ? (
             pending.map((f) => (
               <div key={f.path} role="listitem" className={f.change === "add" ? "a" : "m"}>
