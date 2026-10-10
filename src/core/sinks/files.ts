@@ -24,12 +24,19 @@
  * - Only on disk (IndexedDB was cleared): adopted into the store with `store.hydrate` (numbers kept, no
  *   `entry:created`), as parsed from the file.
  *
+ * ## Merge before write (3-way)
+ * An entry is rarely only edited in the UI: an agent may resolve it, or reply, while the page is open. So before
+ * a write, the sink GETs the session once and, for each entry whose file differs from the text it last knew (from
+ * `rehydrate()` or its own last write), applies the fields changed on disk (base: the last-known file) to the
+ * store first, then writes the merged entry. A field changed both on disk and in the store: the store (local)
+ * wins. If the GET fails, the write goes ahead as before.
+ *
  * ## Preview and prod
  * `enabled: false` (the default root passes `NODE_ENV === "development"`) makes `rehydrate()` skip its GET, so
  * production pages never show a failing request in the console: entries just stay pending until `write()`.
  */
 import type { Entry, Session } from "../entry";
-import { assetNames, cleanDescription, entryPath, pad, serialize } from "../serialize";
+import { assetNames, cleanDescription, entryPath, pad, parse, serialize } from "../serialize";
 import type { EntryPatch, EntryStore } from "../store";
 
 /** One file the next write creates or changes, relative to `reviews/<session>/`. */
@@ -103,6 +110,7 @@ export function diskPatch(local: Entry, disk: Entry): EntryPatch {
   if ((disk.testPlan ?? null) !== (local.testPlan ?? null)) p.testPlan = disk.testPlan ?? null;
   if ((disk.task ?? null) !== (local.task ?? null)) p.task = disk.task ?? null;
   if ((disk.resolution ?? null) !== (local.resolution ?? null)) p.resolution = disk.resolution ?? null;
+  if ((disk.replies ?? null) !== (local.replies ?? null)) p.replies = disk.replies ?? null;
   if (disk.issue !== local.issue) p.issue = disk.issue;
   return p;
 }
@@ -238,6 +246,40 @@ export function createFilesSink(opts: FilesSinkOptions): FilesSink {
     }
   }
 
+  /** The session's files on disk, or null when the route does not answer. */
+  async function readDisk(): Promise<{ path: string; markdown: string; entry: Entry }[] | null> {
+    if (opts.enabled === false) return null;
+    try {
+      const sid = store.getState().session.id;
+      const res = await doFetch(`${endpoint}?session=${encodeURIComponent(sid)}`, { headers: { [HEADER]: "1" } });
+      const body = res.ok ? await readJson(res) : null;
+      if (body?.ok !== true) return null;
+      const sessions = body.sessions as { session: Session; entries: { path: string; markdown: string; entry: Entry }[] }[] | undefined;
+      return sessions?.find((x) => x.session.id === sid)?.entries ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Pull changes made to the file since we last saw it into the store; returns the entry to write. */
+  async function mergeExternal(e: Entry, disk: { path: string; markdown: string; entry: Entry }[]): Promise<Entry> {
+    try {
+      const prefix = `entries/${pad(e.n)}-`;
+      const onDisk = disk.find((f) => f.path.startsWith(prefix));
+      const lastKnown = [...known].find(([k]) => k.startsWith(prefix))?.[1];
+      if (!onDisk || lastKnown === undefined || lastKnown === onDisk.markdown) return e;
+      const base = parse(lastKnown);
+      const external = diskPatch(base, onDisk.entry);
+      const local = diskPatch(base, e);
+      const patch: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(external)) if (!(k in local)) patch[k] = v;
+      if (Object.keys(patch).length === 0) return e;
+      return (await store.update(e.id, patch as EntryPatch, "disk")) ?? e;
+    } catch {
+      return e;
+    }
+  }
+
   async function post(auto = false): Promise<WriteResult> {
     // Queued automatic posts re-check the pause: an earlier one in the queue may have just paused the sink.
     if (auto && isPaused) return { ok: false, files: pendingList.length, error: "paused" };
@@ -246,7 +288,9 @@ export function createFilesSink(opts: FilesSinkOptions): FilesSink {
     if (todo.length === 0) return { ok: true, status: 200, files: 0 };
     const session = store.getState().session;
     let rejected: { status: number; error: string } | undefined;
-    for (const e of todo) {
+    const disk = todo.some((e) => hasNumber(e.n)) ? await readDisk() : null;
+    for (let e of todo) {
+      if (disk) e = await mergeExternal(e, disk);
       const r = await postOne(e, session);
       if (r.kind === "ok") {
         isPaused = false;
