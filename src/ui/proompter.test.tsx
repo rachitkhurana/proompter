@@ -15,6 +15,7 @@ let host: HTMLElement | undefined;
 const path0 = window.location.pathname;
 
 beforeEach(() => {
+  vi.stubEnv("NODE_ENV", "development"); // the default mode; the preview tests below stub "production"
   localStorage.clear();
 });
 
@@ -25,6 +26,7 @@ afterEach(async () => {
   window.history.replaceState(null, "", path0);
   localStorage.clear();
   toast.clear();
+  vi.unstubAllEnvs();
 });
 
 async function mount(props: ProompterProps = {}) {
@@ -72,7 +74,7 @@ describe("window.__proompter", () => {
     expect(window.__proompter).toBeUndefined();
     await mount({ deps: createFakeDeps() });
     expect(window.__proompter).toBeDefined();
-    expect(Object.keys(window.__proompter ?? {}).sort()).toEqual(["close", "entries", "open", "toggle"]);
+    expect(Object.keys(window.__proompter ?? {}).sort()).toEqual(["close", "disable", "enable", "enabled", "entries", "open", "toggle"]);
     expect(kit()).toBeNull();
     expect(document.querySelector("style[data-proompter-fonts]")).toBeNull();
     await act(async () => root?.unmount());
@@ -489,5 +491,144 @@ describe("default dependencies (T07's store)", () => {
     await press("e");
     expect(sq(".empty")?.textContent).toContain("No entries yet");
     expect(sq(".sh-hd b")?.textContent).toBe("Smoke pass");
+  });
+});
+
+describe("preview mode (D15)", () => {
+  const KEY = "proompter:enabled";
+  let originalError: typeof console.error;
+  beforeEach(() => {
+    vi.stubEnv("NODE_ENV", "production");
+    originalError = console.error;
+  });
+  /** Capture wraps the console, so a changed `console.error` means it is running. */
+  const patched = () => console.error !== originalError;
+
+  it("is dormant: no capture, no UI chunk, empty entries, open() does nothing", async () => {
+    await mount({ deps: createFakeDeps() });
+    expect(window.__proompter?.enabled()).toBe(false);
+    await act(async () => window.__proompter?.open());
+    await act(async () => window.__proompter?.toggle());
+    await wait(150); // past the idle callback that would start capture
+    expect(kit()).toBeNull();
+    expect(patched()).toBe(false);
+    expect(window.__proompter?.entries()).toEqual([]);
+  });
+
+  it("enable() starts capture and opens the kit; disable() returns to dormant", async () => {
+    await mount({ deps: createFakeDeps() });
+    await act(async () => window.__proompter?.enable());
+    await until(() => sq(".dock"), "enable() to open the kit");
+    expect(localStorage.getItem(KEY)).toBe("1");
+    expect(window.__proompter?.enabled()).toBe(true);
+    await until(patched, "capture to start");
+    await act(async () => window.__proompter?.disable());
+    expect(kit()).toBeNull();
+    expect(localStorage.getItem(KEY)).toBeNull();
+    expect(window.__proompter?.enabled()).toBe(false);
+    expect(window.__proompter?.entries()).toEqual([]);
+    expect(patched()).toBe(false);
+    await act(async () => window.__proompter?.open());
+    expect(kit()).toBeNull();
+  });
+
+  it("the chord enables a dormant kit, then toggles it", async () => {
+    await mount({ deps: createFakeDeps() });
+    await chord();
+    await until(() => sq(".dock"), "the chord to enable it");
+    await chord();
+    expect(kit()).toBeNull();
+    expect(window.__proompter?.enabled()).toBe(true);
+  });
+
+  it("stays enabled across a remount: capture starts, the kit opens on open()", async () => {
+    localStorage.setItem(KEY, "1");
+    await mount({ deps: createFakeDeps() });
+    expect(window.__proompter?.enabled()).toBe(true);
+    expect(kit()).toBeNull();
+    await until(patched, "capture to start");
+    await act(async () => window.__proompter?.open());
+    await until(() => sq(".dock"), "open()");
+  });
+
+  it("development ignores the key and is always active", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    await mount({ deps: createFakeDeps() });
+    expect(window.__proompter?.enabled()).toBe(true);
+    expect(localStorage.getItem(KEY)).toBeNull();
+  });
+
+  it("development: disable() only closes the kit, enabled() stays true, nothing is stored", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    originalError = console.error;
+    await mount({ deps: createFakeDeps() });
+    await act(async () => window.__proompter?.enable());
+    await until(() => sq(".dock"), "enable()");
+    await until(patched, "capture to start");
+    await act(async () => window.__proompter?.disable());
+    expect(kit()).toBeNull();
+    expect(window.__proompter?.enabled()).toBe(true);
+    expect(patched()).toBe(true);
+    expect(localStorage.getItem(KEY)).toBeNull();
+  });
+
+  it("enable, disable, enable: capture runs again at the end", async () => {
+    await mount({ deps: createFakeDeps() });
+    await act(async () => window.__proompter?.enable());
+    await until(patched, "capture to start");
+    await act(async () => window.__proompter?.disable());
+    expect(patched()).toBe(false);
+    await act(async () => window.__proompter?.enable());
+    await until(patched, "capture to start again");
+  });
+
+  it("two instances: disable() stops both captures", async () => {
+    localStorage.setItem(KEY, "1");
+    const mod = await import("../core/capture");
+    const real = mod.createCapture;
+    const running: boolean[] = [];
+    vi.spyOn(mod, "createCapture").mockImplementation((o) => {
+      const c = real(o);
+      const i = running.push(false) - 1;
+      return { ...c, enable: () => {
+          running[i] = true;
+          c.enable();
+        },
+        disable: () => {
+          running[i] = false;
+          c.disable();
+        },
+      };
+    });
+    await mount({ deps: createFakeDeps() });
+    const host2 = document.createElement("div");
+    document.body.appendChild(host2);
+    const root2 = createRoot(host2);
+    await act(async () => root2.render(<Proompter shadowCss="" frameSrc="about:blank" deps={createFakeDeps()} />));
+    await until(() => running.length === 2 && running.every(Boolean), "both captures to start");
+    await act(async () => window.__proompter?.disable());
+    expect(running).toEqual([false, false]);
+    await act(async () => window.__proompter?.enable());
+    await until(() => running.every(Boolean), "both captures to start again");
+    await act(async () => root2.unmount());
+    vi.restoreAllMocks();
+    host2.remove();
+  });
+
+  it("storage that throws does not crash: enable() is active for this page only", async () => {
+    const boom = () => {
+      throw new Error("denied");
+    };
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(boom);
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(boom);
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(boom);
+    await mount({ deps: createFakeDeps() });
+    expect(window.__proompter?.enabled()).toBe(false);
+    await act(async () => window.__proompter?.enable());
+    await until(() => sq(".dock"), "enable()");
+    expect(window.__proompter?.enabled()).toBe(true);
+    await act(async () => window.__proompter?.disable());
+    expect(window.__proompter?.enabled()).toBe(false);
+    vi.restoreAllMocks();
   });
 });
