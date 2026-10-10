@@ -78,6 +78,9 @@ examples/playground/    → Next 16 app with a Gamorite-like mock page (the prot
      Everything patched is restored on unmount.
   3. The command menu is non-modal with its own focus trap, so nothing touches the host document
      (§1.2). `@radix-ui/react-dialog` is dropped if nothing else needs it.
+- **D6. Route location (2026-10-10):** the dev file writer is mounted at `app/api/proompter/route.ts` and
+  served at `/api/proompter`, a conventional place with no encoded folder names (`_`-prefixed app folders are
+  private in Next). The client's `endpoint` is configurable and defaults to `/api/proompter`.
 - **Peer dependencies:** `react >=19`, `react-dom >=19`, `next >=15.3` (optional, only for `./next`).
 - **Dependencies:**
   - `html-to-image` (snapshots)
@@ -120,7 +123,7 @@ export default withProompter(nextConfig, { enabled: process.env.NEXT_PUBLIC_PROO
 import { Proompter } from "@rachitkay/proompter";
 {process.env.NEXT_PUBLIC_PROOMPTER === "true" && <Proompter session={{ reviewer: "rachit" }} />}
 
-// app/__proompter/route.ts   (dev-only file writer)
+// app/api/proompter/route.ts   (dev-only file writer, served at /api/proompter; D6)
 export { POST, GET } from "@rachitkay/proompter/next/route";
 ```
 
