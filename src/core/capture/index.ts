@@ -1,8 +1,7 @@
 import { createConsolePatches } from "./console.ts";
 import { createFetchPatch, createXhrPatches } from "./network.ts";
 import type { Patch } from "./patch.ts";
-import { excerpt, redactHeaders, redactString, redactText, redactUrl } from "./redact.ts";
-import { Ring } from "./ring.ts";
+import { redactConsoleEntry, redactNetworkEntry } from "./redact.ts";
 import { takeSnapshot } from "./snapshot.ts";
 import type {
   Capture,
@@ -15,40 +14,17 @@ import type {
   CaptureQuery,
 } from "./types.ts";
 
-export type {
-  Capture,
-  CaptureConsoleEntry,
-  CaptureContext,
-  CaptureEntry,
-  CaptureInternalError,
-  CaptureNetworkEntry,
-  CaptureOptions,
-  CaptureQuery,
-  Rect,
-  SnapshotResult,
-  Surface,
-} from "./types.ts";
-export { REDACTED, excerpt, redactHeaders, redactString, redactText, redactUrl } from "./redact.ts";
-export { RING_CAP } from "./ring.ts";
+const RING_CAP = 50;
 
-function redactConsole(e: CaptureConsoleEntry): CaptureConsoleEntry {
+/** Keeps the last `RING_CAP` items. */
+function createRing<T>() {
+  const items: T[] = [];
   return {
-    ...e,
-    message: excerpt(redactText(e.message)),
-    ...(e.frame !== undefined ? { frame: redactUrl(e.frame) } : {}),
-  };
-}
-
-function redactNetwork(e: CaptureNetworkEntry): CaptureNetworkEntry {
-  const { requestHeaders, responseHeaders, requestExcerpt, responseExcerpt, error, ...rest } = e;
-  return {
-    ...rest,
-    url: redactUrl(e.url),
-    ...(error !== undefined ? { error: redactString(error) } : {}),
-    ...(requestHeaders ? { requestHeaders: redactHeaders(requestHeaders) } : {}),
-    ...(responseHeaders ? { responseHeaders: redactHeaders(responseHeaders) } : {}),
-    ...(requestExcerpt !== undefined ? { requestExcerpt: excerpt(redactText(requestExcerpt)) } : {}),
-    ...(responseExcerpt !== undefined ? { responseExcerpt: excerpt(redactText(responseExcerpt)) } : {}),
+    push(item: T): void {
+      items.push(item);
+      if (items.length > RING_CAP) items.splice(0, items.length - RING_CAP);
+    },
+    toArray: (): T[] => items.slice(),
   };
 }
 
@@ -58,9 +34,9 @@ function redactNetwork(e: CaptureNetworkEntry): CaptureNetworkEntry {
  */
 export function createCapture(opts: CaptureOptions): Capture {
   const { win } = opts;
-  const consoleRing = new Ring<CaptureConsoleEntry>();
-  const networkRing = new Ring<CaptureNetworkEntry>();
-  const errorRing = new Ring<CaptureInternalError>();
+  const consoleRing = createRing<CaptureConsoleEntry>();
+  const networkRing = createRing<CaptureNetworkEntry>();
+  const errorRing = createRing<CaptureInternalError>();
   let patches: Patch[] | null = null;
   let enabled = false;
 
@@ -81,14 +57,14 @@ export function createCapture(opts: CaptureOptions): Capture {
   const consoleSink = {
     fail,
     push(entry: CaptureConsoleEntry) {
-      const out = applyHook(redactConsole(entry));
+      const out = applyHook(redactConsoleEntry(entry));
       if (out) consoleRing.push(out);
     },
   };
   const networkSink = {
     fail,
     push(entry: CaptureNetworkEntry) {
-      const out = applyHook(redactNetwork(entry));
+      const out = applyHook(redactNetworkEntry(entry));
       if (out) networkRing.push(out);
     },
   };
@@ -100,9 +76,6 @@ export function createCapture(opts: CaptureOptions): Capture {
   ];
 
   return {
-    get enabled() {
-      return enabled;
-    },
     enable() {
       if (enabled) return;
       try {
@@ -137,10 +110,6 @@ export function createCapture(opts: CaptureOptions): Capture {
         queries,
         internalErrors: errorRing.toArray(),
       };
-    },
-    clear() {
-      consoleRing.clear();
-      networkRing.clear();
     },
     snapshot: (surface, el) => takeSnapshot(surface, el, fail),
   };

@@ -4,8 +4,9 @@
  */
 import { useEffect, useRef, useState } from "react";
 import type { Entry, EntryActivity, EntryKind, EntryTarget, Session } from "../../core/entry";
-import type { PickCommit } from "../../core/pick";
-import type { ResolvedTarget } from "../../core/resolve";
+import { assetNames, entryPath, pad } from "../../core/serialize";
+import { viewportSize } from "../../core/surface";
+import { commitTargets, toEntryTarget } from "../composer/composer";
 import { Button } from "../primitives/button";
 import type {
   ComposerSlotProps,
@@ -16,14 +17,6 @@ import type {
   Serialize,
   StoreState,
 } from "../proompter-deps";
-import { pad3 } from "./format";
-
-export const slugify = (s: string) =>
-  s
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 42) || "note";
 
 // -- seed ------------------------------------------------------------------------------------------------
 
@@ -71,9 +64,8 @@ function target(source: string | null, label: string, component: string, selecto
 type Seed = Partial<Entry> & Pick<Entry, "n" | "title" | "status" | "intent" | "priority" | "viewport">;
 
 function seedEntry(s: Seed): Entry {
-  const size =
-    s.viewport === "mobile" ? { width: 390, height: 844 } : s.viewport === "tablet" ? { width: 834, height: 1194 } : s.viewport === "desktop" ? { width: 1440, height: 900 } : { width: 1280, height: 800 };
-  const created = `2026-10-10T12:${String(40 + s.n).padStart(2, "0")}:00Z`;
+  const size = viewportSize(s.viewport, false) ?? { width: 1280, height: 800 };
+  const created = `2026-10-10T12:${pad(40 + s.n, 2)}:00Z`;
   const t = s.target ?? target(null, "Page", "Page", "body");
   return {
     id: `PRO-${s.n}`,
@@ -219,8 +211,8 @@ export function createFakeStore(init?: FakeInit): FakeStore {
     return [
       { path: "session.md", change: "modify" },
       ...list.flatMap((e): PendingFile[] => [
-        { path: `entries/${pad3(e.n)}-${slugify(e.title)}.md`, change: "add" },
-        { path: `assets/${pad3(e.n)}-${e.viewport}.png`, change: "add" },
+        { path: entryPath(e), change: "add" },
+        { path: `assets/${assetNames(e.n, e.viewport).element}`, change: "add" },
       ]),
     ];
   };
@@ -308,31 +300,9 @@ export const fakeSerialize: Serialize = (e, s) =>
     .join("\n")
     .replace(/\n{3,}/g, "\n\n");
 
-export const fakeEntryPath = (e: Entry, s: Session) => `reviews/${s.id}/entries/${pad3(e.n)}-${slugify(e.title)}.md`;
+export const fakeEntryPath = (e: Entry, s: Session) => `reviews/${s.id}/${entryPath(e)}`;
 
 // -- composer --------------------------------------------------------------------------------------------
-
-const toTarget = (t: ResolvedTarget): EntryTarget => ({
-  selector: t.selector,
-  source: t.source,
-  sourceInherited: t.inherited,
-  label: t.label,
-  component: t.crumb,
-});
-
-function targetsOf(c: PickCommit): ResolvedTarget[] {
-  switch (c.kind) {
-    case "element":
-      return [c.target];
-    case "multi":
-    case "box":
-      return c.targets;
-    case "text":
-      return c.target ? [c.target] : [];
-    default:
-      return [];
-  }
-}
 
 /** A bare-bones composer for tests and the fixture: a title, `⌘↵` to create. T07's replaces it. */
 function FakeComposer({ props, store }: { props: ComposerSlotProps; store: FakeStore }) {
@@ -350,7 +320,7 @@ function FakeComposer({ props, store }: { props: ComposerSlotProps; store: FakeS
     }
     const entries = store.getSnapshot().entries;
     const n = entries.reduce((m, e) => Math.max(m, e.n), 0) + 1;
-    const targets = targetsOf(commit).map(toTarget);
+    const targets = commitTargets(commit).map(toEntryTarget);
     const ctx = getCapture().context();
     const now = new Date().toISOString();
     const entry: Entry = {

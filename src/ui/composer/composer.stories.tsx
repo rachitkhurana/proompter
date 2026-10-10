@@ -1,14 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { useLayoutEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { expect, userEvent, waitFor, within } from "storybook/test";
 import type { ProompterPlugin } from "../../core/entry";
 import type { PickCommit } from "../../core/pick";
 import { resolveTarget } from "../../core/resolve";
-import { createPageSurface, type Rect } from "../../core/surface";
+import { createPageSurface, VIEWPORTS, type Rect } from "../../core/surface";
 import { Button } from "../primitives/button";
-import { Toaster } from "../primitives/toast";
+import { Toaster, toast } from "../primitives/toast";
 import { shadowOf } from "../primitives/story-frame";
-import { Composer, type ComposerResult } from "./composer";
+import { Composer, type ComposerHandle, type ComposerResult } from "./composer";
 import { createMemoryStore, createStubCapture, mountMockPage, samplePlugin } from "./composer-fixtures";
 import { unionBox } from "./place";
 
@@ -59,8 +59,9 @@ function buildCommit(kind: Case, els: ReturnType<typeof mountMockPage>["els"]): 
   }
 }
 
-function Harness({ kind, plugins, tags }: { kind: Case; plugins?: readonly ProompterPlugin[]; tags?: readonly string[] }) {
+function Harness({ kind, plugins }: { kind: Case; plugins?: readonly ProompterPlugin[] }) {
   const [commit, setCommit] = useState<PickCommit | null>(null);
+  const handle = useRef<ComposerHandle>(null);
   const [result, setResult] = useState<ComposerResult | null>(null);
   const [round, setRound] = useState(0);
   const surface = useMemo(() => createPageSurface(window), []);
@@ -73,12 +74,32 @@ function Harness({ kind, plugins, tags }: { kind: Case; plugins?: readonly Proom
     return page.dispose;
   }, [kind, round]);
 
+  // The root owns Esc and the "saved" toast; this harness stands in for it.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !e.defaultPrevented) handle.current?.discard();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+  const onClose = (r: ComposerResult) => {
+    if (r.type === "saved") {
+      toast(
+        <>
+          <b style={{ fontWeight: 500 }}>{r.entry.id}</b> saved on {VIEWPORTS[r.entry.viewport].label.toLowerCase()}
+        </>,
+      );
+    }
+    setResult(r);
+  };
+
   const size = surface.size();
   return (
     <>
       {commit && !result ? (
         <Composer
           key={round}
+          ref={handle}
           commit={commit}
           surface={surface}
           viewport="responsive"
@@ -88,8 +109,7 @@ function Harness({ kind, plugins, tags }: { kind: Case; plugins?: readonly Proom
           capture={capture}
           store={store}
           plugins={plugins}
-          tags={tags}
-          onClose={setResult}
+          onClose={onClose}
         />
       ) : (
         <div style={{ position: "fixed", left: 16, bottom: 16, display: "flex", gap: 12, alignItems: "center", zIndex: 100 }}>

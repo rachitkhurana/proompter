@@ -52,3 +52,22 @@ test("ticket", async ({ page }) => {
   const sheet = page.getByLabel("Review session", { exact: true });
   await expect(sheet).toHaveScreenshot("ticket.png", { ...shot, mask: [sheet.getByRole("time")] });
 });
+
+// The REAL composer (the kit fixture above uses a stand-in): pick the avatar on the playground page.
+// Guards the element-case composer's CSS. The captured-context counts depend on the dev server, so they are masked.
+test("composer (real, element)", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForFunction(() => !!window.__proompter);
+  await page.keyboard.press("ControlOrMeta+Shift+.");
+  await expect(page.locator(".dock")).not.toHaveClass(/\bintro\b/);
+  await page.evaluate(() => document.fonts.ready);
+  await page.getByRole("button", { name: "Pick element", exact: true }).click();
+  const avatar = page.getByTestId("post-avatar");
+  await avatar.hover();
+  await avatar.click();
+  const composer = page.getByRole("dialog", { name: "New entry" });
+  await expect(composer).toBeVisible();
+  await page.mouse.move(0, 0);
+  await page.waitForTimeout(500); // the grow-in is over
+  await expect(composer).toHaveScreenshot("composer-real.png", { ...shot, mask: [composer.locator("summary, .pm-ctx")] });
+});

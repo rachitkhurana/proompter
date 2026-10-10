@@ -136,7 +136,7 @@ const splitComp = (v: string) =>
 const lastComp = (v: string) => splitComp(v).pop() ?? v.trim();
 
 /** Component chain (outermost first) from the `data-comp` ancestors, then the element's own label if it is not a component root. */
-export function crumbPartsOf(el: Element): string[] {
+function crumbPartsOf(el: Element): string[] {
   const chain: string[] = [];
   for (let n: Element | null = el; n; n = n.parentElement) {
     const c = attr(n, "data-comp");
@@ -153,11 +153,12 @@ export function crumbPartsOf(el: Element): string[] {
 const srcSelector = (src: string) =>
   `[data-src="${src.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\a ")}"]`;
 
-function count(doc: Document, selector: string): number {
+/** Every element matching `selector`; none when the selector is invalid. */
+function matches(doc: Document, selector: string): Element[] {
   try {
-    return doc.querySelectorAll(selector).length;
+    return [...doc.querySelectorAll(selector)];
   } catch {
-    return 0;
+    return [];
   }
 }
 
@@ -193,7 +194,7 @@ export function selectorFor(target: Element): string {
   const own = attr(el, "data-src");
   if (own) {
     const s = srcSelector(own);
-    if (count(doc, s) === 1) return s;
+    if (matches(doc, s).length === 1) return s;
   }
   const parts: string[] = [];
   for (let n: Element | null = el; n && n !== doc.body && n !== doc.documentElement; n = n.parentElement) {
@@ -201,9 +202,10 @@ export function selectorFor(target: Element): string {
       const src = attr(n, "data-src");
       if (src) {
         const s = srcSelector(src);
-        if (count(doc, s) === 1) {
+        if (matches(doc, s).length === 1) {
           const candidate = `${s} > ${parts.join(" > ")}`;
-          if (isExactly(doc, candidate, el)) return candidate;
+          const found = matches(doc, candidate);
+          if (found.length === 1 && found[0] === el) return candidate;
           break;
         }
       }
@@ -211,15 +213,6 @@ export function selectorFor(target: Element): string {
     parts.unshift(step(n));
   }
   return fullChain(el, doc);
-}
-
-function isExactly(doc: Document, selector: string, el: Element): boolean {
-  try {
-    const found = doc.querySelectorAll(selector);
-    return found.length === 1 && found[0] === el;
-  } catch {
-    return false;
-  }
 }
 
 /** Re-resolve a stored selector. Null when it matches nothing, or is invalid. */
@@ -250,9 +243,6 @@ export interface ResolvedTarget extends TargetInfo {
   selector: string;
   /** Component chain down to the element, joined with ` › `. */
   crumb: string;
-  crumbParts: string[];
-  /** Reserved for the query-cache adapter. */
-  query?: string;
 }
 
 export function describeTarget(el: Element): TargetInfo {
@@ -260,9 +250,8 @@ export function describeTarget(el: Element): TargetInfo {
   return { el, source: a ? attr(a, "data-src") : null, inherited: !!a && a !== el, label: labelOf(el) };
 }
 
-/** `resolveTarget(el) -> { el, selector, source, inherited, label, crumb, query? }` (DESIGN §4). */
+/** `resolveTarget(el) -> { el, selector, source, inherited, label, crumb }` (DESIGN §4). */
 export function resolveTarget(target: Element): ResolvedTarget {
   const el = retarget(target);
-  const parts = crumbPartsOf(el);
-  return { ...describeTarget(el), selector: selectorFor(el), crumb: parts.join(" › "), crumbParts: parts };
+  return { ...describeTarget(el), selector: selectorFor(el), crumb: crumbPartsOf(el).join(" › ") };
 }

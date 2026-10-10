@@ -6,6 +6,7 @@
  * Closed form, so the result does not depend on the frame rate:
  *   d(t) = (d0 + (v0 + w*d0) * t) * e^(-w*t), with w = 2*pi / response and d = value - to.
  */
+import { reducedMotion } from "./motion";
 
 export interface SpringOptions {
   from: number;
@@ -28,18 +29,10 @@ const RESPONSE = 0.35;
 const REST_DISTANCE = 0.1;
 const REST_SPEED = 1;
 
-export function prefersReducedMotion(): boolean {
-  try {
-    return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-  } catch {
-    return false;
-  }
-}
-
 /** Animate `from` to `to` on requestAnimationFrame. With reduced motion it jumps straight to `to`. */
 export function spring(o: SpringOptions): SpringHandle {
   const w = (2 * Math.PI) / RESPONSE;
-  if (o.reducedMotion ?? prefersReducedMotion()) {
+  if (o.reducedMotion ?? reducedMotion()) {
     o.onUpdate(o.to);
     o.onDone?.();
     return { cancel() {} };

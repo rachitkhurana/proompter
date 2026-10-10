@@ -53,8 +53,6 @@ export const VIEWPORTS: Record<ViewportId, ViewportSpec> = {
   mobile: { id: "mobile", label: "Mobile", size: [390, 844], bezel: 10, radius: 38 },
 };
 
-/** The lowest the fit-scale goes. */
-export const MIN_SCALE = 0.15;
 export const FRAME_PARAM = "__proompter_frame";
 
 export const rectRight = (r: Rect) => r.left + r.width;
@@ -75,11 +73,6 @@ export function viewportSize(vp: ViewportId, rotated: boolean): { width: number;
   const s = VIEWPORTS[vp].size;
   if (!s) return null;
   return rotated ? { width: s[1], height: s[0] } : { width: s[0], height: s[1] };
-}
-
-/** `max(.15, min(1, availW / w, availH / h))`. */
-export function fitScale(avail: { width: number; height: number }, size: { width: number; height: number }): number {
-  return Math.max(MIN_SCALE, Math.min(1, avail.width / size.width, avail.height / size.height));
 }
 
 export interface Padding {
@@ -125,7 +118,8 @@ export function layoutDevice(opts: {
     width: opts.stage.width - opts.padding.left - opts.padding.right - bezel * 2,
     height: opts.stage.height - opts.padding.top - opts.padding.bottom - bezel * 2,
   };
-  const scale = fitScale(avail, size);
+  // `max(.15, min(1, availW / w, availH / h))`: never scaled up, never below 15%.
+  const scale = Math.max(0.15, Math.min(1, avail.width / size.width, avail.height / size.height));
   return {
     size,
     scale,
@@ -245,11 +239,7 @@ export type FrameLike = Pick<
  * browser error page because of X-Frame-Options / CSP), so the caller can show the "can't be framed" notice.
  * Create a new surface after every frame load.
  */
-export function createFrameSurface(
-  frame: FrameLike,
-  viewport: ViewportId,
-  opts: { scale?: () => number } = {},
-): PickSurface | null {
+export function createFrameSurface(frame: FrameLike, viewport: ViewportId): PickSurface | null {
   const reached = ((): { doc: Document; win: SurfaceWindow } | null => {
     try {
       const d = frame.contentDocument;
@@ -262,26 +252,22 @@ export function createFrameSurface(
   })();
   if (!reached || reached.doc.URL.startsWith("chrome-error:")) return null;
   const { doc, win } = reached;
-  const frameDoc = doc;
-  const frameWin = win;
   const hostWin = frame.ownerDocument.defaultView ?? window;
 
   // The frame is laid out at the preset size and scaled with `transform` (origin 0 0), so the ratio of its
   // painted box to its layout box is the scale.
-  const getScale =
-    opts.scale ??
-    (() => {
-      const w = frame.offsetWidth;
-      return w ? frame.getBoundingClientRect().width / w : 1;
-    });
+  const getScale = () => {
+    const w = frame.offsetWidth;
+    return w ? frame.getBoundingClientRect().width / w : 1;
+  };
 
   const bus = createLayoutBus(hostWin, (emit) => {
-    frameDoc.addEventListener("scroll", emit, { capture: true, passive: true });
-    frameWin.addEventListener("resize", emit);
+    doc.addEventListener("scroll", emit, { capture: true, passive: true });
+    win.addEventListener("resize", emit);
     hostWin.addEventListener("resize", emit);
     return () => {
-      frameDoc.removeEventListener("scroll", emit, { capture: true });
-      frameWin.removeEventListener("resize", emit);
+      doc.removeEventListener("scroll", emit, { capture: true });
+      win.removeEventListener("resize", emit);
       hostWin.removeEventListener("resize", emit);
     };
   });
@@ -290,8 +276,8 @@ export function createFrameSurface(
     kind: "frame",
     viewport,
     frame: frame as HTMLIFrameElement,
-    doc: frameDoc,
-    win: frameWin,
+    doc,
+    win,
     get scale() {
       return getScale();
     },
@@ -305,7 +291,7 @@ export function createFrameSurface(
     emitLayout: bus.emit,
   };
   // Text reflows when the frame's web fonts arrive: re-measure pins and selections.
-  void frameDoc.fonts?.ready.then(bus.emit, () => {});
+  void doc.fonts?.ready.then(bus.emit, () => {});
   return surface;
 }
 

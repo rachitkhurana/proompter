@@ -1,10 +1,11 @@
 import { toPng } from "html-to-image";
-import type { SnapshotResult, Surface } from "./types.ts";
+import type { Surface } from "../surface";
+import type { SnapshotResult } from "./types.ts";
 
 const PADDING = 12;
 
 /** Keeps the kit's own UI out of the PNG. */
-export function snapshotFilter(node: Node): boolean {
+function snapshotFilter(node: Node): boolean {
   if (node.nodeType !== 1) return true;
   const el = node as Element;
   // The host is a custom element whose TAG is `proompter-root` (HOST_TAG in src/ui/shadow-root.tsx).

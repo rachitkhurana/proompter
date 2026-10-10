@@ -7,12 +7,12 @@ afterEach(() => {
 });
 
 describe("returnFocusFromFrame", () => {
-  it("blurs a focused device frame and reports it", () => {
+  it("blurs a focused device frame", () => {
     const frame = document.createElement("iframe");
     document.body.append(frame);
     frame.focus();
     expect(document.activeElement).toBe(frame);
-    expect(returnFocusFromFrame()).toBe(true);
+    returnFocusFromFrame();
     expect(document.activeElement).not.toBe(frame);
   });
 
@@ -20,7 +20,7 @@ describe("returnFocusFromFrame", () => {
     const btn = document.createElement("button");
     document.body.append(btn);
     btn.focus();
-    expect(returnFocusFromFrame()).toBe(false);
+    returnFocusFromFrame();
     expect(document.activeElement).toBe(btn);
   });
 });

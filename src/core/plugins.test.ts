@@ -200,4 +200,11 @@ describe("applyRedact (fails closed)", () => {
     const r = applyRedact([strip], e);
     expect(r.ok).toBe(false);
   });
+
+  it("a plugin result that cannot be cloned is reported as plugin '(clone)'", () => {
+    const e = makeEntry();
+    const withFn = (x: Entry): Entry => ({ ...x, extra: { fn: () => 1 } });
+    const r = applyRedact([{ name: "fn", redact: withFn }], e);
+    expect(r).toMatchObject({ ok: false, plugin: "(clone)" });
+  });
 });

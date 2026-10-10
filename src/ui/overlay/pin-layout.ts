@@ -15,8 +15,8 @@ export interface PinModel {
   route?: string | null;
   /** Element selector. Null or empty for page notes. */
   selector: string | null;
-  /** Shown in the hover card. Defaults to `PRO-<id>`. */
-  ref?: string;
+  /** Shown in the hover card and the pin's name (`PRO-5`). */
+  ref: string;
 }
 
 export interface PlacedPin {

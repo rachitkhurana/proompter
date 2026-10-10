@@ -97,6 +97,16 @@ export interface ProompterDeps {
   composer: ComposerSlot;
 }
 
+/**
+ * What must outlive the UI chunk mounting and unmounting (hiding the kit with `⌘⇧.` keeps the session and the
+ * console and network buffers): the deps, and the host window's capture. The light entry chunk owns one; the
+ * lazy UI chunk fills it.
+ */
+export interface DepsBox {
+  deps?: ProompterDeps;
+  capture?: Capture;
+}
+
 export interface ProompterSessionInput {
   reviewer?: string;
   title?: string;

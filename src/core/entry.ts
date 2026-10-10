@@ -9,12 +9,17 @@
 import type { CaptureConsoleEntry, CaptureNetworkEntry, CaptureQuery } from "./capture/types";
 import type { ViewportId } from "./surface";
 
-export type EntryStatus = "open" | "progress" | "resolved";
-export type EntryIntent = "fix" | "change" | "question" | "approve";
+export const ENTRY_STATUSES = ["open", "progress", "resolved"] as const;
+export const ENTRY_INTENTS = ["fix", "change", "question", "approve"] as const;
 /** One vocabulary everywhere (DESIGN §2 D2.5). */
-export type EntryPriority = "blocking" | "important" | "minor";
+export const ENTRY_PRIORITIES = ["blocking", "important", "minor"] as const;
 /** How the target was chosen; the composer's header and the entry body vary with it. */
-export type EntryKind = "element" | "multi" | "box" | "text" | "note";
+export const ENTRY_KINDS = ["element", "multi", "box", "text", "note"] as const;
+
+export type EntryStatus = (typeof ENTRY_STATUSES)[number];
+export type EntryIntent = (typeof ENTRY_INTENTS)[number];
+export type EntryPriority = (typeof ENTRY_PRIORITIES)[number];
+export type EntryKind = (typeof ENTRY_KINDS)[number];
 
 /** One picked element. Multi and box entries carry several. */
 export interface EntryTarget {

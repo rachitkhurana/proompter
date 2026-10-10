@@ -12,7 +12,7 @@ function face(family: string, base64: string): string {
 }
 
 /** The `@font-face` CSS for "Proompter Sans" and "Proompter Mono". Empty until the fonts are generated. */
-export function fontsCss(): string {
+function fontsCss(): string {
   return face("Proompter Sans", GEIST_SANS_WOFF2_BASE64) + face("Proompter Mono", GEIST_MONO_WOFF2_BASE64);
 }
 

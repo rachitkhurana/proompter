@@ -17,17 +17,12 @@ export function clockSeconds(ms: number): string {
   return `${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`;
 }
 
-export const pad3 = (n: number) => String(n).padStart(3, "0");
-
 export const viewportLabel = (v: ViewportId) => VIEWPORTS[v].label;
 
 /** `390×844` (the exact size the entry was filed at). */
 export function sizeLabel(e: Pick<Entry, "size">): string {
   return `${e.size.width}×${e.size.height}`;
 }
-
-/** `path/to/post-card.tsx:48:7` -> `post-card.tsx:48:7`. */
-export const shortSource = (source: string) => source.split("/").pop() ?? source;
 
 /** The last two segments of a path: `entries/005-avatar-cropped.md`. */
 export const tailPath = (path: string) => path.split("/").slice(-2).join("/");
@@ -36,9 +31,4 @@ export const tailPath = (path: string) => path.split("/").slice(-2).join("/");
 export function sessionSubtitle(s: { branch?: string; sha?: string; env?: string }): string {
   const build = s.branch && s.sha ? `${s.branch}@${s.sha}` : (s.branch ?? s.sha ?? "");
   return [build, s.env].filter(Boolean).join(" · ");
-}
-
-/** Snapshot file names, as the files sink writes them (DESIGN §8). */
-export function snapshotFile(e: Pick<Entry, "n" | "viewport">, mode: "element" | "viewport"): string {
-  return `${pad3(e.n)}-${e.viewport}${mode === "viewport" ? "-full" : ""}.png`;
 }

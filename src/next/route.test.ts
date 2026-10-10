@@ -237,10 +237,11 @@ describe("write, update, rename", () => {
     expect(idx.entries.map((i) => i.file)).toEqual(["entries/005-avatar-is-clipped.md"]);
   });
 
-  it("does not delete other entries when one is renamed, and accepts a batch", async () => {
+  it("does not delete other entries when one is renamed", async () => {
     const one = makeEntry({ id: "PRO-1", n: 1, title: "First" });
     const two = makeEntry({ id: "PRO-2", n: 2, title: "Second" });
-    expect((await post({ session: makeSession(), entries: [one, two] })).status).toBe(200);
+    expect((await post({ session: makeSession(), entry: one })).status).toBe(200);
+    expect((await post({ session: makeSession(), entry: two })).status).toBe(200);
     await post({ session: makeSession(), entry: { ...one, title: "First renamed" } });
     expect((await fs.readdir(path.join(reviews(), "entries"))).sort()).toEqual(["001-first-renamed.md", "002-second.md"]);
     const idx = parseSession(await fs.readFile(path.join(reviews(), "session.md"), "utf8"));

@@ -153,7 +153,6 @@ describe("crumb", () => {
     html(PAGE);
     const t = resolveTarget($("#avatar-1"));
     expect(t.crumb).toBe("FeedPage › PostCard › Avatar › img · avatar");
-    expect(t.crumbParts).toEqual(["FeedPage", "PostCard", "Avatar", "img · avatar"]);
   });
 
   it("ends at the component when the element is a component root", () => {

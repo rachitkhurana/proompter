@@ -231,9 +231,7 @@ describe("update and resolve", () => {
 describe("persistence (IndexedDB)", () => {
   it("writes the session and every entry, and updates them", async () => {
     const { store, idb } = make();
-    expect(store.getState().persistence).toBe("pending");
     await store.ready;
-    expect(store.getState().persistence).toBe("indexeddb");
     const a = await store.create(draft({ snapshot: { element: PNG, fontsEmbedded: true } }));
     await store.update(a.id, { status: "progress" });
     await store.flush();
@@ -319,7 +317,6 @@ describe("persistence falls back to memory", () => {
       const events: EntryEvent[] = [];
       store.on((e) => events.push(e));
       await store.ready;
-      expect(store.getState().persistence).toBe("memory");
       expect(store.getState().ready).toBe(true);
       const e = await store.create(draft());
       expect(e.id).toBe("PRO-1");
@@ -338,7 +335,6 @@ describe("persistence falls back to memory", () => {
       void store.ready.then(() => (ready = true));
       await vi.advanceTimersByTimeAsync(3000);
       expect(ready).toBe(true);
-      expect(store.getState().persistence).toBe("memory");
     } finally {
       vi.useRealTimers();
     }
@@ -355,30 +351,39 @@ describe("persistence falls back to memory", () => {
     expect(store.getState().entries[0]?.status).toBe("progress");
   });
 
-  it("a failed write switches to memory and says so; the entry is still filed", async () => {
-    const { store, idb } = make();
+  it("a failed write calls onWriteError once per burst; the entry is still filed", async () => {
+    const onWriteError = vi.fn();
+    const { store, idb } = make({ onWriteError });
     await store.ready;
-    expect(store.getState().lastWriteError).toBeNull();
     const a = await store.create(draft());
     await store.flush();
-    expect(store.getState().persistence).toBe("indexeddb");
+    expect(onWriteError).not.toHaveBeenCalled();
     idb.options.failWrites = true;
     await store.update(a.id, { status: "progress" });
     await store.flush();
-    expect(store.getState().persistence).toBe("memory");
-    expect(store.getState().lastWriteError).toMatch(/IndexedDB/);
+    expect(onWriteError).toHaveBeenCalledTimes(1);
     const b = await store.create(draft());
+    await store.flush();
     expect(b.n).toBe(2);
     expect(store.getState().entries).toHaveLength(2);
+    expect(onWriteError).toHaveBeenCalledTimes(1);
+    idb.options.failWrites = false;
+    await store.update(a.id, { status: "resolved" });
+    await store.flush();
+    idb.options.failWrites = true;
+    await store.update(a.id, { status: "open" });
+    await store.flush();
+    expect(onWriteError).toHaveBeenCalledTimes(2);
   });
 
-  it("a failed create write also warns", async () => {
-    const { store, idb } = make();
+  it("a failed create write also calls onWriteError", async () => {
+    const onWriteError = vi.fn();
+    const { store, idb } = make({ onWriteError });
     await store.ready;
     idb.options.failWrites = true;
     const e = await store.create(draft());
     expect(e.id).toBe("PRO-1");
-    expect(store.getState()).toMatchObject({ persistence: "memory", lastWriteError: expect.stringContaining("IndexedDB") as string });
+    expect(onWriteError).toHaveBeenCalledTimes(1);
   });
 
   it("with no indexedDB global at all (SSR, old browsers), runs in memory", async () => {
@@ -386,7 +391,6 @@ describe("persistence falls back to memory", () => {
     try {
       const store = createStore({ session });
       await store.ready;
-      expect(store.getState().persistence).toBe("memory");
       expect((await store.create(draft())).id).toBe("PRO-1");
     } finally {
       vi.unstubAllGlobals();

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { isToggleChord } from "./chord";
-import { escapeStep, handleKeydown, type KeyActions, type KeyState } from "./shortcuts";
+import { handleKeydown, type KeyActions, type KeyState } from "./shortcuts";
 
 const idle: KeyState = {
   menuOpen: false,
@@ -67,7 +67,7 @@ function field(tag: "input" | "textarea" | "div") {
 
 describe("Esc order", () => {
   it("closes one thing at a time: menu, composer, command menu, mode, ticket, sheet", () => {
-    const state: KeyState = {
+    let state: KeyState = {
       menuOpen: true,
       composerOpen: true,
       commandOpen: true,
@@ -75,15 +75,19 @@ describe("Esc order", () => {
       sheetOpen: true,
       ticketOpen: true,
     };
-    expect(escapeStep(state)).toBe("menu");
-    expect(escapeStep({ ...state, menuOpen: false })).toBe("composer");
-    expect(escapeStep({ ...state, menuOpen: false, composerOpen: false })).toBe("command");
-    expect(escapeStep({ ...state, menuOpen: false, composerOpen: false, commandOpen: false })).toBe("mode");
-    expect(escapeStep({ ...state, menuOpen: false, composerOpen: false, commandOpen: false, mode: "idle" })).toBe("ticket");
-    expect(
-      escapeStep({ ...state, menuOpen: false, composerOpen: false, commandOpen: false, mode: "idle", ticketOpen: false }),
-    ).toBe("sheet");
-    expect(escapeStep(idle)).toBeNull();
+    const layers: Array<[keyof ReturnType<typeof actions>, Partial<KeyState>]> = [
+      ["closeMenu", { menuOpen: false }],
+      ["closeComposer", { composerOpen: false }],
+      ["closeCommand", { commandOpen: false }],
+      ["exitMode", { mode: "idle" }],
+      ["backToList", { ticketOpen: false }],
+      ["closeSheet", { sheetOpen: false }],
+    ];
+    for (const [expected, closed] of layers) {
+      expect(press("Escape", { state }).a[expected], expected).toHaveBeenCalledOnce();
+      state = { ...state, ...closed };
+    }
+    expect(press("Escape", { state }).used).toBe(false);
   });
 
   it("calls the matching action only, and prevents the default when it used the key", () => {

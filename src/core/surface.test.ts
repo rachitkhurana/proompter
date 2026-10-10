@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createFrameSurface,
   createPageSurface,
-  fitScale,
   frameUrl,
   freezeSurface,
   layoutDevice,
@@ -86,7 +85,6 @@ describe("device layout", () => {
   it("never scales up and never below 15%", () => {
     expect(layoutDevice({ viewport: "mobile", rotated: false, stage: { width: 4000, height: 4000 }, padding })!.scale).toBe(1);
     expect(layoutDevice({ viewport: "desktop", rotated: false, stage: { width: 100, height: 100 }, padding })!.scale).toBe(0.15);
-    expect(fitScale({ width: 10, height: 10 }, { width: 1000, height: 1000 })).toBe(0.15);
   });
 
   it("Desktop and Tablet bezels", () => {
@@ -145,12 +143,6 @@ describe("frame surface", () => {
     expect(s.size()).toEqual({ width: 844, height: 390 });
     expect(s.bounds()).toEqual({ left: 40, top: 60, width: 844, height: 390 });
     expect(s.toScreen({ left: 10, top: 20, width: 100, height: 40 })).toEqual({ left: 50, top: 80, width: 100, height: 40 });
-  });
-
-  it("accepts an explicit scale source", () => {
-    const { frame } = fakeFrame({ left: 0, top: 0, layoutW: 100, layoutH: 100, scale: 1 });
-    const s = createFrameSurface(frame, "tablet", { scale: () => 0.25 })!;
-    expect(s.toScreen({ left: 40, top: 40, width: 40, height: 8 })).toEqual({ left: 10, top: 10, width: 10, height: 2 });
   });
 
   it("is null when the document can't be reached (framing refused)", () => {

@@ -271,13 +271,4 @@ describe("hooks and adapters", () => {
     expect(bad.context().queries).toEqual([]);
     expect(bad.context().internalErrors[0]?.where).toBe("queries");
   });
-
-  it("clear() empties buffers", () => {
-    const win = makeWin();
-    const cap = createCapture({ win });
-    cap.enable();
-    win.console.warn("x");
-    cap.clear();
-    expect(cap.context().console).toEqual([]);
-  });
 });

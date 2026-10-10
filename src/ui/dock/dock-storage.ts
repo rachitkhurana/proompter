@@ -4,39 +4,33 @@ import { parsePosition, type DockPosition } from "./dock-math";
 export const DOCK_KEY = "proompter.dock";
 export const COLLAPSED_KEY = "proompter.collapsed";
 
-// Every access is wrapped: storage can throw (private mode, blocked site data, quota) or be missing.
+// Every access is wrapped: storage can throw (private mode, blocked site data, quota) or be missing, and a
+// stored value can be corrupt.
 
-export function loadPosition(): DockPosition | null {
+function read<T>(key: string, parse: (raw: string) => T, fallback: T): T {
   try {
-    const raw = localStorage.getItem(DOCK_KEY);
-    return raw ? parsePosition(JSON.parse(raw)) : null;
+    const raw = localStorage.getItem(key);
+    return raw === null ? fallback : parse(raw);
   } catch {
-    return null;
+    return fallback;
   }
 }
+
+/** `null` removes the key. */
+function write(key: string, value: string | null): void {
+  try {
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+  } catch {
+    // ignore
+  }
+}
+
+export const loadPosition = (): DockPosition | null => read(DOCK_KEY, (raw) => parsePosition(JSON.parse(raw)), null);
 
 /** `null` clears the saved position (reset). */
-export function savePosition(p: DockPosition | null): void {
-  try {
-    if (p) localStorage.setItem(DOCK_KEY, JSON.stringify(p));
-    else localStorage.removeItem(DOCK_KEY);
-  } catch {
-    // ignore
-  }
-}
+export const savePosition = (p: DockPosition | null): void => write(DOCK_KEY, p && JSON.stringify(p));
 
-export function loadCollapsed(): boolean {
-  try {
-    return localStorage.getItem(COLLAPSED_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
+export const loadCollapsed = (): boolean => read(COLLAPSED_KEY, (raw) => raw === "1", false);
 
-export function saveCollapsed(collapsed: boolean): void {
-  try {
-    localStorage.setItem(COLLAPSED_KEY, collapsed ? "1" : "0");
-  } catch {
-    // ignore
-  }
-}
+export const saveCollapsed = (collapsed: boolean): void => write(COLLAPSED_KEY, collapsed ? "1" : "0");

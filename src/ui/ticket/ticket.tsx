@@ -1,33 +1,21 @@
 import { useState, type ComponentPropsWithRef, type ReactNode } from "react";
+import type { CaptureNetworkEntry } from "../../core/capture/types";
 import type { Entry, EntryActivity, EntryStatus, Session } from "../../core/entry";
 import type { EntryPatch } from "../proompter-deps";
-import {
-  BackIcon,
-  ChevIcon,
-  CodeIcon,
-  CopyIcon,
-  EyeIcon,
-  GhIcon,
-  LinkIcon,
-  PlanIcon,
-  SparkleIcon,
-  TagIcon,
-  XIcon,
-  icons,
-} from "../icons";
+import { Icon } from "../icons";
 import { Button, IconButton } from "../primitives/button";
 import { Chip } from "../primitives/chip";
-import { Menu, type MenuItem } from "../primitives/menu";
 import { PRIORITY_LABEL, PriorityIcon } from "../primitives/priority-icon";
 import { STATUS_LABEL, StatusIcon } from "../primitives/status-icon";
 import { toast } from "../primitives/toast";
+import { shortSource } from "../../core/resolve";
+import { LogRows, PropMenu, propertyItems } from "../entry-parts";
+import { INTENT_LABEL, NO_PLAN_KEY, targetName } from "../labels";
 import { useShadowContainer } from "../shadow-root";
 import { copyText } from "../shell/clipboard";
-import { clock, clockSeconds, shortSource, sizeLabel, viewportLabel } from "../shell/format";
-import { INTENT_LABEL, INTENTS, PRIORITIES, STATUSES } from "./labels";
+import { clock, sizeLabel, viewportLabel } from "../shell/format";
 import { Snapshot } from "./snapshot";
 import { TabList } from "./tab-list";
-import { TICKET_CSS } from "./ticket-css";
 
 export interface TicketProps {
   entry: Entry;
@@ -50,24 +38,7 @@ export interface TicketProps {
   onOpenIssue?(): void;
 }
 
-/** What the "Where" section names when the entry has no component chain. */
-export function targetName(entry: Entry): string {
-  const n = entry.targets.length;
-  switch (entry.kind) {
-    case "note":
-      return "Page note";
-    case "text":
-      return "Quoted text";
-    case "multi":
-      return `${n} element${n === 1 ? "" : "s"}`;
-    case "box":
-      return `${n} element${n === 1 ? "" : "s"} in a box`;
-    default:
-      return entry.target?.label || "Element";
-  }
-}
-
-const NONE = "__none__";
+const isFailed = (n: CaptureNetworkEntry) => n.status === null || n.status >= 400;
 
 /** A property value that opens a menu or runs an action (`.val`). Forwards its ref, so it can trigger a Menu. */
 function Value({ className = "val", ...rest }: ComponentPropsWithRef<"button">) {
@@ -116,63 +87,35 @@ export function Ticket({
   const [showMd, setShowMd] = useState(false);
 
   const t = entry.target;
-  const VpIcon = icons[entry.viewport];
-  const IntentIcon = icons[entry.intent];
   const resolved = entry.status === "resolved";
-  const fails = entry.context.network.filter((n) => n.status === null || n.status >= 400);
-  const crumbParts = (t?.component || targetName(entry)).split("›").map((x) => x.trim());
+  const fails = entry.context.network.filter(isFailed);
+  const crumbParts = (t?.component || targetName(entry.kind, entry.targets.length, t?.label ?? "")).split("›").map((x) => x.trim());
 
   const copy = (text: string, ok: string) => void copyText(text, ok, container);
 
   const tags = Array.from(new Set([...tagOptions, ...entry.tags]));
   const plans = Array.from(new Set([...planOptions, ...(entry.testPlan ? [entry.testPlan] : [])]));
 
-  const statusItems: MenuItem[] = STATUSES.map((s) => ({
-    key: s,
-    label: STATUS_LABEL[s],
-    icon: <StatusIcon status={s} />,
-    checked: entry.status === s,
-  }));
-  const priorityItems: MenuItem[] = PRIORITIES.map((p) => ({
-    key: p,
-    label: PRIORITY_LABEL[p],
-    icon: <PriorityIcon priority={p} />,
-    checked: entry.priority === p,
-  }));
-  const intentItems: MenuItem[] = INTENTS.map(({ value, label }) => {
-    const Icon = icons[value];
-    return { key: value, label, icon: <Icon size="s" />, checked: entry.intent === value };
-  });
-  const tagItems: MenuItem[] = tags.map((tag) => ({
-    key: tag,
-    label: tag,
-    icon: <TagIcon size="s" />,
-    checked: entry.tags.includes(tag),
-  }));
-  const planItems: MenuItem[] = [
-    { key: NONE, label: "Not linked", checked: !entry.testPlan },
-    ...plans.map((p) => ({ key: p, label: p, icon: <PlanIcon size="s" />, checked: entry.testPlan === p })),
-  ];
+  const items = propertyItems({ ...entry, plan: entry.testPlan ?? null }, tags, plans);
 
   const elementLabel = entry.targets.length > 1 ? `${entry.targets.length} elements` : t?.label || "element";
   const selectors = entry.targets.map((x) => x.selector).filter(Boolean);
 
   return (
     <div className="tk">
-      <style>{TICKET_CSS}</style>
       <div className="tk-crumb">
         <IconButton label="Back to entries" onClick={onBack}>
-          <BackIcon size="s" />
+          <Icon name="back" size="s" />
         </IconButton>
         <span className="ttl">{session.title}</span>
-        <ChevIcon size="xs" />
+        <Icon name="chev" size="xs" />
         <b className="mono">{entry.id}</b>
         <span className="sp" />
         <IconButton label="Copy file path" onClick={() => copy(path, "Copied the file path")}>
-          <LinkIcon size="s" />
+          <Icon name="link" size="s" />
         </IconButton>
         <IconButton label="Close" onClick={onClose}>
-          <XIcon size="s" />
+          <Icon name="x" size="s" />
         </IconButton>
       </div>
 
@@ -188,10 +131,9 @@ export function Ticket({
           <dl className="kv">
             <dt>Status</dt>
             <dd>
-              <Menu
-                selection="single"
-                label="Status"
-                items={statusItems}
+              <PropMenu
+                prop="status"
+                items={items.status}
                 onSelect={(k) => onUpdate({ status: k as EntryStatus })}
                 trigger={
                   <Value aria-label={`Status: ${STATUS_LABEL[entry.status]}`}>
@@ -203,10 +145,9 @@ export function Ticket({
             </dd>
             <dt>Priority</dt>
             <dd>
-              <Menu
-                selection="single"
-                label="Priority"
-                items={priorityItems}
+              <PropMenu
+                prop="priority"
+                items={items.priority}
                 onSelect={(k) => onUpdate({ priority: k as Entry["priority"] })}
                 trigger={
                   <Value aria-label={`Priority: ${PRIORITY_LABEL[entry.priority]}`}>
@@ -218,14 +159,13 @@ export function Ticket({
             </dd>
             <dt>Intent</dt>
             <dd>
-              <Menu
-                selection="single"
-                label="Intent"
-                items={intentItems}
+              <PropMenu
+                prop="intent"
+                items={items.intent}
                 onSelect={(k) => onUpdate({ intent: k as Entry["intent"] })}
                 trigger={
                   <Value aria-label={`Intent: ${INTENT_LABEL[entry.intent]}`}>
-                    <IntentIcon size="s" />
+                    <Icon name={entry.intent} size="s" />
                     <span>{INTENT_LABEL[entry.intent]}</span>
                   </Value>
                 }
@@ -235,7 +175,7 @@ export function Ticket({
             <dd>
               {/* The prototype's Viewport row goes to where the entry was filed; the size it was filed at is not editable. */}
               <Value aria-label={`Viewport: ${viewportLabel(entry.viewport)} ${sizeLabel(entry)}. Show on page`} onClick={onShow}>
-                <VpIcon size="s" />
+                <Icon name={entry.viewport} size="s" />
                 <span>
                   {viewportLabel(entry.viewport)} <span className="num mute">{sizeLabel(entry)}</span>
                 </span>
@@ -243,11 +183,9 @@ export function Ticket({
             </dd>
             <dt>Tags</dt>
             <dd>
-              <Menu
-                selection="multiple"
-                label="Tags"
-                header="Tags"
-                items={tagItems}
+              <PropMenu
+                prop="tags"
+                items={items.tags}
                 onSelect={(tag) =>
                   onUpdate({
                     tags: entry.tags.includes(tag) ? entry.tags.filter((x) => x !== tag) : [...entry.tags, tag],
@@ -255,7 +193,7 @@ export function Ticket({
                 }
                 trigger={
                   <Value aria-label={`Tags: ${entry.tags.length ? entry.tags.join(", ") : "none"}`}>
-                    <TagIcon size="s" />
+                    <Icon name="tag" size="s" />
                     <span>{entry.tags.length ? entry.tags.join(", ") : <span className="mute">Add tags</span>}</span>
                   </Value>
                 }
@@ -265,15 +203,13 @@ export function Ticket({
               <>
                 <dt>Test plan</dt>
                 <dd>
-                  <Menu
-                    selection="single"
-                    label="Test plan"
-                    header="Link to the manual test plan"
-                    items={planItems}
-                    onSelect={(k) => onUpdate({ testPlan: k === NONE ? null : k })}
+                  <PropMenu
+                    prop="plan"
+                    items={items.plan}
+                    onSelect={(k) => onUpdate({ testPlan: k === NO_PLAN_KEY ? null : k })}
                     trigger={
                       <Value aria-label={`Test plan: ${entry.testPlan ?? "not linked"}`}>
-                        <PlanIcon size="s" />
+                        <Icon name="plan" size="s" />
                         <span>{entry.testPlan ?? <span className="mute">Not linked</span>}</span>
                       </Value>
                     }
@@ -285,17 +221,17 @@ export function Ticket({
             <dd>
               {entry.issue ? (
                 <span className="val ro">
-                  <GhIcon size="s" />
+                  <Icon name="gh" size="s" />
                   <span>{entry.issue}</span>
                 </span>
               ) : canOpenIssue ? (
                 <Value onClick={onOpenIssue}>
-                  <GhIcon size="s" />
+                  <Icon name="gh" size="s" />
                   <span className="mute">Open an issue</span>
                 </Value>
               ) : (
                 <span className="val ro">
-                  <GhIcon size="s" />
+                  <Icon name="gh" size="s" />
                   <span className="mute">Not opened · v2</span>
                 </span>
               )}
@@ -308,7 +244,7 @@ export function Ticket({
           <div className="crumbs">
             {crumbParts.map((part, i) => (
               <span key={i} style={{ display: "contents" }}>
-                {i > 0 ? <ChevIcon size="xs" /> : null}
+                {i > 0 ? <Icon name="chev" size="xs" /> : null}
                 <span>{part}</span>
               </span>
             ))}
@@ -324,12 +260,12 @@ export function Ticket({
                     aria-label={`Copy source ${t.sourceInherited ? "(inherited) " : ""}${shortSource(t.source)}`}
                     onClick={() => copy(t.source ?? "", `Copied ${shortSource(t.source ?? "")}`)}
                   >
-                    <CodeIcon size="s" />
+                    <Icon name="code" size="s" />
                     <span>
                       {t.sourceInherited ? "↳ " : ""}
                       {shortSource(t.source)}
                     </span>
-                    <CopyIcon size="xs" />
+                    <Icon name="copy" size="xs" />
                   </Value>
                 </dd>
               </>
@@ -345,7 +281,7 @@ export function Ticket({
                     onClick={() => copy(selectors.join("\n"), "Copied the element selector")}
                   >
                     <span>{elementLabel}</span>
-                    <CopyIcon size="xs" />
+                    <Icon name="copy" size="xs" />
                   </Value>
                 </dd>
               </>
@@ -392,29 +328,12 @@ export function Ticket({
           <div className="log" role="tabpanel" aria-label={ctx === "console" ? "Console" : "Network"}>
             {ctx === "console" ? (
               entry.context.console.length ? (
-                entry.context.console.map((c, i) => (
-                  <div key={i}>
-                    <span className="m">{clockSeconds(c.timestamp)}</span>
-                    <span className={c.level === "error" ? "e" : "w"}>{c.level}</span>
-                    <span title={c.message}>{c.message}</span>
-                  </div>
-                ))
+                <LogRows console={entry.context.console} />
               ) : (
                 <span className="log-none">No console errors or warnings were captured.</span>
               )
             ) : entry.context.network.length ? (
-              entry.context.network.map((n, i) => {
-                const bad = n.status === null || n.status >= 400;
-                return (
-                  <div key={i}>
-                    <span className={bad ? "e" : "g"}>{n.status ?? "ERR"}</span>
-                    <span className="m num">{Math.round(n.durationMs)}ms</span>
-                    <span title={n.url}>
-                      {n.method} {n.url}
-                    </span>
-                  </div>
-                );
-              })
+              <LogRows network={entry.context.network} bad={isFailed} />
             ) : (
               <span className="log-none">No requests were captured.</span>
             )}
@@ -456,13 +375,13 @@ export function Ticket({
 
       <div className="sh-ft">
         <Button onClick={onShow}>
-          <EyeIcon size="s" />
+          <Icon name="eye" size="s" />
           Show on page
         </Button>
         <Button
           onClick={() => copy(serialize(entry), `Copied ${entry.id} as a prompt for an agent`)}
         >
-          <SparkleIcon size="s" />
+          <Icon name="sparkle" size="s" />
           Copy for agent
         </Button>
         <span className="sp" />

@@ -127,7 +127,6 @@ describe("window.__proompter", () => {
     await until(() => window.__proompter_capture, "the frame capture");
     expect(window.__proompter).toBeUndefined();
     expect(kit()).toBeNull();
-    expect(window.__proompter_capture?.enabled).toBe(true);
     await chord();
     expect(kit()).toBeNull();
     await act(async () => root?.unmount());

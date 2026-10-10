@@ -1,32 +1,25 @@
 import { useCallback, useEffect, useLayoutEffect, useImperativeHandle, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type Ref } from "react";
-import type { Capture, CaptureContext } from "../../core/capture";
+import type { Capture, CaptureContext } from "../../core/capture/types";
 import type { Entry, EntryIntent, EntryPriority, EntrySnapshot, EntryTarget, ProompterPlugin } from "../../core/entry";
 import type { PickCommit } from "../../core/pick";
 import { pluginContext, pluginTask, pluginTestPlan } from "../../core/plugins";
 import { shortSource, type ResolvedTarget } from "../../core/resolve";
-import { cleanDescription, entryPath } from "../../core/serialize";
+import { cleanDescription } from "../../core/serialize";
 import { RedactError, type EntryStore, type NewEntry } from "../../core/store";
-import { VIEWPORTS, type PickSurface, type ViewportId } from "../../core/surface";
+import type { PickSurface, ViewportId } from "../../core/surface";
 import { getDockPlacement } from "../dock/placement";
-import { ChevIcon, CodeIcon, FileIcon, Icon, LayersIcon, PlanIcon, TagIcon, XIcon } from "../icons";
+import { Icon } from "../icons";
 import { Button, IconButton } from "../primitives/button";
 import { Chip } from "../primitives/chip";
 import { cx } from "../primitives/cx";
 import { Kbd } from "../primitives/kbd";
-import { Menu, type MenuItem } from "../primitives/menu";
 import { PRIORITY_LABEL, PriorityIcon } from "../primitives/priority-icon";
 import { toast } from "../primitives/toast";
-import { composerCss } from "./composer-styles";
-import {
-  DEFAULT_TAGS,
-  INTENT_LABEL,
-  INTENT_ORDER,
-  KIND_ICON,
-  NO_PLAN_KEY,
-  PRIORITY_ORDER,
-  plural,
-  targetName,
-} from "./labels";
+import { reducedMotion } from "../../core/motion";
+import { LogRows, PropMenu, propertyItems } from "../entry-parts";
+import { DEFAULT_TAGS, INTENT_LABEL, KIND_ICON, NO_PLAN_KEY, plural, targetName } from "../labels";
+import { useShadowContainer } from "../shadow-root";
+import { copyText } from "../shell/clipboard";
 import { placeComposer, unionBox, type Box } from "./place";
 
 export type ComposerResult = { type: "saved"; entry: Entry } | { type: "discarded" };
@@ -38,11 +31,8 @@ export interface ComposerHandle {
 }
 
 export interface ComposerProps {
+  /** The root owns Esc (it calls `ref.discard()`) and the "saved" toast (from `onClose`). */
   ref?: Ref<ComposerHandle>;
-  /** Listen for Esc and discard (default true). A root that owns the global Esc order passes false and calls `ref.discard()`. */
-  handleEscape?: boolean;
-  /** Show the "saved" toast (default true). A root that toasts itself from `onClose` passes false. */
-  toast?: boolean;
   /** What the pick engine committed (`PickEngine`'s `onCommit`). */
   commit: PickCommit;
   /** The surface the target lives in: projects element rects to screen space, and is what gets snapshotted. */
@@ -57,10 +47,6 @@ export interface ComposerProps {
   store: EntryStore;
   /** Host plugins: task chip, test plan menu, extra frontmatter, redaction. */
   plugins?: readonly ProompterPlugin[];
-  /** Tag choices in the Tags menu. Defaults to the prototype's seven. */
-  tags?: readonly string[];
-  /** Exit animation length, ms (0 when the user prefers reduced motion). Default 160. */
-  exitMs?: number;
   /**
    * Called once, after the exit animation: `saved` with the stored entry (the root should pulse its pin and
    * leave pick mode), or `discarded` (Esc, click outside, the X, Cancel).
@@ -68,7 +54,10 @@ export interface ComposerProps {
   onClose(result: ComposerResult): void;
 }
 
-const toEntryTarget = (t: ResolvedTarget): EntryTarget => ({
+/** Exit animation length, ms (0 when the user prefers reduced motion). */
+const EXIT_MS = 160;
+
+export const toEntryTarget = (t: ResolvedTarget): EntryTarget => ({
   selector: t.selector,
   source: t.source,
   sourceInherited: t.inherited,
@@ -76,7 +65,7 @@ const toEntryTarget = (t: ResolvedTarget): EntryTarget => ({
   component: t.crumb,
 });
 
-function commitTargets(commit: PickCommit): ResolvedTarget[] {
+export function commitTargets(commit: PickCommit): ResolvedTarget[] {
   switch (commit.kind) {
     case "element":
       return [commit.target];
@@ -119,20 +108,10 @@ const isMac = () => {
   }
 };
 
-const clock = (ms: number) => new Date(ms).toTimeString().slice(0, 8);
-
-const reducedMotion = () => {
-  try {
-    return !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-  } catch {
-    return false;
-  }
-};
-
 /**
  * The composer (DESIGN §7): anchored to the target and growing out of it, clear of the dock. Title is required;
- * ⌘↵ / Ctrl↵ files the entry; Esc, a click outside, Cancel or the X discards it. Renders its own CSS, and must be
- * inside the shadow root (it uses the menu primitive's portal container). Mount `<Toaster>` for the "saved" toast.
+ * ⌘↵ / Ctrl↵ files the entry; a click outside, Cancel or the X discards it (Esc is the root's, through `ref`).
+ * Renders its own CSS, and must be inside the shadow root (it uses the menu primitive's portal container).
  *
  * On save it reads the capture context, takes the snapshot, builds the entry, and hands it to `store.create`
  * (which numbers it, runs the plugins' `redact`, persists it and emits `entry:created`). If a redact plugin fails
@@ -140,8 +119,6 @@ const reducedMotion = () => {
  */
 export function Composer({
   ref,
-  handleEscape = true,
-  toast: showToast = true,
   commit,
   surface,
   viewport,
@@ -151,10 +128,9 @@ export function Composer({
   capture,
   store,
   plugins,
-  tags: tagChoices = DEFAULT_TAGS,
-  exitMs = 160,
   onClose,
 }: ComposerProps) {
+  const container = useShadowContainer();
   const resolved = useMemo(() => commitTargets(commit), [commit]);
   const entryTargets = useMemo(() => resolved.map(toEntryTarget), [resolved]);
   const primary = entryTargets[0];
@@ -228,9 +204,9 @@ export function Composer({
       if (root && active && root.contains(active)) (active as HTMLElement).blur();
       setLeaving(true);
       clearTimeout(closeTimer.current);
-      closeTimer.current = setTimeout(() => onCloseRef.current(result), reducedMotion() ? 0 : exitMs);
+      closeTimer.current = setTimeout(() => onCloseRef.current(result), reducedMotion() ? 0 : EXIT_MS);
     },
-    [exitMs],
+    [],
   );
   useEffect(() => () => clearTimeout(closeTimer.current), []);
 
@@ -240,8 +216,6 @@ export function Composer({
   }, [finish]);
   const discardRef = useRef(discard);
   discardRef.current = discard;
-  const escapeRef = useRef(handleEscape);
-  escapeRef.current = handleEscape;
   useImperativeHandle(ref, () => ({ discard: () => discardRef.current() }), []);
 
   // Focus the title shortly after opening (prototype: 30ms).
@@ -256,15 +230,9 @@ export function Composer({
     return () => clearTimeout(t);
   }, []);
 
-  // Esc discards, unless a menu took it first (the menu closes itself and marks the event handled).
   // Clicking outside discards, unless it landed in a menu or a toast. The listener is added a tick late so the
   // press that opened the composer can't close it.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (!escapeRef.current || e.key !== "Escape" || e.defaultPrevented || openMenus.current.size > 0) return;
-      e.preventDefault();
-      discardRef.current();
-    };
     const onDown = (e: Event) => {
       if (openMenus.current.size > 0) return;
       const path = e.composedPath();
@@ -272,10 +240,8 @@ export function Composer({
       if (path.some((n) => n instanceof Element && (n.classList.contains("menu") || n.classList.contains("toast")))) return;
       discardRef.current();
     };
-    document.addEventListener("keydown", onKey);
     const t = setTimeout(() => document.addEventListener("pointerdown", onDown, true), 0);
     return () => {
-      document.removeEventListener("keydown", onKey);
       clearTimeout(t);
       document.removeEventListener("pointerdown", onDown, true);
     };
@@ -333,12 +299,6 @@ export function Composer({
         ...(extra ? { extra } : {}),
       };
       const entry = await store.create(draft, { plugins });
-      if (showToast) toast(
-        <>
-          <b style={{ fontWeight: 500 }}>{entry.id}</b> saved on {VIEWPORTS[entry.viewport].label.toLowerCase()} ·{" "}
-          <span className="mono">{entryPath(entry)}</span>
-        </>,
-      );
       savingRef.current = false;
       finish({ type: "saved", entry });
     } catch (e) {
@@ -349,7 +309,7 @@ export function Composer({
           ? `Plugin ${e.plugin} failed to redact this entry. Nothing was saved.`
           : "Not saved: something went wrong. Your text is still here.",
       );
-      toast("Couldn’t save this entry", { icon: <XIcon /> });
+      toast("Couldn’t save this entry", { icon: <Icon name="x" /> });
     }
   };
 
@@ -363,44 +323,13 @@ export function Composer({
     }
   };
 
-  const copySource = async () => {
-    if (!primary?.source) return;
-    try {
-      await navigator.clipboard.writeText(primary.source);
-      toast(`Copied ${shortSource(primary.source)}`);
-    } catch {
-      toast("Couldn’t copy to the clipboard", { icon: <XIcon /> });
-    }
-  };
-
   // ---- menus
   const track = (name: string) => (open: boolean) => {
     if (open) openMenus.current.add(name);
     else openMenus.current.delete(name);
   };
 
-  const intentItems: MenuItem[] = INTENT_ORDER.map((k) => ({
-    key: k,
-    label: INTENT_LABEL[k],
-    icon: <Icon name={k} size="s" />,
-    checked: intent === k,
-  }));
-  const priorityItems: MenuItem[] = PRIORITY_ORDER.map((k) => ({
-    key: k,
-    label: PRIORITY_LABEL[k],
-    icon: <PriorityIcon priority={k} />,
-    checked: priority === k,
-  }));
-  const tagItems: MenuItem[] = tagChoices.map((t) => ({
-    key: t,
-    label: t,
-    icon: <TagIcon size="s" />,
-    checked: selectedTags.includes(t),
-  }));
-  const planItems: MenuItem[] = [
-    { key: NO_PLAN_KEY, label: "Not linked", checked: plan === null },
-    ...planSections.map((p) => ({ key: p, label: p, icon: <PlanIcon size="s" />, checked: plan === p })),
-  ];
+  const items = propertyItems({ intent, priority, tags: selectedTags, plan }, DEFAULT_TAGS, planSections);
 
   const name = targetName(commit.kind, resolved.length, primary?.label ?? "");
   const fileText = !primary ? "page-level" : (primary.source ?? "no source (nothing is stamped here)");
@@ -408,7 +337,6 @@ export function Composer({
 
   return (
     <>
-      <style data-proompter-composer="">{composerCss}</style>
       <div
         ref={rootRef}
         className={cx("pm-comp", !leaving && "on")}
@@ -428,7 +356,7 @@ export function Composer({
               <Chip
                 as="button"
                 mono
-                onClick={() => void copySource()}
+                onClick={() => void copyText(primary.source ?? "", `Copied ${shortSource(primary.source ?? "")}`, container)}
                 title={`${primary.sourceInherited ? "Nearest component source. " : ""}Copy file and line`}
                 aria-label={`Copy ${primary.source}`}
               >
@@ -441,7 +369,7 @@ export function Composer({
             {`${size.width}×${size.height}`}
           </Chip>
           <IconButton label="Discard" onClick={discard}>
-            <XIcon size="s" />
+            <Icon name="x" size="s" />
           </IconButton>
         </div>
 
@@ -486,10 +414,9 @@ export function Composer({
         </div>
 
         <div className="pm-props">
-          <Menu
-            label="Intent"
-            selection="single"
-            items={intentItems}
+          <PropMenu
+            prop="intent"
+            items={items.intent}
             onSelect={(k) => setIntent(k as EntryIntent)}
             onOpenChange={track("intent")}
             trigger={
@@ -498,10 +425,9 @@ export function Composer({
               </Chip>
             }
           />
-          <Menu
-            label="Priority"
-            selection="single"
-            items={priorityItems}
+          <PropMenu
+            prop="priority"
+            items={items.priority}
             onSelect={(k) => setPriority(k as EntryPriority)}
             onOpenChange={track("priority")}
             trigger={
@@ -510,36 +436,32 @@ export function Composer({
               </Chip>
             }
           />
-          <Menu
-            label="Tags"
-            header="Tags"
-            selection="multiple"
-            items={tagItems}
+          <PropMenu
+            prop="tags"
+            items={items.tags}
             onSelect={(k) => setSelectedTags((cur) => (cur.includes(k) ? cur.filter((t) => t !== k) : [...cur, k]))}
             onOpenChange={track("tags")}
             trigger={
-              <Chip as="button" icon={<TagIcon size="s" />}>
+              <Chip as="button" icon={<Icon name="tag" size="s" />}>
                 {selectedTags.length ? selectedTags.join(", ") : "Tags"}
               </Chip>
             }
           />
           {planSections.length > 0 ? (
-            <Menu
-              label="Test plan"
-              header="Link to the manual test plan"
-              selection="single"
-              items={planItems}
+            <PropMenu
+              prop="plan"
+              items={items.plan}
               onSelect={(k) => setPlan(k === NO_PLAN_KEY ? null : k)}
               onOpenChange={track("plan")}
               trigger={
-                <Chip as="button" icon={<PlanIcon size="s" />}>
+                <Chip as="button" icon={<Icon name="plan" size="s" />}>
                   {plan ?? "Test plan"}
                 </Chip>
               }
             />
           ) : null}
           {task ? (
-            <Chip accent icon={<CodeIcon size="s" />} title="Task, from the host's plugin">
+            <Chip accent icon={<Icon name="code" size="s" />} title="Task, from the host's plugin">
               {task}
             </Chip>
           ) : null}
@@ -547,13 +469,13 @@ export function Composer({
 
         <details className="pm-ctx">
           <summary>
-            <LayersIcon size="s" />
+            <Icon name="layers" size="s" />
             <span>
               Context attached: {plural(preview.console.length, "console line", "console lines")},{" "}
               {plural(preview.network.length, "request", "requests")}, <span className="pm-bad">{failed} failed</span>
             </span>
             <span className="pm-car">
-              <ChevIcon size="s" />
+              <Icon name="chev" size="s" />
             </span>
           </summary>
           <div className="pm-ctx-in">
@@ -573,13 +495,6 @@ export function Composer({
                   <span />
                   <span>{primary?.component || route}</span>
                 </div>
-                {resolved[0]?.query ? (
-                  <div>
-                    <span className="m">query</span>
-                    <span />
-                    <span>{resolved[0].query}</span>
-                  </div>
-                ) : null}
               </div>
             </div>
             <div>
@@ -590,13 +505,7 @@ export function Composer({
                     <span className="m">none</span>
                   </div>
                 ) : (
-                  preview.console.map((c, i) => (
-                    <div key={i}>
-                      <span className="m">{clock(c.timestamp)}</span>
-                      <span className={c.level === "error" ? "e" : "w"}>{c.level}</span>
-                      <span>{c.message}</span>
-                    </div>
-                  ))
+                  <LogRows console={preview.console} />
                 )}
               </div>
             </div>
@@ -608,15 +517,7 @@ export function Composer({
                     <span className="m">none</span>
                   </div>
                 ) : (
-                  preview.network.map((n, i) => (
-                    <div key={i}>
-                      <span className={n.ok ? "g" : "e"}>{n.status ?? "ERR"}</span>
-                      <span className="m num">{Math.round(n.durationMs)}ms</span>
-                      <span>
-                        {n.method} {n.url}
-                      </span>
-                    </div>
-                  ))
+                  <LogRows network={preview.network} bad={(n) => !n.ok} />
                 )}
               </div>
             </div>
@@ -625,7 +526,7 @@ export function Composer({
 
         <div className="pm-comp-ft">
           <span className="pm-hint">
-            <FileIcon size="xs" />
+            <Icon name="file" size="xs" />
             <span className="mono">reviews/…/entries</span>
           </span>
           <Button variant="ghost" onClick={discard}>

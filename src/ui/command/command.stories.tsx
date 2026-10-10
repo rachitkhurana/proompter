@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { toast } from "../primitives/toast";
-import { DockedToaster } from "../dock";
+import { DockedToaster } from "../dock/placement";
 import { seedEntries } from "../shell/fake";
 import { Command } from "./command";
 import { buildCommandItems } from "./items";

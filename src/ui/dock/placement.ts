@@ -1,6 +1,7 @@
 import { createElement, useSyncExternalStore, type ReactElement } from "react";
 import { Toaster } from "../primitives/toast";
 import type { TooltipSide } from "../primitives/tooltip";
+import type { DockEdge } from "./dock-math";
 
 /**
  * Where the dock is, and what that means for everything around it (DESIGN section 7):
@@ -10,6 +11,12 @@ import type { TooltipSide } from "../primitives/tooltip";
  */
 
 export type DockMode = "horizontal" | "vertical-left" | "vertical-right";
+
+/** The dock's saved edge (`l`, `r`, or floating/default) as a placement mode, and back. */
+export const modeOf = (edge: DockEdge): DockMode =>
+  edge === "l" ? "vertical-left" : edge === "r" ? "vertical-right" : "horizontal";
+export const edgeOf = (mode: DockMode): DockEdge =>
+  mode === "vertical-left" ? "l" : mode === "vertical-right" ? "r" : null;
 
 export interface DockRect {
   left: number;
@@ -92,33 +99,4 @@ export function useDockPlacement(): DockPlacement {
 export function DockedToaster(): ReactElement {
   const { toastPosition } = useDockPlacement();
   return createElement(Toaster, { position: toastPosition });
-}
-
-/**
- * Where the multi-select bar ("N selected / Clear / Add entry") goes: centred above (dock in the lower
- * half) or below (upper half) a horizontal dock; beside a vertical one, aligned to its top. Clamped to
- * the window. Ported from the prototype's `placeSubbar`.
- */
-export function subbarPosition(
-  placement: Pick<DockPlacement, "mode" | "rect" | "lower">,
-  bar: { width: number; height: number },
-  viewport: { width: number; height: number },
-): { left: number; top: number } {
-  const r = placement.rect ?? { left: viewport.width / 2 - 100, top: viewport.height - 70, width: 200, height: 50 };
-  const sw = bar.width || 220;
-  const sh = bar.height || 42;
-  let x = r.left + r.width / 2 - sw / 2;
-  let y = placement.lower ? r.top - sh - 10 : r.top + r.height + 10;
-  if (placement.mode === "vertical-left") {
-    x = r.left + r.width + 10;
-    y = r.top;
-  }
-  if (placement.mode === "vertical-right") {
-    x = r.left - sw - 10;
-    y = r.top;
-  }
-  return {
-    left: Math.min(Math.max(8, x), viewport.width - sw - 8),
-    top: Math.min(Math.max(8, y), viewport.height - sh - 8),
-  };
 }

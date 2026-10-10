@@ -4,24 +4,29 @@
  * on first open, so nothing here (fonts included) is in the entry chunk.
  */
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { createCapture, type Capture } from "../../core/capture";
+import { createCapture } from "../../core/capture";
+import type { Capture } from "../../core/capture/types";
 import type { Entry } from "../../core/entry";
 import { PickEngine, type PickCommit, type PickMode } from "../../core/pick";
 import { findBySelector } from "../../core/resolve";
 import type { PickSurface, ViewportId } from "../../core/surface";
 import { buildCommandItems } from "../command/items";
 import { Command } from "../command/command";
-import { Dock, DockedToaster, useDockPlacement, type DockTool } from "../dock";
+import { Dock, type DockTool } from "../dock/dock";
 import { loadCollapsed, saveCollapsed } from "../dock/dock-storage";
-import { Overlay, useFreeze, usePickSnapshot, type PinModel, type PulseRequest } from "../overlay";
+import { DockedToaster, edgeOf, useDockPlacement } from "../dock/placement";
+import { useFreeze, usePickSnapshot } from "../overlay/hooks";
+import { Overlay } from "../overlay/overlay";
+import type { PinModel } from "../overlay/pin-layout";
+import type { PulseRequest } from "../overlay/pins";
 import { toast } from "../primitives/toast";
-import type { ProompterDeps, ProompterProps } from "../proompter-deps";
+import type { DepsBox, ProompterDeps, ProompterProps } from "../proompter-deps";
 import { ShadowRoot, useShadowContainer } from "../shadow-root";
-import { Sheet, type SheetTab, type SheetTicketProps } from "../sheet";
-import { DEFAULT_TAGS } from "../ticket/labels";
-import { ViewportStage } from "../viewports";
+import { reducedMotion } from "../../core/motion";
+import { Sheet, type SheetTab, type SheetTicketProps } from "../sheet/sheet";
+import { DEFAULT_TAGS } from "../labels";
+import { ViewportStage } from "../viewports/viewport-stage";
 import { createDefaultDeps } from "./defaults";
-import type { DepsBox } from "./deps-box";
 import { isToggleChord } from "./chord";
 import { tailPath, viewportLabel } from "./format";
 import { returnFocusFromFrame } from "./focus";
@@ -53,13 +58,9 @@ export default function ProompterUI(props: ShellProps) {
   );
 }
 
-function reducedMotion() {
-  return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-}
-
 function Kit({ options, box, onToggleKit }: ShellProps) {
   const container = useShadowContainer();
-  const deps: ProompterDeps = useState(() => box.get(() => options.deps ?? createDefaultDeps(options)))[0];
+  const deps: ProompterDeps = useState(() => (box.deps ??= options.deps ?? createDefaultDeps(options)))[0];
   const { store, serialize, entryPath, composer } = deps;
   const { session, entries, pending } = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   const reviewer = options.session?.reviewer ?? session.reviewer;
@@ -138,9 +139,7 @@ function Kit({ options, box, onToggleKit }: ShellProps) {
   // The host window's capture belongs to <Proompter> (it starts when the page is idle and stops when
   // <Proompter> unmounts); this reuses it, and only creates one if the UI opened before the idle task ran.
   const [hostCapture] = useState(
-    () =>
-      box.getCapture() ??
-      box.setCapture(createCapture({ win: window, redact: options.redact, queries: options.queries })),
+    () => (box.capture ??= createCapture({ win: window, redact: options.redact, queries: options.queries })),
   );
   useEffect(() => {
     hostCapture.enable();
@@ -341,32 +340,24 @@ function Kit({ options, box, onToggleKit }: ShellProps) {
   );
   const planOptions = useMemo(() => Array.from(new Set(plugins.flatMap((p) => p.testPlan ?? []))), [plugins]);
 
+  // Running a command closes the menu first (focus goes back to where it was), then does the work.
+  const thenClose =
+    <A extends unknown[]>(run: (...args: A) => void) =>
+    (...args: A) => {
+      setCommandOpen(false);
+      run(...args);
+    };
   const commandItems = buildCommandItems({
     viewport,
     frozen,
     entries,
     pendingFiles: pending.length,
-    onTool: (tool) => {
-      setCommandOpen(false);
-      toggleTool(tool);
-    },
-    onFreeze: () => {
-      setCommandOpen(false);
-      toggleFreeze();
-    },
-    onViewport: (v) => {
-      setCommandOpen(false);
-      changeViewport(v);
-    },
-    onOpenEntry: openTicket,
-    onAllEntries: () => {
-      setCommandOpen(false);
-      setSheet({ open: true, tab: "entries", selected: null });
-    },
-    onPublish: () => {
-      setCommandOpen(false);
-      setSheet({ open: true, tab: "publish", selected: null });
-    },
+    onTool: thenClose(toggleTool),
+    onFreeze: thenClose(toggleFreeze),
+    onViewport: thenClose(changeViewport),
+    onOpenEntry: openTicket, // closes the menu itself
+    onAllEntries: thenClose(() => setSheet({ open: true, tab: "entries", selected: null })),
+    onPublish: thenClose(() => setSheet({ open: true, tab: "publish", selected: null })),
   });
 
   const write = store.write;
@@ -384,7 +375,6 @@ function Kit({ options, box, onToggleKit }: ShellProps) {
   };
 
   const activeTool: DockTool | null = mode === "idle" ? null : mode === "box" ? "area" : mode;
-  const dockEdge = placement.mode === "vertical-left" ? "l" : placement.mode === "vertical-right" ? "r" : null;
 
   return (
     <>
@@ -408,7 +398,7 @@ function Kit({ options, box, onToggleKit }: ShellProps) {
           const e = entries.find((x) => x.n === id);
           if (e) openTicket(e.id);
         }}
-        dock={{ rect: placement.rect, edge: dockEdge }}
+        dock={{ rect: placement.rect, edge: edgeOf(placement.mode) }}
       />
       <Dock
         key={dockKey}

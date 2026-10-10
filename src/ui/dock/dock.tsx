@@ -11,30 +11,14 @@ import {
 } from "react";
 import { flushSync } from "react-dom";
 import { spring, type SpringHandle } from "../../core/spring";
-import {
-  AreaIcon,
-  DesktopIcon,
-  FreezeIcon,
-  GripIcon,
-  InboxIcon,
-  LogoIcon,
-  MobileIcon,
-  MultiIcon,
-  NoteIcon,
-  PickIcon,
-  ResponsiveIcon,
-  RotateIcon,
-  SearchIcon,
-  TabletIcon,
-  TextIcon,
-} from "../icons";
+import { GripIcon, Icon } from "../icons";
 import { IconButton } from "../primitives/button";
 import { cx } from "../primitives/cx";
 import { Kbd } from "../primitives/kbd";
 import { Segmented, type SegmentedItem } from "../primitives/segmented";
 import { toast } from "../primitives/toast";
 import { Tooltip, TooltipProvider, type TooltipSide } from "../primitives/tooltip";
-import { DOCK_CSS } from "./dock-css";
+import { reducedMotion } from "../../core/motion";
 import {
   capSpeed,
   defaultPosition,
@@ -52,7 +36,7 @@ import {
   type Sample,
 } from "./dock-math";
 import { loadCollapsed, loadPosition, saveCollapsed, savePosition } from "./dock-storage";
-import { derivePlacement, publishDockPlacement, resetDockPlacement, type DockMode } from "./placement";
+import { derivePlacement, modeOf, publishDockPlacement, resetDockPlacement } from "./placement";
 
 export type DockTool = "pick" | "multi" | "area" | "text" | "note";
 export type DockViewport = "responsive" | "desktop" | "tablet" | "mobile";
@@ -80,33 +64,22 @@ export interface DockProps {
   onCollapsedChange?: (collapsed: boolean) => void;
   /** After a drag, key step or reset; `null` is the default position. */
   onPositionChange?: (position: DockPosition | null) => void;
-  /** Start here instead of the saved position (stories, tests). `null` is the default bottom-centre. */
-  initialPosition?: DockPosition | null;
-  initialCollapsed?: boolean;
-  /** Read and write `localStorage` (`proompter.dock`, `proompter.collapsed`). Default true. */
-  persist?: boolean;
 }
 
-const TOOLS: ReadonlyArray<{
-  tool: DockTool;
-  label: string;
-  name: string;
-  key: string;
-  extra?: string;
-  Icon: typeof PickIcon;
-}> = [
-  { tool: "pick", label: "Pick element", name: "Pick element", key: "P", extra: "· ↑↓ to walk", Icon: PickIcon },
-  { tool: "multi", label: "Select several", name: "Select several elements", key: "M", Icon: MultiIcon },
-  { tool: "area", label: "Box select", name: "Box select", key: "B", Icon: AreaIcon },
-  { tool: "text", label: "Quote text", name: "Quote text", key: "T", Icon: TextIcon },
-  { tool: "note", label: "Page note", name: "Page note", key: "N", Icon: NoteIcon },
+// A tool's and a viewport's value is also its icon name (see `icons.tsx`).
+const TOOLS: ReadonlyArray<{ tool: DockTool; label: string; name: string; key: string; extra?: string }> = [
+  { tool: "pick", label: "Pick element", name: "Pick element", key: "P", extra: "· ↑↓ to walk" },
+  { tool: "multi", label: "Select several", name: "Select several elements", key: "M" },
+  { tool: "area", label: "Box select", name: "Box select", key: "B" },
+  { tool: "text", label: "Quote text", name: "Quote text", key: "T" },
+  { tool: "note", label: "Page note", name: "Page note", key: "N" },
 ];
 
-const VIEWPORTS: ReadonlyArray<{ value: DockViewport; label: string; tip: string; key: string; Icon: typeof PickIcon }> = [
-  { value: "responsive", label: "Responsive", tip: "Responsive", key: "1", Icon: ResponsiveIcon },
-  { value: "desktop", label: "Desktop", tip: "Desktop 1440", key: "2", Icon: DesktopIcon },
-  { value: "tablet", label: "Tablet", tip: "Tablet 834", key: "3", Icon: TabletIcon },
-  { value: "mobile", label: "Mobile", tip: "Mobile 390", key: "4", Icon: MobileIcon },
+const VIEWPORTS: ReadonlyArray<{ value: DockViewport; label: string; tip: string; key: string }> = [
+  { value: "responsive", label: "Responsive", tip: "Responsive", key: "1" },
+  { value: "desktop", label: "Desktop", tip: "Desktop 1440", key: "2" },
+  { value: "tablet", label: "Tablet", tip: "Tablet 834", key: "3" },
+  { value: "mobile", label: "Mobile", tip: "Mobile 390", key: "4" },
 ];
 
 function tip(label: string, key: string, extra?: string): ReactNode {
@@ -119,8 +92,6 @@ function tip(label: string, key: string, extra?: string): ReactNode {
   );
 }
 
-const noop = () => {};
-
 export function Dock({
   activeTool = null,
   frozen = false,
@@ -129,32 +100,26 @@ export function Dock({
   commandOpen,
   entriesOpen,
   openCount = 0,
-  onTool = noop,
-  onFreeze = noop,
-  onViewport = noop,
-  onRotate = noop,
-  onCommand = noop,
-  onEntries = noop,
+  onTool,
+  onFreeze,
+  onViewport,
+  onRotate,
+  onCommand,
+  onEntries,
   onCollapsedChange,
   onPositionChange,
-  initialPosition,
-  initialCollapsed,
-  persist = true,
 }: DockProps) {
   const toolsId = useId();
-  const [pos, setPos] = useState<DockPosition | null>(() =>
-    initialPosition !== undefined ? initialPosition : persist ? loadPosition() : null,
-  );
-  const [collapsed, setCollapsedState] = useState<boolean>(() =>
-    initialCollapsed !== undefined ? initialCollapsed : persist ? loadCollapsed() : false,
-  );
+  // The position and collapsed state are restored from, and saved to, `localStorage`.
+  const [pos, setPos] = useState<DockPosition | null>(loadPosition);
+  const [collapsed, setCollapsedState] = useState<boolean>(loadCollapsed);
   const [dragging, setDragging] = useState(false);
   const [intro, setIntro] = useState(true);
   const [tooltipSide, setTooltipSide] = useState<TooltipSide>("top");
 
   // Reduced motion turns every animation off, so `animationend` never fires and the intro class would stay.
   useEffect(() => {
-    if (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches) setIntro(false);
+    if (reducedMotion()) setIntro(false);
   }, []);
 
   const dockRef = useRef<HTMLDivElement>(null);
@@ -163,18 +128,16 @@ export function Dock({
   const animating = useRef(false);
   const springs = useRef<SpringHandle[]>([]);
   const dragCleanup = useRef<(() => void) | null>(null);
-  const cb = useRef({ onCollapsedChange, onPositionChange, persist });
-  cb.current = { onCollapsedChange, onPositionChange, persist };
+  const cb = useRef({ onCollapsedChange, onPositionChange });
+  cb.current = { onCollapsedChange, onPositionChange };
 
   /** Tell the rest of the UI where the dock is (tooltips, toasts, sub-bar, sheet). */
   const publish = useCallback(() => {
     const el = dockRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    const edge = posRef.current?.edge ?? null;
-    const mode: DockMode = edge === "l" ? "vertical-left" : edge === "r" ? "vertical-right" : "horizontal";
     const next = derivePlacement(
-      mode,
+      modeOf(posRef.current?.edge ?? null),
       { left: r.left, top: r.top, width: r.width, height: r.height },
       viewportSize().h,
     );
@@ -234,7 +197,7 @@ export function Dock({
       el.style.left = `${r.left}px`;
       el.style.top = `${r.top}px`;
       publish();
-      if (cb.current.persist) savePosition(live);
+      savePosition(live);
       cb.current.onPositionChange?.(live);
     },
     [commit, publish],
@@ -259,7 +222,7 @@ export function Dock({
       const vp = viewportSize();
       const target = final ? restingPosition(final, size, vp) : defaultPosition(size, vp);
       const saved: DockPosition | null = final ? { x: target.x, y: target.y, edge: final.edge } : null;
-      if (cb.current.persist) savePosition(saved);
+      savePosition(saved);
       cb.current.onPositionChange?.(saved);
 
       const maxX = Math.max(0, vp.w - size.w);
@@ -297,7 +260,7 @@ export function Dock({
   const setCollapsed = useCallback((v: boolean) => {
     collapsedRef.current = v;
     setCollapsedState(v);
-    if (cb.current.persist) saveCollapsed(v);
+    saveCollapsed(v);
     cb.current.onCollapsedChange?.(v);
   }, []);
 
@@ -395,7 +358,7 @@ export function Dock({
       const rest = restingPosition(provisional, { w: el.offsetWidth, h: el.offsetHeight }, vp);
       if (!edge && Math.abs(rest.x - r.left) < 0.5 && Math.abs(rest.y - r.top) < 0.5) {
         // Released inside the window: it stays exactly where it is.
-        if (cb.current.persist) savePosition(provisional);
+        savePosition(provisional);
         cb.current.onPositionChange?.(provisional);
         commit(provisional);
         return;
@@ -438,7 +401,7 @@ export function Dock({
       edge: null,
     };
     commit(landed);
-    if (persist) savePosition(landed);
+    savePosition(landed);
     onPositionChange?.(landed);
   }
 
@@ -448,7 +411,7 @@ export function Dock({
     const narrow = typeof matchMedia === "function" && matchMedia("(max-width: 760px)").matches;
     if (!posRef.current || narrow) {
       stopSprings(false);
-      if (persist) savePosition(null);
+      savePosition(null);
       onPositionChange?.(null);
       commit(null);
     } else {
@@ -461,18 +424,16 @@ export function Dock({
   const edge = pos?.edge ?? null;
   const vertical = edge !== null;
   const free = pos !== null;
-  const mode: DockMode = edge === "l" ? "vertical-left" : edge === "r" ? "vertical-right" : "horizontal";
 
   const viewportItems: Array<SegmentedItem<DockViewport>> = VIEWPORTS.map((v) => ({
     value: v.value,
     label: v.label,
-    icon: <v.Icon />,
+    icon: <Icon name={v.value} />,
     tooltip: tip(v.tip, v.key),
   }));
 
   return (
     <TooltipProvider>
-      <style>{DOCK_CSS}</style>
       <div
         ref={dockRef}
         className={cx(
@@ -488,7 +449,7 @@ export function Dock({
         role="toolbar"
         aria-label="Proompter"
         aria-orientation={vertical ? "vertical" : "horizontal"}
-        data-placement={mode}
+        data-placement={modeOf(edge)}
         onAnimationEnd={() => setIntro(false)}
       >
         <button
@@ -520,7 +481,7 @@ export function Dock({
           }}
         >
           <span className="logo">
-            <LogoIcon />
+            <Icon name="logo" />
           </span>
           <span className="nm-w">
             <span className="nm">Proompter</span>
@@ -532,23 +493,23 @@ export function Dock({
         <div className="tw" id={toolsId}>
           <div className="tw-in">
             <span className="sep" />
-            {TOOLS.map(({ tool, label, name, key, extra, Icon }) => (
+            {TOOLS.map(({ tool, label, name, key, extra }) => (
               <Tooltip key={tool} content={tip(label, key, extra)} side={tooltipSide}>
-                <IconButton label={name} pressed={activeTool === tool} onClick={() => onTool(tool)}>
-                  <Icon />
+                <IconButton label={name} pressed={activeTool === tool} onClick={() => onTool?.(tool)}>
+                  <Icon name={tool} />
                 </IconButton>
               </Tooltip>
             ))}
             <Tooltip content={tip("Freeze motion", "F")} side={tooltipSide}>
               <IconButton label="Freeze animations" pressed={frozen} onClick={onFreeze}>
-                <FreezeIcon />
+                <Icon name="freeze" />
               </IconButton>
             </Tooltip>
             <span className="sep" />
             <Segmented
               items={viewportItems}
               value={viewport}
-              onValueChange={onViewport}
+              onValueChange={(v) => onViewport?.(v)}
               label="Viewport"
               orientation={vertical ? "vertical" : "horizontal"}
               tooltipSide={tooltipSide}
@@ -560,13 +521,13 @@ export function Dock({
                 disabled={viewport === "responsive"}
                 onClick={onRotate}
               >
-                <RotateIcon />
+                <Icon name="rotate" />
               </IconButton>
             </Tooltip>
             <span className="sep" />
             <Tooltip content={tip("Command menu", "⌘K")} side={tooltipSide}>
               <IconButton label="Command menu" pressed={commandOpen} onClick={onCommand}>
-                <SearchIcon />
+                <Icon name="search" />
               </IconButton>
             </Tooltip>
             <Tooltip content={tip("Entries", "E")} side={tooltipSide}>
@@ -576,7 +537,7 @@ export function Dock({
                 badge={openCount > 0 ? openCount : undefined}
                 onClick={onEntries}
               >
-                <InboxIcon />
+                <Icon name="inbox" />
               </IconButton>
             </Tooltip>
           </div>

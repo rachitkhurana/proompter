@@ -1,13 +1,11 @@
 import type { KeyboardEvent } from "react";
-import type { Entry, EntryStatus } from "../../core/entry";
-import { PickIcon, icons } from "../icons";
+import { ENTRY_STATUSES, type Entry } from "../../core/entry";
+import { Icon } from "../icons";
 import { cx } from "../primitives/cx";
 import { Kbd } from "../primitives/kbd";
 import { PRIORITY_LABEL, PriorityIcon } from "../primitives/priority-icon";
 import { STATUS_LABEL, StatusIcon } from "../primitives/status-icon";
 import { clock, viewportLabel } from "../shell/format";
-
-const GROUPS: ReadonlyArray<EntryStatus> = ["open", "progress", "resolved"];
 
 export interface EntryListProps {
   entries: readonly Entry[];
@@ -22,7 +20,7 @@ export function EntryList({ entries, selectedId, onOpen }: EntryListProps) {
     return (
       <div className="empty">
         <span className="ei">
-          <PickIcon />
+          <Icon name="pick" />
         </span>
         <span>
           No entries yet. Press <Kbd>P</Kbd> and click anything on the page.
@@ -44,7 +42,7 @@ export function EntryList({ entries, selectedId, onOpen }: EntryListProps) {
 
   return (
     <div onKeyDown={onKeyDown}>
-      {GROUPS.map((status) => {
+      {ENTRY_STATUSES.map((status) => {
         const list = entries.filter((e) => e.status === status);
         if (list.length === 0) return null;
         return (
@@ -58,7 +56,6 @@ export function EntryList({ entries, selectedId, onOpen }: EntryListProps) {
               .slice()
               .reverse()
               .map((e) => {
-                const VpIcon = icons[e.viewport];
                 return (
                   <button
                     key={e.id}
@@ -74,7 +71,7 @@ export function EntryList({ entries, selectedId, onOpen }: EntryListProps) {
                     <span className="t">{e.title}</span>
                     <span className="r">
                       <span title={viewportLabel(e.viewport)}>
-                        <VpIcon size="s" />
+                        <Icon name={e.viewport} size="s" />
                       </span>
                       <span className="num">{clock(e.created)}</span>
                     </span>

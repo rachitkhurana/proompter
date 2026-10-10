@@ -1,5 +1,5 @@
 /** Shared by the composer's stories and tests: a stub capture, an in-memory store, a sample plugin, a mock page. */
-import type { Capture, CaptureContext, SnapshotResult } from "../../core/capture";
+import type { Capture, CaptureContext, SnapshotResult } from "../../core/capture/types";
 import type { ProompterPlugin } from "../../core/entry";
 import { CONSOLE, NETWORK, PNG } from "../../core/entry-fixtures.test-util";
 import { createStore, type EntryStore, type StoreOptions } from "../../core/store";
@@ -11,11 +11,9 @@ export interface StubCaptureOptions {
 
 export function createStubCapture(opts: StubCaptureOptions = {}): Capture & { snapshots: number } {
   const stub = {
-    enabled: true,
     snapshots: 0,
     enable() {},
     disable() {},
-    clear() {},
     context(): CaptureContext {
       return { console: CONSOLE, network: NETWORK, queries: [], internalErrors: [], ...opts.context };
     },

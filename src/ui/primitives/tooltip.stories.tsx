@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { PickIcon, MultiIcon, AreaIcon, TextIcon } from "../icons";
+import { Icon } from "../icons";
 import { IconButton } from "./button";
 import { Kbd } from "./kbd";
 import { Row, Stack } from "./story-frame";
@@ -17,22 +17,17 @@ export const WarmHover: Story = {
         <Row>
           <Tooltip content={<>Pick element <Kbd>P</Kbd></>}>
             <IconButton label="Pick element">
-              <PickIcon />
+              <Icon name="pick" />
             </IconButton>
           </Tooltip>
           <Tooltip content={<>Select several <Kbd>M</Kbd></>}>
             <IconButton label="Select several">
-              <MultiIcon />
+              <Icon name="multi" />
             </IconButton>
           </Tooltip>
           <Tooltip content={<>Box select <Kbd>B</Kbd></>}>
             <IconButton label="Box select">
-              <AreaIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip content="Disabled tooltip" disabled>
-            <IconButton label="No tooltip">
-              <TextIcon />
+              <Icon name="area" />
             </IconButton>
           </Tooltip>
         </Row>
@@ -47,14 +42,16 @@ export const WarmHover: Story = {
 
 export const Sides: Story = {
   render: () => (
-    <Row style={{ justifyContent: "center", padding: "48px 80px" }}>
-      {(["top", "bottom", "left", "right"] as const).map((side) => (
-        <Tooltip key={side} content={`Opens ${side}`} side={side}>
-          <IconButton label={`Tooltip ${side}`}>
-            <PickIcon />
-          </IconButton>
-        </Tooltip>
-      ))}
-    </Row>
+    <TooltipProvider>
+      <Row style={{ justifyContent: "center", padding: "48px 80px" }}>
+        {(["top", "bottom", "left", "right"] as const).map((side) => (
+          <Tooltip key={side} content={`Opens ${side}`} side={side}>
+            <IconButton label={`Tooltip ${side}`}>
+              <Icon name="pick" />
+            </IconButton>
+          </Tooltip>
+        ))}
+      </Row>
+    </TooltipProvider>
   ),
 };

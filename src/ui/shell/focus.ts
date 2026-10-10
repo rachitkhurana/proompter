@@ -5,16 +5,14 @@
  * takes over (a new entry draft, or a save/discard), so every shortcut works exactly as on the live page.
  */
 
-/** If a device frame holds focus, hand it back to the host document. Returns true when it moved focus. */
-export function returnFocusFromFrame(doc: Document = document): boolean {
-  const active = doc.activeElement;
-  const isFrame = !!active && active.tagName === "IFRAME";
-  if (!isFrame) return false;
+/** If a device frame holds focus, hand it back to the host document. */
+export function returnFocusFromFrame(): void {
+  const active = document.activeElement;
+  if (active?.tagName !== "IFRAME") return;
   (active as HTMLElement).blur();
   try {
-    doc.defaultView?.focus();
+    window.focus();
   } catch {
     /* some embedders refuse; blur already moved focus to the body */
   }
-  return true;
 }

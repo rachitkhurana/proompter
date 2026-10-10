@@ -17,19 +17,18 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useShadowContainer } from "../shadow-root";
-import {
-  TOOLTIP_COOLDOWN_MS,
-  TOOLTIP_DELAY_MS,
-  TOOLTIP_EXIT_DELAY_MS,
-  TOOLTIP_EXIT_MS,
-  TOOLTIP_WARM_AFTER_MS,
-} from "../tokens";
+import { clamp, reducedMotion } from "../../core/motion";
 
 export type TooltipSide = "top" | "bottom" | "left" | "right";
 
 const GAP = 10; // distance from the trigger, as in the prototype
 const HEIGHT = 24;
 const EDGE = 8; // keep this far from the viewport edge
+/** The first tooltip waits this long; neighbours are instant while warm. */
+const DELAY_MS = 350;
+/** Cold hide, as in the prototype: fade over 120ms, starting after a 350ms delay. A warm hide is instant. */
+const EXIT_MS = 120;
+const EXIT_DELAY_MS = 350;
 
 /**
  * Shared "warm" state, the prototype's `.dock.warm`. The group goes warm `warmAfterMs` (420) after the
@@ -41,8 +40,8 @@ export class TooltipWarmth {
   warm = false;
   private timer: ReturnType<typeof setTimeout> | undefined;
   constructor(
-    readonly cooldownMs: number = TOOLTIP_COOLDOWN_MS,
-    readonly warmAfterMs: number = TOOLTIP_WARM_AFTER_MS,
+    readonly cooldownMs: number = 250,
+    readonly warmAfterMs: number = 420,
   ) {}
   /** Pointer went over a trigger: (re)start the warm-up. */
   pointerOver() {
@@ -68,33 +67,28 @@ export class TooltipWarmth {
   }
 }
 
-interface TooltipContextValue {
-  warmth: TooltipWarmth;
-  /** True inside a `<TooltipProvider>`, which reports group enter/leave itself. */
-  grouped: boolean;
-}
+const TooltipContext = createContext<TooltipWarmth | null>(null);
 
-const defaultContext: TooltipContextValue = {
-  warmth: new TooltipWarmth(),
-  grouped: false,
-};
-const TooltipContext = createContext<TooltipContextValue>(defaultContext);
+function missingProvider(): never {
+  throw new Error("<Tooltip> must be inside a <TooltipProvider>");
+}
 
 /**
  * Scopes the warm state to a group of triggers (one per dock). Renders a `display: contents` wrapper
- * whose pointerenter/pointerleave define "the pointer is inside the group".
+ * whose pointerenter/pointerleave define "the pointer is inside the group". Every `<Tooltip>` must be
+ * inside one.
  */
 export function TooltipProvider({ children }: { children?: ReactNode }) {
-  const value = useMemo(() => ({ warmth: new TooltipWarmth(), grouped: true }), []);
+  const warmth = useMemo(() => new TooltipWarmth(), []);
   return (
-    <TooltipContext value={value}>
+    <TooltipContext value={warmth}>
       <div
         style={{ display: "contents" }}
         onPointerOverCapture={(e) => {
-          if (e.pointerType !== "touch" && !movesWithin(e)) value.warmth.enterGroup();
+          if (e.pointerType !== "touch" && !movesWithin(e)) warmth.enterGroup();
         }}
         onPointerOut={(e) => {
-          if (e.pointerType !== "touch" && !movesWithin(e)) value.warmth.leaveGroup();
+          if (e.pointerType !== "touch" && !movesWithin(e)) warmth.leaveGroup();
         }}
       >
         {children}
@@ -129,7 +123,6 @@ export interface TooltipProps {
   content: ReactNode;
   /** Preferred side. Flips to the opposite side when there's no room. */
   side?: TooltipSide;
-  disabled?: boolean;
   /** One element that forwards `ref` and DOM event props (a button, chip, ...). */
   children: ReactElement<TriggerProps>;
 }
@@ -143,10 +136,6 @@ interface Placement {
 }
 
 const OPPOSITE: Record<TooltipSide, TooltipSide> = { top: "bottom", bottom: "top", left: "right", right: "left" };
-
-function clamp(v: number, min: number, max: number) {
-  return Math.min(Math.max(v, min), Math.max(min, max));
-}
 
 function place(trigger: Element, width: number, preferred: TooltipSide): Placement {
   const r = trigger.getBoundingClientRect();
@@ -178,8 +167,8 @@ function place(trigger: Element, width: number, preferred: TooltipSide): Placeme
  * Opens on hover (mouse and pen only) and on keyboard focus; Esc or leaving closes it.
  * Renders into the shadow container, positioned `fixed` so no ancestor can clip it.
  */
-export function Tooltip({ content, side: preferredSide = "top", disabled, children }: TooltipProps) {
-  const ctx = useContext(TooltipContext);
+export function Tooltip({ content, side: preferredSide = "top", children }: TooltipProps) {
+  const warmth = useContext(TooltipContext) ?? missingProvider();
   const container = useShadowContainer();
   const id = useId();
   const [phase, setPhase] = useState<Phase>("closed");
@@ -191,10 +180,8 @@ export function Tooltip({ content, side: preferredSide = "top", disabled, childr
   const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const phaseRef = useRef<Phase>("closed");
   phaseRef.current = phase;
-  const { warmth } = ctx;
 
   const open = useCallback(() => {
-    if (disabled) return;
     clearTimeout(hideTimer.current);
     if (phaseRef.current === "open") return;
     clearTimeout(showTimer.current);
@@ -203,23 +190,21 @@ export function Tooltip({ content, side: preferredSide = "top", disabled, childr
       setPhase("open");
     };
     if (warmth.warm) show(true);
-    else showTimer.current = setTimeout(() => show(false), TOOLTIP_DELAY_MS);
-  }, [disabled, warmth]);
+    else showTimer.current = setTimeout(() => show(false), DELAY_MS);
+  }, [warmth]);
 
   const close = useCallback(() => {
     clearTimeout(showTimer.current);
     if (phaseRef.current !== "open") return;
     const wasWarm = warmth.warm;
-    const reduced =
-      typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (wasWarm || reduced) {
+    if (wasWarm || reducedMotion()) {
       // Warm hide is instant (the prototype zeroes its transition delay and duration).
       setPhase("closed");
       return;
     }
     // Cold hide: the prototype's delayed fade (350ms delay, 120ms fade).
     setPhase("closing");
-    hideTimer.current = setTimeout(() => setPhase("closed"), TOOLTIP_EXIT_DELAY_MS + TOOLTIP_EXIT_MS);
+    hideTimer.current = setTimeout(() => setPhase("closed"), EXIT_DELAY_MS + EXIT_MS);
   }, [warmth]);
 
   useEffect(
@@ -271,8 +256,6 @@ export function Tooltip({ content, side: preferredSide = "top", disabled, childr
       childProps.onPointerOut?.(e);
       if (movesWithin(e)) return;
       close();
-      // Without a <TooltipProvider> there is no group: each trigger is its own.
-      if (!ctx.grouped && e.pointerType !== "touch") warmth.leaveGroup();
     },
     onPointerDown: (e: PointerEvent<HTMLElement>) => {
       childProps.onPointerDown?.(e);

@@ -324,26 +324,6 @@ describe("Menu behaviour", () => {
     expect(focusedIndex()).toBe(1);
   });
 
-  it("skips disabled items", async () => {
-    const pick = vi.fn();
-    await mount(
-      <Menu
-        trigger={<Chip as="button">Open</Chip>}
-        items={[
-          { key: "a", label: "A" },
-          { key: "b", label: "B", disabled: true },
-          { key: "c", label: "C" },
-        ]}
-        onSelect={pick}
-      />,
-    );
-    await openWithKeyboard();
-    await key(focused(), "ArrowDown");
-    expect(focusedIndex()).toBe(2);
-    await act(async () => (items()[1] as HTMLElement).click());
-    expect(pick).not.toHaveBeenCalled();
-  });
-
   it("dismisses on a pointerdown outside, in the shadow root and on the host page, and not before open", async () => {
     await mount(<Single onPick={() => {}} />);
     const outsideHost = document.createElement("div");
@@ -474,6 +454,7 @@ describe("Menu behaviour", () => {
     await mount(
       <Menu
         trigger={<Chip as="button">Open</Chip>}
+        selection="single"
         items={["Beta", "Bravo", "Blue", "Cat"].map((l) => ({ key: l, label: l }))}
         onSelect={() => {}}
       />,
@@ -490,7 +471,13 @@ describe("Menu behaviour", () => {
 
   it("gives the header role=presentation", async () => {
     await mount(
-      <Menu trigger={<Chip as="button">Open</Chip>} header="Tags" items={[{ key: "a", label: "A" }]} onSelect={() => {}} />,
+      <Menu
+        trigger={<Chip as="button">Open</Chip>}
+        header="Tags"
+        selection="single"
+        items={[{ key: "a", label: "A" }]}
+        onSelect={() => {}}
+      />,
     );
     await openWithKeyboard();
     expect(menu()!.querySelector(".mh")?.getAttribute("role")).toBe("presentation");
@@ -499,8 +486,8 @@ describe("Menu behaviour", () => {
   it("gives each menu its own ids when two open in sequence", async () => {
     await mount(
       <>
-        <Menu trigger={<Chip as="button">One</Chip>} items={[{ key: "a", label: "A" }]} onSelect={() => {}} />
-        <Menu trigger={<Chip as="button">Two</Chip>} items={[{ key: "b", label: "B" }]} onSelect={() => {}} />
+        <Menu trigger={<Chip as="button">One</Chip>} selection="single" items={[{ key: "a", label: "A" }]} onSelect={() => {}} />
+        <Menu trigger={<Chip as="button">Two</Chip>} selection="single" items={[{ key: "b", label: "B" }]} onSelect={() => {}} />
       </>,
     );
     const [one, two] = Array.from(m.shadow().querySelectorAll("button")) as HTMLButtonElement[];

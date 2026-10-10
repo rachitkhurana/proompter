@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import type { Entry, Session } from "../../core/entry";
-import { LogoIcon, XIcon } from "../icons";
+import { Icon } from "../icons";
 import { IconButton } from "../primitives/button";
 import { cx } from "../primitives/cx";
 import { Segmented } from "../primitives/segmented";
 import type { EntryPatch, PendingFile } from "../proompter-deps";
 import { sessionSubtitle } from "../shell/format";
+import { reducedMotion } from "../../core/motion";
 import { Ticket } from "../ticket/ticket";
 import { EntryList } from "./entry-list";
 import { PublishPanel } from "./publish-panel";
-import { SHEET_CSS } from "./sheet-css";
 
 export type SheetTab = "entries" | "publish";
 
@@ -42,8 +42,6 @@ export interface SheetProps {
   onWrite?(): Promise<void>;
   ticket: SheetTicketProps;
 }
-
-const reducedMotion = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /**
  * The review session sheet (DESIGN §7): it slides in from the right, or from the left when the dock is on the
@@ -148,7 +146,6 @@ export function Sheet({
         if (to && !e.currentTarget.contains(to)) focus.current.inside = false;
       }}
     >
-      <style>{SHEET_CSS}</style>
       {selected && tab === "entries" ? (
         <Ticket
           key={selected.id}
@@ -170,14 +167,14 @@ export function Sheet({
         <>
           <div className="sh-hd">
             <span className="logo">
-              <LogoIcon />
+              <Icon name="logo" />
             </span>
             <div className="t">
               <b role="heading" aria-level={2}>{session.title}</b>
               <span>{sessionSubtitle(session)}</span>
             </div>
             <IconButton label="Close" onClick={onClose}>
-              <XIcon size="s" />
+              <Icon name="x" size="s" />
             </IconButton>
           </div>
           <Segmented
