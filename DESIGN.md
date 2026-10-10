@@ -128,6 +128,12 @@ examples/playground/    → Next 16 app with a Gamorite-like mock page (the prot
   - A modal's `aria-hidden` is taken off the host, so the kit stays reachable to assistive tech.
   Picking inside the dialog works as before. A click on the app itself still closes it. `e2e/app-dialog.spec.ts`
   covers this against a real Radix Dialog (`radix-ui`, a playground dev dependency only).
+- **D13. Unset flag must fold away (2026-10-10, release prep):** Next only inlines `NEXT_PUBLIC_*` variables
+  that exist at build time. With `NEXT_PUBLIC_PROOMPTER` truly unset, the layout's flag check stayed a runtime
+  read, so the dynamic import survived and a fresh app shipped the kit's client chunks. The playground's 11.1
+  build had set the flag to `""`, which hid this. `withProompter` now defines the flag as `""` when it is
+  unset. `scripts/e2e-servers.mjs` builds the 11.1 app with the variable removed, and that check failed before
+  the fix.
 - **Peer dependencies:** `react >=19`, `react-dom >=19`, `next >=15.3` (optional, only for `./next`).
 - **Dependencies:**
   - `html-to-image` (snapshots)
