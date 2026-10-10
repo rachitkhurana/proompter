@@ -1,12 +1,16 @@
 {
   "name": "@rachitkay/proompter",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "A review layer you turn on over your own app: pick any element, write what's wrong, get a markdown file with the source location, console, network and a snapshot.",
   "license": "MIT",
   "author": "Rachit Khurana",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/rachitkhurana/proompter.git"
+  },
+  "homepage": "https://github.com/rachitkhurana/proompter#readme",
+  "bugs": {
+    "url": "https://github.com/rachitkhurana/proompter/issues"
   },
   "type": "module",
   "sideEffects": false,
@@ -18,6 +22,10 @@
     "dist",
     "licenses"
   ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
