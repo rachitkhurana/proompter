@@ -1,0 +1,12 @@
+node_modules
+dist
+.next
+next-env.d.ts
+test-results
+playwright-report
+storybook-static
+*.tsbuildinfo
+.DS_Store
+# `reviews/` at the repo root is product output (committed). The playground's e2e runs write
+# throwaway entries into its own folder, so only that one is ignored.
+examples/playground/reviews/
