@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.2 (2026-10-10)
+
+- **Accessibility:** the publish view's list of pending files can now take keyboard focus, so long paths that
+  scroll sideways can be read without a mouse.
+- **npm page:** the package page no longer lists the private `./internal/fixtures` export. Installs were never
+  affected.
+- Published from GitHub Actions with npm trusted publishing and provenance.
+
 ## 0.0.1 (2026-10-10)
 
 First release.
