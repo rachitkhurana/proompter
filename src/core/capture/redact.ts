@@ -27,7 +27,7 @@ export function redactString(s: string): string {
   return s.replace(JWT, REDACTED).replace(EMAIL, REDACTED).replace(BEARER, `$1 ${REDACTED}`);
 }
 
-function redactValue(v: unknown, depth: number): unknown {
+export function redactValue(v: unknown, depth: number): unknown {
   if (typeof v === "string") return redactString(v);
   if (v === null || typeof v !== "object") return v;
   if (depth > 8) return REDACTED;
