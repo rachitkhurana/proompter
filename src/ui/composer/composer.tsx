@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useImperativeHandle, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type Ref } from "react";
-import type { Capture, CaptureContext } from "../../core/capture";
+import type { Capture, CaptureContext } from "../../core/capture/types";
 import type { Entry, EntryIntent, EntryPriority, EntrySnapshot, EntryTarget, ProompterPlugin } from "../../core/entry";
 import type { PickCommit } from "../../core/pick";
 import { pluginContext, pluginTask, pluginTestPlan } from "../../core/plugins";
@@ -573,13 +573,6 @@ export function Composer({
                   <span />
                   <span>{primary?.component || route}</span>
                 </div>
-                {resolved[0]?.query ? (
-                  <div>
-                    <span className="m">query</span>
-                    <span />
-                    <span>{resolved[0].query}</span>
-                  </div>
-                ) : null}
               </div>
             </div>
             <div>
