@@ -1,10 +1,12 @@
 import { defineConfig, devices } from "@playwright/test";
 
 // E2E_PORT_BASE (default 3100) lets two checkouts run e2e at once without sharing servers. The servers script
-// reads the same variable: base = Next dev, +1 Next prod, +2 Vite dev, +3 Vite preview.
+// reads the same variable: base = Next dev, +1 Next prod, +2 Vite dev, +3 Vite preview, +4 Next preview build.
 const BASE = Number(process.env.E2E_PORT_BASE ?? 3100);
 const DEV_PORT = BASE; // playground in dev with NEXT_PUBLIC_PROOMPTER=true
 const PROD_PORT = BASE + 1; // production build with the flag unset (DESIGN 11.1)
+
+const PREVIEW_PORT = BASE + 4; // production build with the flag ON: dormant until enabled (D15)
 
 export default defineConfig({
   testDir: "e2e",
@@ -22,20 +24,26 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   projects: [
-    { name: "chromium", use: { ...devices["Desktop Chrome"] }, testIgnore: "**/production.spec.ts" },
+    { name: "chromium", use: { ...devices["Desktop Chrome"] }, testIgnore: ["**/production.spec.ts", "**/preview.spec.ts"] },
     {
       name: "production",
       use: { ...devices["Desktop Chrome"], baseURL: `http://localhost:${PROD_PORT}` },
       testMatch: "**/production.spec.ts",
     },
+    {
+      name: "preview",
+      use: { ...devices["Desktop Chrome"], baseURL: `http://localhost:${PREVIEW_PORT}` },
+      testMatch: "**/preview.spec.ts",
+    },
   ],
-  // Playwright owns the servers (scripts/e2e-servers.mjs): the package build, a flag-unset production build
-  // served on :3101, then `next dev` with the flag on at :3100.
+  // Playwright owns the servers (scripts/e2e-servers.mjs): the package build, then (ports are BASE +)
+  // +1 flag-unset Next production build, +4 flag-on Next preview build, +3 Vite preview (flag unset), +2 Vite
+  // dev, and last +0 `next dev` with the flag on, the URL Playwright waits for.
   webServer: {
     command: "node scripts/e2e-servers.mjs",
     url: `http://localhost:${DEV_PORT}`,
     reuseExistingServer: !process.env.CI,
-    timeout: 420_000,
+    timeout: 600_000,
     stdout: "pipe",
     stderr: "pipe",
   },
