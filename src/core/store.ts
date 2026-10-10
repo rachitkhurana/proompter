@@ -96,6 +96,8 @@ export interface EntryPatch {
   task?: string | null;
   /** The note from `proompter resolve --note` (T15); `null` removes it. */
   resolution?: string | null;
+  /** Agent replies (T16); `null` removes them. */
+  replies?: string | null;
   issue?: string | null;
 }
 
@@ -291,6 +293,7 @@ function sanitizePatch(patch: EntryPatch): EntryPatch {
   if (typeof patch.testPlan === "string") out.testPlan = redactText(patch.testPlan);
   if (typeof patch.task === "string") out.task = redactText(patch.task);
   if (typeof patch.resolution === "string") out.resolution = redactText(patch.resolution);
+  if (typeof patch.replies === "string") out.replies = redactText(patch.replies);
   if (typeof patch.issue === "string") out.issue = redactText(patch.issue);
   return out;
 }
@@ -321,6 +324,7 @@ const CHANGE_FIELDS: ReadonlyArray<readonly [keyof EntryPatch, string, boolean]>
   ["testPlan", "test plan", false],
   ["task", "task", false],
   ["resolution", "resolution", true],
+  ["replies", "replies", true],
   ["issue", "issue", false],
 ];
 const show = (v: unknown) => (Array.isArray(v) ? v.join(", ") || "none" : orNone(v as string | null | undefined));
