@@ -16,7 +16,6 @@ import { copyText } from "../shell/clipboard";
 import { clock, sizeLabel, viewportLabel } from "../shell/format";
 import { Snapshot } from "./snapshot";
 import { TabList } from "./tab-list";
-import { TICKET_CSS } from "./ticket-css";
 
 export interface TicketProps {
   entry: Entry;
@@ -104,7 +103,6 @@ export function Ticket({
 
   return (
     <div className="tk">
-      <style>{TICKET_CSS}</style>
       <div className="tk-crumb">
         <IconButton label="Back to entries" onClick={onBack}>
           <Icon name="back" size="s" />
