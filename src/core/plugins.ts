@@ -115,6 +115,8 @@ export function builtinRedact(e: Entry): Entry {
     ...(e.testPlan !== undefined ? { testPlan: optional(e.testPlan) } : {}),
     ...(e.extra ? { extra: redactValue(e.extra, 0) as Record<string, unknown> } : {}),
     ...(e.quote !== undefined ? { quote: redactText(e.quote) } : {}),
+    ...(e.resolution !== undefined ? { resolution: optional(e.resolution) } : {}),
+    ...(e.replies !== undefined ? { replies: optional(e.replies) } : {}),
     context: {
       ...ctx,
       ...(ctx.build !== undefined ? { build: redactText(ctx.build) } : {}),
