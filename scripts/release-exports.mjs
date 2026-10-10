@@ -5,7 +5,7 @@
 //   node scripts/release-exports.mjs strip     remove it from package.json (a backup is kept)
 //   node scripts/release-exports.mjs restore   put package.json back
 //   node scripts/release-exports.mjs prepack   release build (no fixtures entry, PROOMPTER_RELEASE=1) + strip
-//   node scripts/release-exports.mjs postpack  restore
+//   node scripts/release-exports.mjs postpack  restore, unless PROOMPTER_KEEP_STRIPPED=1 (the release job)
 //
 // `prepack` / `postpack` are wired into package.json, so `pnpm pack` and `pnpm publish` strip and restore on
 // their own. CI runs `strip`, then `PROOMPTER_RELEASE=1 vitest run src/internal/exports.test.ts`, then `restore`.
@@ -61,9 +61,10 @@ function prepack() {
   }
 }
 
-// `node scripts/release-exports.mjs check-pack pack.json`, where pack.json is `npm pack --dry-run --json`
-// output taken while package.json is stripped: the tarball must hold no dist/internal file, must carry the
-// font licence, and its exports must be exactly the public entry points.
+// `node scripts/release-exports.mjs check-pack pack.json`, where pack.json is the output of
+// `PROOMPTER_KEEP_STRIPPED=1 npm pack --dry-run --json` (scripts on, the same order as `npm publish`): the tarball
+// must hold no dist/internal file and must carry the font licence, and package.json as it is after postpack (what
+// `npm publish` sends to the registry) must export exactly the public entry points.
 function checkPack() {
   const file = process.argv[3];
   if (!file) throw new Error("usage: check-pack <npm-pack-dry-run.json>");
@@ -84,7 +85,15 @@ function checkPack() {
   console.log(`release-exports: tarball ok (${files.length} files, exports ${keys.join(", ")})`);
 }
 
-const modes = { strip, restore, prepack, postpack: restore, "check-pack": checkPack };
+// `npm publish` re-reads package.json after postpack and sends THAT to the registry, so a restore here put the
+// private export back on the npm page (0.0.1, 0.0.2). The release job sets PROOMPTER_KEEP_STRIPPED=1: its
+// checkout is thrown away, so nothing needs restoring.
+function postpack() {
+  if (process.env.PROOMPTER_KEEP_STRIPPED === "1") return console.log("release-exports: keeping package.json stripped");
+  restore();
+}
+
+const modes = { strip, restore, prepack, postpack, "check-pack": checkPack };
 const mode = process.argv[2];
 if (!modes[mode]) {
   console.error(`usage: release-exports.mjs ${Object.keys(modes).join(" | ")}`);
