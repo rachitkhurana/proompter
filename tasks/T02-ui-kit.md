@@ -27,6 +27,8 @@
   `Chip` and the sheet are hand-built, as in the prototype. Every Radix portal gets `container` = the
   shadow container. No `motion`: CSS transitions/keyframes with the prototype's easing tokens, and the
   Web Animations API for code-driven motion.
+- `Menu` stories cover keyboard navigation, multi-select (tags) and portalling into the shadow root.
+  T02 adds only `@radix-ui/react-dropdown-menu`; `@radix-ui/react-dialog` arrives with the command menu in T08.
 
 **Done when:** each primitive has a story with all its states, axe is clean, and a story shows that host
 CSS (`* { color: red !important }` outside) can't reach the shadow tree.

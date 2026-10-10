@@ -46,6 +46,8 @@ examples/playground/    → Next 16 app with a Gamorite-like mock page (the prot
   reserve the export names now.
 - **Build:** tsup (ESM and CJS, d.ts). The `"use client"` banner goes on the client entry only. CSS is
   inlined as a string export, so there's no CSS file for the host to import.
+- **TypeScript:** pinned to 5.9.x, not 7.x. tsup's dts build and typescript-eslint need the TS JS API,
+  which the native 7.x port doesn't ship, and typescript-eslint requires TS <6.1.
 - **Peer dependencies:** `react >=19`, `react-dom >=19`, `next >=15.3` (optional, only for `./next`).
 - **Dependencies:**
   - `html-to-image` (snapshots)
