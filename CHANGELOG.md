@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.0.3 (2026-10-10)
 
 - **Vite and plain React:** new `@rachitkay/proompter/vite` export with a `proompter()` plugin. It stamps source
   locations and serves the file writer on the Vite dev server, so the kit works in any React 19 app built with
