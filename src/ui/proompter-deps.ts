@@ -3,11 +3,11 @@
  *
  * T08 builds against these small interfaces so it never imports `src/core/store.ts`, `serialize.ts`,
  * `plugins.ts` or `src/ui/composer/**`. `<Proompter>` takes a `deps` prop; when it is absent the defaults in
- * `src/ui/shell/defaults.ts` apply (that file holds the single `INTEGRATION(T07)` marker).
+ * `src/ui/shell/defaults.tsx` apply (T07's store, serializer and composer).
  *
  * Types only: nothing here runs, so the light entry chunk can import it freely.
  */
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 import type { Capture, CaptureOptions } from "../core/capture/types";
 import type {
   Entry,
@@ -74,6 +74,11 @@ export interface ComposerSlotProps {
    * must not handle Esc itself; it only calls this from its Cancel and close buttons.
    */
   onClose(): void;
+  /**
+   * The composer attaches its `discard()` here (T07's `ref`), so the root's Esc can close it with its exit
+   * animation. A composer without one is simply closed with `onClose`.
+   */
+  discardRef: RefObject<{ discard(): void } | null>;
   /**
    * The entry was created (the store already has it). The root closes the composer, clears the selection,
    * shows the "saved" toast and pulses the new pin, so the composer must not toast.
