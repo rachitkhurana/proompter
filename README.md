@@ -80,7 +80,7 @@ Start your app with `NEXT_PUBLIC_PROOMPTER=true next dev`, then press `⌘⇧.` 
 | `R` | Rotate the device |
 | `1` `2` `3` `4` | Responsive, Desktop, Tablet, Mobile |
 | `E` | Entries sheet |
-| `⌘K` | Command menu |
+| `⌘⇧K` | Command menu |
 | `⌘⇧.` | Show or hide the kit |
 | `⌘↵` | Create the entry (in the composer) |
 | `↑` `[` / `↓` `]` | While picking: parent / back down |
