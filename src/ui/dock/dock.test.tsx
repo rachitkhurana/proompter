@@ -1,9 +1,9 @@
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { toast } from "../primitives/toast";
+import { toast, Toaster } from "../primitives/toast";
 import { mountInShadow, type Mounted } from "../test-utils";
 import { Dock, type DockProps } from "./dock";
-import { rubber } from "./dock-math";
+import { rubber, type DockPosition } from "./dock-math";
 import { COLLAPSED_KEY, DOCK_KEY } from "./dock-storage";
 import { getDockPlacement } from "./placement";
 
@@ -121,8 +121,17 @@ afterEach(async () => {
   localStorage.clear();
 });
 
-async function setup(props: DockProps = {}) {
-  m = await mountInShadow(<Dock persist={false} {...props} />, { css: "" });
+/** `at` and `collapsed` seed `localStorage` (the dock restores them on mount) before mounting. */
+async function setup({ at, collapsed, ...props }: DockProps & { at?: DockPosition; collapsed?: boolean } = {}) {
+  if (at) localStorage.setItem(DOCK_KEY, JSON.stringify(at));
+  if (collapsed) localStorage.setItem(COLLAPSED_KEY, "1");
+  m = await mountInShadow(
+    <>
+      <Dock {...props} />
+      <Toaster />
+    </>,
+    { css: "" },
+  );
   const q = <T extends Element = HTMLElement>(sel: string) => m!.shadow().querySelector<T>(sel)!;
   return {
     dock: q(".dock"),
@@ -242,7 +251,7 @@ describe("Dock parts", () => {
 describe("keyboard steps on the grip", () => {
   it("moves 24px per arrow and prevents the default", async () => {
     const onPositionChange = vi.fn();
-    const { grip, dock } = await setup({ initialPosition: { x: 100, y: 200, edge: null }, onPositionChange });
+    const { grip, dock } = await setup({ at:{ x: 100, y: 200, edge: null }, onPositionChange });
     expect([left(dock), top(dock)]).toEqual([100, 200]);
     expect(key(grip, "ArrowRight").defaultPrevented).toBe(true);
     expect([left(dock), top(dock)]).toEqual([124, 200]);
@@ -257,7 +266,7 @@ describe("keyboard steps on the grip", () => {
   });
 
   it("ignores other keys and stays 8px inside the window", async () => {
-    const { grip, dock } = await setup({ initialPosition: { x: 10, y: 10, edge: null } });
+    const { grip, dock } = await setup({ at:{ x: 10, y: 10, edge: null } });
     expect(key(grip, "a").defaultPrevented).toBe(false);
     key(grip, "ArrowLeft");
     key(grip, "ArrowUp");
@@ -265,7 +274,7 @@ describe("keyboard steps on the grip", () => {
   });
 
   it("leaves a vertical bar for a floating dock, and saves the result", async () => {
-    const { grip, dock } = await setup({ initialPosition: { x: 12, y: 100, edge: "l" }, persist: true });
+    const { grip, dock } = await setup({ at:{ x: 12, y: 100, edge: "l" } });
     expect(dock.classList.contains("v")).toBe(true);
     key(grip, "ArrowDown");
     expect(dock.classList.contains("v")).toBe(false);
@@ -320,18 +329,18 @@ describe("collapse (click under 4px)", () => {
     expect(q(".lbadge").textContent).toBe("4");
   });
 
-  it("starts collapsed from initialCollapsed", async () => {
-    const { dock } = await setup({ initialCollapsed: true });
+  it("starts collapsed from the saved state", async () => {
+    const { dock } = await setup({ collapsed: true });
     expect(dock.classList.contains("col")).toBe(true);
   });
 
   it("persists and restores the collapsed state", async () => {
-    const first = await setup({ persist: true });
+    const first = await setup();
     key(first.brand, "Enter");
     expect(localStorage.getItem(COLLAPSED_KEY)).toBe("1");
     await m!.unmount();
     m = undefined;
-    const second = await setup({ persist: true });
+    const second = await setup();
     expect(second.dock.classList.contains("col")).toBe(true);
   });
 });
@@ -339,7 +348,7 @@ describe("collapse (click under 4px)", () => {
 describe("drag", () => {
   it("follows the pointer 1:1 from the grab offset, then stays put when released inside the window", async () => {
     const onPositionChange = vi.fn();
-    const { grip, dock } = await setup({ initialPosition: { x: 100, y: 200, edge: null }, onPositionChange });
+    const { grip, dock } = await setup({ at:{ x: 100, y: 200, edge: null }, onPositionChange });
     pointer(grip, "pointerdown", 150, 215); // grab offset (50, 15)
     pointer(grip, "pointermove", 152, 216, 0); // under the slop: nothing yet
     expect(dock.classList.contains("dragging")).toBe(false);
@@ -362,7 +371,7 @@ describe("drag", () => {
   });
 
   it("rubber-bands past the window edge instead of following 1:1", async () => {
-    const { grip, dock } = await setup({ initialPosition: { x: 100, y: 200, edge: null } });
+    const { grip, dock } = await setup({ at:{ x: 100, y: 200, edge: null } });
     pointer(grip, "pointerdown", 150, 215);
     pointer(grip, "pointermove", -200, 215, 100); // 1:1 would be x = -250
     expect(left(dock)).toBeCloseTo(8 - rubber(258, W), 6);
@@ -371,7 +380,7 @@ describe("drag", () => {
   });
 
   it("releasing past the left edge snaps to the bar and settles inside the window", async () => {
-    const { grip, dock } = await setup({ initialPosition: { x: 100, y: 200, edge: null } });
+    const { grip, dock } = await setup({ at:{ x: 100, y: 200, edge: null } });
     pointer(grip, "pointerdown", 150, 215);
     pointer(grip, "pointermove", -200, 215, 100);
     pointer(grip, "pointerup", -200, 215, 1100);
@@ -380,7 +389,7 @@ describe("drag", () => {
   });
 
   it("releasing past the top edge eases back to the margin", async () => {
-    const { grip, dock } = await setup({ initialPosition: { x: 400, y: 300, edge: null } });
+    const { grip, dock } = await setup({ at:{ x: 400, y: 300, edge: null } });
     pointer(grip, "pointerdown", 450, 315);
     pointer(grip, "pointermove", 450, -100, 100);
     expect(top(dock)).toBeLessThan(8);
@@ -391,7 +400,7 @@ describe("drag", () => {
 
   it("snaps to the nearest side edge as a vertical bar when released within 72px", async () => {
     const onPositionChange = vi.fn();
-    const { grip, dock } = await setup({ initialPosition: { x: 400, y: 300, edge: null }, onPositionChange, persist: true });
+    const { grip, dock } = await setup({ at:{ x: 400, y: 300, edge: null }, onPositionChange });
     pointer(grip, "pointerdown", 450, 315);
     pointer(grip, "pointermove", 200, 315, 0);
     pointer(grip, "pointermove", 60, 315, 1000); // slow
@@ -406,7 +415,7 @@ describe("drag", () => {
   });
 
   it("snaps to the right edge, and tooltips, toasts and the sheet follow", async () => {
-    const { grip, dock } = await setup({ initialPosition: { x: 400, y: 100, edge: null } });
+    const { grip, dock } = await setup({ at:{ x: 400, y: 100, edge: null } });
     pointer(grip, "pointerdown", 450, 115);
     pointer(grip, "pointermove", 900, 115, 0);
     pointer(grip, "pointermove", 950, 115, 1000);
@@ -417,7 +426,7 @@ describe("drag", () => {
   });
 
   it("projects a fast flick: a release far from the edge still snaps", async () => {
-    const { grip, dock } = await setup({ initialPosition: { x: 500, y: 300, edge: null } });
+    const { grip, dock } = await setup({ at:{ x: 500, y: 300, edge: null } });
     pointer(grip, "pointerdown", 550, 315);
     for (const [i, x] of [500, 400, 350, 300, 250, 200].entries()) pointer(grip, "pointermove", x, 315, i * 16);
     pointer(grip, "pointerup", 200, 315, 80);
@@ -425,7 +434,7 @@ describe("drag", () => {
   });
 
   it("the same drag at slow speed does not snap", async () => {
-    const { grip, dock } = await setup({ initialPosition: { x: 500, y: 300, edge: null } });
+    const { grip, dock } = await setup({ at:{ x: 500, y: 300, edge: null } });
     pointer(grip, "pointerdown", 550, 315);
     for (const [i, x] of [500, 400, 350, 300, 250, 200].entries()) pointer(grip, "pointermove", x, 315, i * 160);
     pointer(grip, "pointerup", 200, 315, 1000);
@@ -436,7 +445,7 @@ describe("drag", () => {
   it("animates the snap with the spring when motion is allowed, and lands on the edge", async () => {
     reduceMotion(false);
     const clock = rafClock();
-    const { grip, dock } = await setup({ initialPosition: { x: 400, y: 300, edge: null } });
+    const { grip, dock } = await setup({ at:{ x: 400, y: 300, edge: null } });
     pointer(grip, "pointerdown", 450, 315);
     pointer(grip, "pointermove", 200, 315, 0);
     pointer(grip, "pointermove", 60, 315, 1000);
@@ -450,7 +459,7 @@ describe("drag", () => {
   });
 
   it("leaving a vertical bar by dragging turns it into a floating dock under the pointer", async () => {
-    const { grip, dock } = await setup({ initialPosition: { x: 12, y: 100, edge: "l" } });
+    const { grip, dock } = await setup({ at:{ x: 12, y: 100, edge: "l" } });
     expect(dock.classList.contains("v")).toBe(true);
     pointer(grip, "pointerdown", 30, 110);
     pointer(grip, "pointermove", 500, 400, 100);
@@ -461,7 +470,7 @@ describe("drag", () => {
   });
 
   it("a second pointer cannot hijack a live drag", async () => {
-    const { grip, brand, dock } = await setup({ initialPosition: { x: 100, y: 200, edge: null } });
+    const { grip, brand, dock } = await setup({ at:{ x: 100, y: 200, edge: null } });
     pointer(grip, "pointerdown", 150, 215, 0, 1);
     pointer(grip, "pointermove", 350, 315, 100, 1);
     expect([left(dock), top(dock)]).toEqual([300, 300]);
@@ -485,8 +494,7 @@ describe("drag", () => {
     const clock = rafClock();
     const onPositionChange = vi.fn();
     const { grip, dock } = await setup({
-      initialPosition: { x: 400, y: 300, edge: null },
-      persist: true,
+      at:{ x: 400, y: 300, edge: null },
       onPositionChange,
     });
     pointer(grip, "pointerdown", 450, 315);
@@ -507,14 +515,14 @@ describe("drag", () => {
   });
 
   it("moves from the brand too", async () => {
-    const { brand, dock } = await setup({ initialPosition: { x: 100, y: 200, edge: null } });
+    const { brand, dock } = await setup({ at:{ x: 100, y: 200, edge: null } });
     pointer(brand, "pointerdown", 120, 215);
     pointer(brand, "pointermove", 220, 315, 100);
     expect([left(dock), top(dock)]).toEqual([200, 300]);
   });
 
   it("ignores non-primary buttons", async () => {
-    const { grip, dock } = await setup({ initialPosition: { x: 100, y: 200, edge: null } });
+    const { grip, dock } = await setup({ at:{ x: 100, y: 200, edge: null } });
     act(() => {
       grip.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 2, pointerId: 1, clientX: 110, clientY: 210 }));
     });
@@ -527,7 +535,7 @@ describe("reset", () => {
   it("double-click returns to the bottom centre, clears storage and toasts", async () => {
     localStorage.setItem(DOCK_KEY, JSON.stringify({ x: 12, y: 100, edge: "l" }));
     const onPositionChange = vi.fn();
-    const { grip, dock } = await setup({ persist: true, onPositionChange });
+    const { grip, dock } = await setup({ onPositionChange });
     expect(dock.classList.contains("edge-l")).toBe(true);
     act(() => void grip.dispatchEvent(new MouseEvent("dblclick", { bubbles: true })));
     expect(dock.classList.contains("free")).toBe(false);
@@ -535,23 +543,15 @@ describe("reset", () => {
     expect(dock.style.left).toBe("");
     expect(localStorage.getItem(DOCK_KEY)).toBeNull();
     expect(onPositionChange).toHaveBeenLastCalledWith(null);
-    expect(toast.list().length).toBe(1);
+    expect(m!.shadow().querySelectorAll(".toast")).toHaveLength(1);
   });
 });
 
 describe("saved position", () => {
   it("restores from localStorage", async () => {
     localStorage.setItem(DOCK_KEY, JSON.stringify({ x: 222, y: 333, edge: null }));
-    const { dock } = await setup({ persist: true });
+    const { dock } = await setup();
     expect([left(dock), top(dock)]).toEqual([222, 333]);
-  });
-
-  it("does not read or write storage when persist is off", async () => {
-    localStorage.setItem(DOCK_KEY, JSON.stringify({ x: 222, y: 333, edge: null }));
-    const { dock, grip } = await setup({ persist: false });
-    expect(dock.classList.contains("free")).toBe(false);
-    key(grip, "ArrowLeft");
-    expect(JSON.parse(localStorage.getItem(DOCK_KEY)!)).toEqual({ x: 222, y: 333, edge: null });
   });
 
   it("survives storage that throws", async () => {
@@ -559,7 +559,7 @@ describe("saved position", () => {
       throw new Error("blocked");
     };
     vi.stubGlobal("localStorage", { getItem: boom, setItem: boom, removeItem: boom });
-    const { dock, grip, brand } = await setup({ persist: true });
+    const { dock, grip, brand } = await setup();
     expect(dock.classList.contains("free")).toBe(false);
     expect(dock.classList.contains("col")).toBe(false);
     key(brand, "Enter");
@@ -576,12 +576,12 @@ describe("placement", () => {
     expect(getDockPlacement().rect).toMatchObject({ left: 350, top: 740, width: 300, height: 40 });
     await m!.unmount();
     m = undefined;
-    await setup({ initialPosition: { x: 100, y: 20, edge: null } });
+    await setup({ at:{ x: 100, y: 20, edge: null } });
     expect(getDockPlacement()).toMatchObject({ mode: "horizontal", tooltipSide: "bottom", toastPosition: "bottom" });
   });
 
   it("goes back to the default when the dock unmounts", async () => {
-    await setup({ initialPosition: { x: 12, y: 100, edge: "r" } });
+    await setup({ at:{ x: 12, y: 100, edge: "r" } });
     expect(getDockPlacement().mode).toBe("vertical-right");
     await m!.unmount();
     m = undefined;
