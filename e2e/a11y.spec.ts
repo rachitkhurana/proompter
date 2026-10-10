@@ -94,7 +94,7 @@ test.describe("axe", () => {
 
   test("command menu", async ({ page }) => {
     await open(page);
-    await page.keyboard.press("ControlOrMeta+k");
+    await page.keyboard.press("ControlOrMeta+Shift+K");
     await expect(page.getByRole("dialog", { name: "Command menu" })).toBeVisible();
     await page.waitForTimeout(400);
     await expectClean(page, "the command menu");
@@ -154,7 +154,7 @@ test.describe("motion", () => {
     await page.keyboard.press("n"); // composer
     await page.waitForTimeout(50);
     await page.keyboard.press("Escape");
-    await page.keyboard.press("ControlOrMeta+k"); // command menu
+    await page.keyboard.press("ControlOrMeta+Shift+K"); // command menu
   };
 
   test.describe("reduced", () => {
