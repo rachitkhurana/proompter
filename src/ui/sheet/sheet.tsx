@@ -10,7 +10,6 @@ import { reducedMotion } from "../../core/motion";
 import { Ticket } from "../ticket/ticket";
 import { EntryList } from "./entry-list";
 import { PublishPanel } from "./publish-panel";
-import { SHEET_CSS } from "./sheet-css";
 
 export type SheetTab = "entries" | "publish";
 
@@ -147,7 +146,6 @@ export function Sheet({
         if (to && !e.currentTarget.contains(to)) focus.current.inside = false;
       }}
     >
-      <style>{SHEET_CSS}</style>
       {selected && tab === "entries" ? (
         <Ticket
           key={selected.id}
