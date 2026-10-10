@@ -73,7 +73,7 @@ function checkPack() {
   const internal = files.filter((f) => f.startsWith("dist/internal"));
   const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
   const keys = Object.keys(pkg.exports).sort();
-  const want = [".", "./next", "./next/route", "./github", "./package.json"].sort();
+  const want = [".", "./next", "./next/route", "./vite", "./github", "./package.json"].sort();
   const problems = [];
   if (internal.length) problems.push(`tarball contains ${internal.join(", ")}`);
   if (!files.includes("licenses/Geist-OFL.txt")) problems.push("tarball lacks licenses/Geist-OFL.txt");
