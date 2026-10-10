@@ -34,7 +34,6 @@ export interface ShellProps {
   onToggleKit(): void;
 }
 
-type FrameWindow = Window & typeof globalThis;
 /** A "Show on page" request that has not completed after this long is dropped. */
 const SHOW_GIVE_UP_MS = 8000;
 const NO_PLUGINS: NonNullable<ProompterProps["plugins"]> = [];
@@ -126,7 +125,7 @@ function Kit({ options, box, onToggleKit }: ShellProps) {
   const [hostCapture] = useState(
     () =>
       box.getCapture() ??
-      box.setCapture(createCapture({ win: window as FrameWindow, redact: options.redact, queries: options.queries })),
+      box.setCapture(createCapture({ win: window, redact: options.redact, queries: options.queries })),
   );
   useEffect(() => {
     hostCapture.enable();
@@ -136,7 +135,7 @@ function Kit({ options, box, onToggleKit }: ShellProps) {
   const frameCaptures = useRef(new Map<Window, Capture>());
   useEffect(() => {
     if (surface?.kind !== "frame") return;
-    const w = surface.win as FrameWindow;
+    const w = surface.win;
     if (w.__proompter_capture) return;
     const c = createCapture({ win: w, redact: options.redact, queries: options.queries });
     c.enable();
@@ -150,14 +149,17 @@ function Kit({ options, box, onToggleKit }: ShellProps) {
   const getCapture = (): Capture => {
     const s = live.current.surface;
     if (s?.kind === "frame") {
-      const w = s.win as FrameWindow;
+      const w = s.win;
       return w.__proompter_capture ?? frameCaptures.current.get(w) ?? hostCapture;
     }
     return hostCapture;
   };
 
   // -- actions -----------------------------------------------------------------------------------------
+  const discardRef = useRef<{ discard(): void } | null>(null);
   const closeComposer = () => setDraft(null);
+  // Esc: the composer closes itself with its exit animation when it can (it then calls `onClose`).
+  const discardComposer = () => (discardRef.current ? discardRef.current.discard() : setDraft(null));
   const closeCommand = () => setCommandOpen(false);
   const openCommand = () => {
     setDraft(null);
@@ -264,7 +266,7 @@ function Kit({ options, box, onToggleKit }: ShellProps) {
       const menu = container?.querySelector('[role="menu"]');
       menu?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true, composed: true }));
     },
-    closeComposer,
+    closeComposer: discardComposer,
     closeCommand,
     exitMode: () => engine.setMode("idle"),
     backToList: () => setSheet((s) => ({ ...s, selected: null })),
@@ -421,6 +423,7 @@ function Kit({ options, box, onToggleKit }: ShellProps) {
             plugins,
             getCapture,
             onClose: closeComposer,
+            discardRef,
             onCreated,
           })}
         </Fragment>
