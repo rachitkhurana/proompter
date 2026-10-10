@@ -11,9 +11,14 @@ const pkg = JSON.parse(readFileSync(resolve(__dirname, "../../package.json"), "u
 };
 
 describe("package.json exports", () => {
+  // Run with `node scripts/release-exports.mjs strip` first (CI does; `prepack` does it for a real release).
   it.runIf(process.env.PROOMPTER_RELEASE === "1")("expose only the public entry points", () => {
     expect(Object.keys(pkg.exports).sort()).toEqual(
       [".", "./next", "./next/route", "./github", "./package.json"].sort(),
     );
+  });
+
+  it.runIf(process.env.PROOMPTER_RELEASE === "1")("leave no internal path in any export", () => {
+    expect(JSON.stringify(pkg.exports)).not.toContain("internal");
   });
 });
