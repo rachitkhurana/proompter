@@ -515,6 +515,25 @@ describe("surfaces", () => {
     expect(forwardKey).toHaveBeenCalledTimes(1);
   });
 
+  it("forwards global shortcut keys from a device frame in every mode, and while an entry is being drafted", () => {
+    const forwardKey = vi.fn();
+    setup({ forwardKey });
+    engine!.attach(frameSurface());
+    for (const mode of ["idle", "pick", "multi", "box", "text"] as const) {
+      engine!.setMode(mode);
+      for (const k of ["1", "3", "p", "n", "f", "r", "e"]) key(document.body, k);
+    }
+    engine!.setBusy(true);
+    key(document.body, "1");
+    expect(forwardKey).toHaveBeenCalledTimes(5 * 7 + 1);
+    // Typing targets and modified keys are forwarded too; the root's handler decides (it skips fields and IME).
+    const input = document.createElement("input");
+    document.body.append(input);
+    forwardKey.mockClear();
+    key(input, "p");
+    expect(forwardKey).toHaveBeenCalledTimes(1);
+  });
+
   it("picks inside a scaled frame: rects go through toScreen", () => {
     setup({}, `<div data-src="a.tsx:1:1" id="a"></div>`);
     setRect($("#a"), 100, 100, 200, 100);
