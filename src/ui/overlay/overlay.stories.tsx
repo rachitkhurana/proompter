@@ -8,10 +8,9 @@ import { shadowOf } from "../primitives/story-frame";
 import { BoxCatcher } from "./box-catcher";
 import { HoverBox, HoverLabel } from "./hover";
 import { MultiBar } from "./multi-bar";
-import { Overlay, OverlayStyles } from "./overlay";
+import { Overlay, OverlayStyles, SelectionBox } from "./overlay";
 import type { PinModel } from "./pin-layout";
-import { PinMarker } from "./pins";
-import { SelectionBox } from "./selection";
+import { createPlayed, PinMarker } from "./pins";
 
 const meta: Meta = { title: "Overlay/Pieces", parameters: { layout: "fullscreen" } };
 export default meta;
@@ -117,11 +116,12 @@ export const BoxSelect: Story = {
   ),
 };
 
-const pin = (over: Partial<PinModel> & Pick<PinModel, "id">) => ({
+const pin = (over: Partial<PinModel> & Pick<PinModel, "id">): PinModel => ({
+  ref: `PRO-${over.id}`,
   title: "Avatar is cropped on mobile",
-  priority: "important" as const,
-  status: "open" as const,
-  viewport: "mobile" as const,
+  priority: "important",
+  status: "open",
+  viewport: "mobile",
   selector: null,
   ...over,
 });
@@ -129,10 +129,10 @@ const pin = (over: Partial<PinModel> & Pick<PinModel, "id">) => ({
 export const PinStates: Story = {
   render: () => (
     <Backdrop>
-      <PinMarker pin={pin({ id: 1, priority: "blocking" })} x={120} y={120} fresh />
-      <PinMarker pin={pin({ id: 2, priority: "important" })} x={200} y={120} fresh />
-      <PinMarker pin={pin({ id: 3, priority: "minor" })} x={280} y={120} fresh />
-      <PinMarker pin={pin({ id: 4, status: "resolved" })} x={360} y={120} fresh />
+      <PinMarker pin={pin({ id: 1, priority: "blocking" })} x={120} y={120} played={createPlayed()} />
+      <PinMarker pin={pin({ id: 2, priority: "important" })} x={200} y={120} played={createPlayed()} />
+      <PinMarker pin={pin({ id: 3, priority: "minor" })} x={280} y={120} played={createPlayed()} />
+      <PinMarker pin={pin({ id: 4, status: "resolved" })} x={360} y={120} played={createPlayed()} />
     </Backdrop>
   ),
 };
@@ -141,9 +141,14 @@ export const PinStates: Story = {
 export const PinStackAndCard: Story = {
   render: () => (
     <Backdrop>
-      <PinMarker pin={pin({ id: 7, priority: "blocking", title: "Standings show the squad ID" })} x={300} y={160} fresh={false} />
-      <PinMarker pin={pin({ id: 8 })} x={272} y={160} fresh={false} />
-      <PinMarker pin={pin({ id: 9, priority: "minor" })} x={244} y={160} fresh={false} />
+      <PinMarker
+        pin={pin({ id: 7, priority: "blocking", title: "Standings show the squad ID" })}
+        x={300}
+        y={160}
+        played={createPlayed([7])}
+      />
+      <PinMarker pin={pin({ id: 8 })} x={272} y={160} played={createPlayed([8])} />
+      <PinMarker pin={pin({ id: 9, priority: "minor" })} x={244} y={160} played={createPlayed([9])} />
     </Backdrop>
   ),
   play: async ({ canvasElement }) => {
@@ -157,7 +162,7 @@ export const PinStackAndCard: Story = {
 export const PinPulse: Story = {
   render: () => (
     <Backdrop>
-      <PinMarker pin={pin({ id: 3 })} x={240} y={160} fresh={false} pulse={{ id: 3, nonce: 1 }} />
+      <PinMarker pin={pin({ id: 3 })} x={240} y={160} played={createPlayed([3])} pulse={{ id: 3, nonce: 1 }} />
     </Backdrop>
   ),
 };
