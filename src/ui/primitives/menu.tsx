@@ -13,19 +13,17 @@ import {
   type Ref,
 } from "react";
 import { createPortal } from "react-dom";
-import { CheckMarkIcon } from "../icons";
+import { Icon } from "../icons";
 import { useShadowContainer } from "../shadow-root";
+import { clamp } from "../../core/motion";
 
 export interface MenuItem {
   /** Stable id, passed to `onSelect`. */
   key: string;
   label: string;
   icon?: ReactNode;
-  /** Right-aligned hint, usually a `<Kbd>`. Not shown for checked items (they show the check). */
-  shortcut?: ReactNode;
-  /** Selected state, for `selection="single"` and `"multiple"`. */
+  /** Selected state (the menu shows a check). */
   checked?: boolean;
-  disabled?: boolean;
 }
 
 export interface MenuProps {
@@ -35,42 +33,31 @@ export interface MenuProps {
   /** Small heading above the items. */
   header?: ReactNode;
   /**
-   * `none`: plain actions, the menu closes on select.
    * `single`: one checked item (radio), the menu closes on select.
    * `multiple`: any number checked (tags), the menu stays open on select.
    */
-  selection?: "none" | "single" | "multiple";
+  selection: "single" | "multiple";
   onSelect: (key: string) => void;
-  open?: boolean;
-  defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
-  side?: "top" | "right" | "bottom" | "left";
-  align?: "start" | "center" | "end";
   /** Accessible name of the menu. Falls back to the trigger's. */
   label?: string;
 }
-
-type Side = NonNullable<MenuProps["side"]>;
-type Align = NonNullable<MenuProps["align"]>;
 
 const GAP = 6; // trigger to menu (prototype)
 const PAD = 8; // viewport edge (prototype)
 const EXIT_FALLBACK_MS = 250;
 const TYPEAHEAD_MS = 500;
-const OPPOSITE: Record<Side, Side> = { top: "bottom", bottom: "top", left: "right", right: "left" };
 
-const clamp = (n: number, lo: number, hi: number) => Math.min(Math.max(n, lo), Math.max(lo, hi));
-
-function enabledItems(menu: HTMLElement): HTMLElement[] {
-  return Array.from(menu.querySelectorAll<HTMLElement>('[role^="menuitem"]:not([data-disabled])'));
+function menuItems(menu: HTMLElement): HTMLElement[] {
+  return Array.from(menu.querySelectorAll<HTMLElement>('[role^="menuitem"]'));
 }
 
 /**
- * Position `menu` (fixed) next to `anchor`: on `side`, flipped to the opposite side when it would overflow the
- * viewport and the opposite fits, clamped to the viewport edge. Sets `--menu-origin` so the scale-in grows out
- * of the trigger (prototype: x at the trigger's aligned point, y at the edge nearest the trigger).
+ * Position `menu` (fixed) below `anchor`, left-aligned with it: flipped above when it would overflow the
+ * viewport and above fits, clamped to the viewport edge. Sets `--menu-origin` so the scale-in grows out
+ * of the trigger (prototype: x at the trigger's left, y at the edge nearest the trigger).
  */
-function place(menu: HTMLElement, anchor: HTMLElement, side: Side, align: Align) {
+function place(menu: HTMLElement, anchor: HTMLElement) {
   const r = anchor.getBoundingClientRect();
   // The viewport without scrollbars (`innerWidth` includes them).
   const vw = document.documentElement.clientWidth;
@@ -80,50 +67,21 @@ function place(menu: HTMLElement, anchor: HTMLElement, side: Side, align: Align)
   menu.style.overflowY = "";
   const w = menu.offsetWidth;
   let h = menu.offsetHeight;
-  const room: Record<Side, number> = {
-    bottom: vh - r.bottom - GAP - PAD,
-    top: r.top - GAP - PAD,
-    right: vw - r.right - GAP - PAD,
-    left: r.left - GAP - PAD,
-  };
-  const fits: Record<Side, boolean> = {
-    bottom: h <= room.bottom,
-    top: h <= room.top,
-    right: w <= room.right,
-    left: w <= room.left,
-  };
-  // Flip when the wanted side overflows and the opposite fits; when neither fits, take the roomier one.
-  const opp = OPPOSITE[side];
-  const s = fits[side] ? side : fits[opp] ? opp : room[opp] > room[side] ? opp : side;
+  const roomBelow = vh - r.bottom - GAP - PAD;
+  const roomAbove = r.top - GAP - PAD;
+  // Flip when below overflows and above fits; when neither fits, take the roomier one.
+  const below = h <= roomBelow || (h > roomAbove && roomBelow >= roomAbove);
   // Taller than the space available: cap the height and scroll.
-  const cap = s === "top" || s === "bottom" ? room[s] : vh - 2 * PAD;
+  const cap = below ? roomBelow : roomAbove;
   if (h > cap) {
     menu.style.maxHeight = `${Math.max(cap, 0)}px`;
     menu.style.overflowY = "auto";
     h = menu.offsetHeight;
   }
-  let left: number;
-  let top: number;
-  let ox: number | string;
-  let oy: number | string;
-  if (s === "top" || s === "bottom") {
-    top = s === "bottom" ? r.bottom + GAP : r.top - GAP - h;
-    const wanted = align === "start" ? r.left : align === "center" ? r.left + (r.width - w) / 2 : r.right - w;
-    left = clamp(wanted, PAD, vw - w - PAD);
-    const ref = align === "start" ? r.left + 12 : align === "center" ? r.left + r.width / 2 : r.right - 12;
-    ox = clamp(ref - left, 0, w);
-    oy = s === "bottom" ? "0" : "100%";
-  } else {
-    left = s === "right" ? r.right + GAP : r.left - GAP - w;
-    const wanted = align === "start" ? r.top : align === "center" ? r.top + (r.height - h) / 2 : r.bottom - h;
-    top = clamp(wanted, PAD, vh - h - PAD);
-    const ref = align === "start" ? r.top + 12 : align === "center" ? r.top + r.height / 2 : r.bottom - 12;
-    ox = s === "right" ? "0" : "100%";
-    oy = clamp(ref - top, 0, h);
-  }
+  const left = clamp(r.left, PAD, vw - w - PAD);
   menu.style.left = `${left}px`;
-  menu.style.top = `${top}px`;
-  menu.style.setProperty("--menu-origin", `${typeof ox === "number" ? `${ox}px` : ox} ${typeof oy === "number" ? `${oy}px` : oy}`);
+  menu.style.top = `${below ? r.bottom + GAP : r.top - GAP - h}px`;
+  menu.style.setProperty("--menu-origin", `${clamp(r.left + 12 - left, 0, w)}px ${below ? "0" : "100%"}`);
 }
 
 function setRef<T>(ref: Ref<T> | undefined, value: T | null) {
@@ -134,28 +92,15 @@ function setRef<T>(ref: Ref<T> | undefined, value: T | null) {
 /**
  * Dropdown menu, hand-built to the prototype (no Radix: its menu inserts focus guards into the host body).
  * Arrow keys move (looping), Home/End, type-ahead, Enter/Space select, Esc and Tab close and return focus to
- * the trigger. It is positioned on `side` with a flip, scales in from the trigger (`--menu-origin`), and
- * portals into the shadow root. Non-modal: no scroll lock, nothing touches the host document. The outside
- * `pointerdown` listener exists only while the menu is open.
+ * the trigger. It opens below the trigger (flipping above when there is no room), scales in from the trigger
+ * (`--menu-origin`), and portals into the shadow root. Non-modal: no scroll lock, nothing touches the host
+ * document. The outside `pointerdown` listener exists only while the menu is open.
  */
-export function Menu({
-  trigger,
-  items,
-  header,
-  selection = "none",
-  onSelect,
-  open,
-  defaultOpen,
-  onOpenChange,
-  side = "bottom",
-  align = "start",
-  label,
-}: MenuProps) {
+export function Menu({ trigger, items, header, selection, onSelect, onOpenChange, label }: MenuProps) {
   const container = useShadowContainer();
-  const [openState, setOpenState] = useState(!!defaultOpen);
-  const isOpen = open ?? openState;
+  const [isOpen, setIsOpen] = useState(false);
   // Mounted while open and for the exit animation after.
-  const [present, setPresent] = useState(isOpen);
+  const [present, setPresent] = useState(false);
   if (isOpen && !present) setPresent(true);
   const [highlighted, setHighlighted] = useState<string | null>(null);
 
@@ -176,10 +121,10 @@ export function Menu({
 
   const setOpen = useCallback(
     (next: boolean) => {
-      if (open === undefined) setOpenState(next);
+      setIsOpen(next);
       if (next !== isOpen) onOpenChange?.(next);
     },
-    [open, isOpen, onOpenChange],
+    [isOpen, onOpenChange],
   );
 
   const setOpenRef = useRef(setOpen);
@@ -204,11 +149,11 @@ export function Menu({
     const menu = menuRef.current;
     const anchor = triggerRef.current;
     if (!menu) return;
-    if (anchor) place(menu, anchor, side, align);
+    if (anchor) place(menu, anchor);
     // Prototype: item 0 is focused however the menu was opened.
-    (enabledItems(menu)[0] ?? menu).focus({ preventScroll: true });
-    setHighlighted(enabledItems(menu)[0]?.dataset.key ?? null);
-  }, [isOpen, side, align]);
+    (menuItems(menu)[0] ?? menu).focus({ preventScroll: true });
+    setHighlighted(menuItems(menu)[0]?.dataset.key ?? null);
+  }, [isOpen]);
 
   // While open: keep it anchored, and dismiss on a pointerdown outside the menu and the trigger.
   useEffect(() => {
@@ -216,7 +161,7 @@ export function Menu({
     const reposition = () => {
       const menu = menuRef.current;
       const anchor = triggerRef.current;
-      if (menu && anchor) place(menu, anchor, side, align);
+      if (menu && anchor) place(menu, anchor);
     };
     const outside = (ev: PointerEvent) => {
       const path = ev.composedPath();
@@ -244,7 +189,7 @@ export function Menu({
       if (root && root !== document) root.removeEventListener("scroll", onRootScroll, true);
       ro?.disconnect();
     };
-  }, [isOpen, side, align]);
+  }, [isOpen]);
 
   // Unmount after the exit animation (or at once when there is none, e.g. reduced motion or no CSS).
   useEffect(() => {
@@ -270,7 +215,6 @@ export function Menu({
   useEffect(() => () => window.clearTimeout(typed.current.timer), []);
 
   const choose = (item: MenuItem) => {
-    if (item.disabled) return;
     onSelect(item.key);
     if (selection !== "multiple") close(true);
   };
@@ -291,7 +235,7 @@ export function Menu({
       close(true);
       return;
     }
-    const list = enabledItems(menu);
+    const list = menuItems(menu);
     const active = (menu.getRootNode() as Document | ShadowRoot).activeElement;
     const i = list.findIndex((el) => el === active);
     const n = list.length;
@@ -319,7 +263,7 @@ export function Menu({
       e.stopPropagation();
       if (e.repeat) return; // holding the key must not select again
       // The item the key was sent to wins over focus (a key event is addressed to its target).
-      const targetItem = (e.target as Element | null)?.closest?.<HTMLElement>('[role^="menuitem"]:not([data-disabled])');
+      const targetItem = (e.target as Element | null)?.closest?.<HTMLElement>('[role^="menuitem"]');
       const k = targetItem?.dataset.key ?? (i >= 0 ? list[i]?.dataset.key : undefined);
       const item = items.find((it) => it.key === k);
       if (item) choose(item);
@@ -362,21 +306,17 @@ export function Menu({
   };
 
   const renderItem = (item: MenuItem) => {
-    const role = selection === "multiple" ? "menuitemcheckbox" : selection === "single" ? "menuitemradio" : "menuitem";
     return (
       <div
         key={item.key}
         className="mi"
-        role={role}
+        role={selection === "multiple" ? "menuitemcheckbox" : "menuitemradio"}
         tabIndex={-1}
         data-key={item.key}
-        aria-checked={selection === "none" ? undefined : !!item.checked}
-        aria-disabled={item.disabled || undefined}
-        data-disabled={item.disabled ? "" : undefined}
+        aria-checked={!!item.checked}
         data-highlighted={highlighted === item.key ? "" : undefined}
         onFocus={() => setHighlighted(item.key)}
         onPointerMove={(e) => {
-          if (item.disabled) return;
           const root = e.currentTarget.getRootNode() as Document | ShadowRoot;
           if (root.activeElement !== e.currentTarget) e.currentTarget.focus({ preventScroll: true });
         }}
@@ -384,11 +324,9 @@ export function Menu({
       >
         {item.icon}
         <span>{item.label}</span>
-        {selection === "none" ? (
-          item.shortcut
-        ) : item.checked ? (
+        {item.checked ? (
           <span className="ck">
-            <CheckMarkIcon size="s" />
+            <Icon name="checkmark" size="s" />
           </span>
         ) : null}
       </div>

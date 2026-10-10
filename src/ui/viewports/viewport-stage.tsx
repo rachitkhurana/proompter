@@ -62,7 +62,8 @@ function useStageSize(ref: RefObject<HTMLElement | null>) {
  * Mobile: a full-screen stage with the page in a same-origin iframe (`?__proompter_frame=1`), scaled to fit
  * inside a device bezel, with a caption below.
  */
-export function ViewportStage({ viewport, rotated, dockVertical, openOnSize = 0, url, onSurface, onExit }: ViewportStageProps) {
+export function ViewportStage(props: ViewportStageProps) {
+  const { viewport, onSurface } = props;
   const device = viewport !== "responsive";
   const emit = useRef(onSurface);
   useEffect(() => {
@@ -80,32 +81,20 @@ export function ViewportStage({ viewport, rotated, dockVertical, openOnSize = 0,
   return (
     <>
       <ViewportStyles />
-      {device ? (
-        <DeviceStage
-          viewport={viewport}
-          rotated={rotated}
-          dockVertical={!!dockVertical}
-          openOnSize={openOnSize}
-          url={url}
-          emit={emit}
-          onExit={onExit}
-        />
-      ) : null}
+      {device ? <DeviceStage {...props} emit={emit} /> : null}
     </>
   );
 }
 
-interface DeviceStageProps {
-  viewport: ViewportId;
-  rotated: boolean;
-  dockVertical: boolean;
-  openOnSize: number;
-  url?: string;
-  emit: { current: (s: PickSurface | null) => void };
-  onExit?: () => void;
-}
-
-function DeviceStage({ viewport, rotated, dockVertical, openOnSize, url, emit, onExit }: DeviceStageProps) {
+function DeviceStage({
+  viewport,
+  rotated,
+  dockVertical = false,
+  openOnSize = 0,
+  url,
+  emit,
+  onExit,
+}: ViewportStageProps & { emit: { current: (s: PickSurface | null) => void } }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const win = useStageSize(stageRef);
   const frameRef = useRef<HTMLIFrameElement>(null);

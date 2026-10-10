@@ -14,7 +14,7 @@ import { buildCommandItems } from "../command/items";
 import { Command } from "../command/command";
 import { Dock, type DockTool } from "../dock/dock";
 import { loadCollapsed, saveCollapsed } from "../dock/dock-storage";
-import { DockedToaster, useDockPlacement } from "../dock/placement";
+import { DockedToaster, edgeOf, useDockPlacement } from "../dock/placement";
 import { useFreeze, usePickSnapshot } from "../overlay/hooks";
 import { Overlay } from "../overlay/overlay";
 import type { PinModel } from "../overlay/pin-layout";
@@ -22,6 +22,7 @@ import type { PulseRequest } from "../overlay/pins";
 import { toast } from "../primitives/toast";
 import type { ProompterDeps, ProompterProps } from "../proompter-deps";
 import { ShadowRoot, useShadowContainer } from "../shadow-root";
+import { reducedMotion } from "../../core/motion";
 import { Sheet, type SheetTab, type SheetTicketProps } from "../sheet/sheet";
 import { DEFAULT_TAGS } from "../ticket/labels";
 import { ViewportStage } from "../viewports/viewport-stage";
@@ -56,10 +57,6 @@ export default function ProompterUI(props: ShellProps) {
       <Kit {...props} />
     </ShadowRoot>
   );
-}
-
-function reducedMotion() {
-  return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
 function Kit({ options, box, onToggleKit }: ShellProps) {
@@ -389,7 +386,6 @@ function Kit({ options, box, onToggleKit }: ShellProps) {
   };
 
   const activeTool: DockTool | null = mode === "idle" ? null : mode === "box" ? "area" : mode;
-  const dockEdge = placement.mode === "vertical-left" ? "l" : placement.mode === "vertical-right" ? "r" : null;
 
   return (
     <>
@@ -413,7 +409,7 @@ function Kit({ options, box, onToggleKit }: ShellProps) {
           const e = entries.find((x) => x.n === id);
           if (e) openTicket(e.id);
         }}
-        dock={{ rect: placement.rect, edge: dockEdge }}
+        dock={{ rect: placement.rect, edge: edgeOf(placement.mode) }}
       />
       <Dock
         key={dockKey}

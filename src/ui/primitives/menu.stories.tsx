@@ -1,9 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
-import { ApproveIcon, ChangeIcon, FixIcon, QuestionIcon, TagIcon } from "../icons";
+import { Icon } from "../icons";
 import { useShadowContainer } from "../shadow-root";
 import { Chip } from "./chip";
-import { Kbd } from "./kbd";
 import { Menu, type MenuItem } from "./menu";
 import { PRIORITY_LABEL, PriorityIcon, type Priority } from "./priority-icon";
 import { expect, userEvent, waitFor, within } from "storybook/test";
@@ -16,12 +15,11 @@ type Story = StoryObj;
 const hint = { font: "12px var(--sans)", color: "var(--fg-3)", maxWidth: 360 } as const;
 
 const intents = [
-  { key: "fix", label: "Fix", icon: <FixIcon size="s" /> },
-  { key: "change", label: "Change", icon: <ChangeIcon size="s" /> },
-  { key: "question", label: "Question", icon: <QuestionIcon size="s" /> },
-  { key: "approve", label: "Looks good", icon: <ApproveIcon size="s" /> },
+  { key: "fix", label: "Fix", icon: <Icon name="fix" size="s" /> },
+  { key: "change", label: "Change", icon: <Icon name="change" size="s" /> },
+  { key: "question", label: "Question", icon: <Icon name="question" size="s" /> },
+  { key: "approve", label: "Looks good", icon: <Icon name="approve" size="s" /> },
 ];
-
 function SingleSelect() {
   const [intent, setIntent] = useState("fix");
   const items: MenuItem[] = intents.map((i) => ({ ...i, checked: i.key === intent }));
@@ -74,11 +72,11 @@ function MultiSelect() {
       <Menu
         header="Tags"
         trigger={
-          <Chip as="button" icon={<TagIcon size="s" />}>
+          <Chip as="button" icon={<Icon name="tag" size="s" />}>
             {tags.length ? tags.join(", ") : "Tags"}
           </Chip>
         }
-        items={TAGS.map((t) => ({ key: t, label: t, icon: <TagIcon size="s" />, checked: tags.includes(t) }))}
+        items={TAGS.map((t) => ({ key: t, label: t, icon: <Icon name="tag" size="s" />, checked: tags.includes(t) }))}
         selection="multiple"
         onSelect={toggle}
       />
@@ -114,21 +112,6 @@ function PriorityMenu() {
 
 export const WithPriorityIcons: Story = { render: () => <PriorityMenu /> };
 
-export const ActionsWithShortcuts: Story = {
-  render: () => (
-    <Menu
-      trigger={<Chip as="button">Actions</Chip>}
-      items={[
-        { key: "copy", label: "Copy for agent", shortcut: <Kbd>⇧C</Kbd> },
-        { key: "show", label: "Show on page", shortcut: <Kbd>S</Kbd> },
-        { key: "resolve", label: "Resolve", shortcut: <Kbd>⌘↵</Kbd> },
-        { key: "gone", label: "Unavailable", disabled: true },
-      ]}
-      onSelect={() => {}}
-    />
-  ),
-};
-
 function PortalProbe() {
   const container = useShadowContainer();
   const [report, setReport] = useState("Open the menu to check where it renders.");
@@ -149,6 +132,7 @@ function PortalProbe() {
     <Stack>
       <Menu
         trigger={<Chip as="button">Open menu</Chip>}
+        selection="single"
         items={[
           { key: "a", label: "First" },
           { key: "b", label: "Second" },
@@ -173,6 +157,7 @@ export const OriginAwareNearEdge: Story = {
     <div style={{ height: "70vh", display: "flex", alignItems: "flex-end" }}>
       <Menu
         trigger={<Chip as="button">Open upward</Chip>}
+        selection="single"
         items={intents.map((i) => ({ ...i }))}
         onSelect={() => {}}
       />

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { CopyIcon, PickIcon, PublishIcon } from "../icons";
+import { Icon } from "../icons";
 import { Button, IconButton } from "./button";
 import { Kbd } from "./kbd";
 import { Caption, Row, Stack } from "./story-frame";
@@ -50,10 +50,10 @@ export const Variants: Story = {
         <Caption>with icon</Caption>
         <Row>
           <Button>
-            <CopyIcon size="s" /> Copy for agent
+            <Icon name="copy" size="s" /> Copy for agent
           </Button>
           <Button variant="pri">
-            <PublishIcon size="s" /> Publish
+            <Icon name="publish" size="s" /> Publish
           </Button>
         </Row>
       </div>
@@ -68,7 +68,7 @@ export const FocusRing: Story = {
       <Button>Tab to me</Button>
       <Button variant="pri">And me</Button>
       <IconButton label="Pick element">
-        <PickIcon />
+        <Icon name="pick" />
       </IconButton>
     </Row>
   ),
@@ -78,19 +78,19 @@ export const IconButtons: Story = {
   render: () => (
     <Row>
       <IconButton label="Pick element">
-        <PickIcon />
+        <Icon name="pick" />
       </IconButton>
       <IconButton label="Pick element (on)" pressed>
-        <PickIcon />
+        <Icon name="pick" />
       </IconButton>
       <IconButton label="Pick element (off)" pressed={false}>
-        <PickIcon />
+        <Icon name="pick" />
       </IconButton>
       <IconButton label="Disabled" disabled>
-        <PickIcon />
+        <Icon name="pick" />
       </IconButton>
       <IconButton label="Entries, 4 open" badge={4}>
-        <CopyIcon />
+        <Icon name="copy" />
       </IconButton>
     </Row>
   ),

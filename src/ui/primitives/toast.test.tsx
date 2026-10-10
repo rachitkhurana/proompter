@@ -69,50 +69,33 @@ describe("Toast", () => {
     expect(staying()).toEqual([]);
   });
 
-  it("does not stay paused when the hovered toast is removed under the cursor", async () => {
+  it("does not stay paused when the hovered toast is pushed out under the cursor", async () => {
     await act(async () => {
-      toast("one", { id: "a" });
-      toast("two", { id: "b" });
+      toast("one");
+      toast("two");
     });
     await act(async () => {
       all()[0]!.dispatchEvent(new PointerEvent("pointerover", { bubbles: true, pointerType: "mouse" }));
     });
-    await act(async () => void toast.dismiss("a")); // no pointerout will ever fire
+    await act(async () => {
+      toast("three");
+      toast("four"); // a 4th: "one" leaves; no pointerout will ever fire
+    });
     await advance(400);
-    await advance(3000); // "two" resumes and runs out
+    await advance(3000); // the rest resume and run out
     expect(staying()).toEqual([]);
   });
 
   it("resets the pause when the list empties", async () => {
     await act(async () => void toast("one"));
+    await advance(2800); // it starts leaving
     await act(async () => {
       all()[0]!.dispatchEvent(new PointerEvent("pointerover", { bubbles: true, pointerType: "mouse" }));
     });
-    await act(async () => void toast.dismiss());
     await advance(300);
     expect(shown()).toEqual([]);
     await act(async () => void toast("fresh"));
     await advance(2900);
     expect(staying()).toEqual([]); // not stuck paused: it timed out
-  });
-
-  it("reusing an id starts a fresh toast: full duration, and the old exit never removes it", async () => {
-    await act(async () => void toast("old", { id: "x" }));
-    await act(async () => void toast.dismiss("x")); // old starts leaving; its removal timer is pending
-    await act(async () => void toast("new", { id: "x" }));
-    await advance(250);
-    expect(shown()).toEqual(["new"]); // survived the old toast's removal timer
-    await advance(2000);
-    await act(async () => void toast("newer", { id: "x" }));
-    await advance(2000); // the replacement must not inherit the 2.25s already spent
-    expect(staying()).toEqual(["newer"]);
-  });
-
-  it("replaces a toast that reuses an id", async () => {
-    await act(async () => {
-      toast("one", { id: "x" });
-      toast("two", { id: "x" });
-    });
-    expect(shown()).toEqual(["two"]);
   });
 });

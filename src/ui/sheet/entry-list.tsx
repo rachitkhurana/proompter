@@ -1,6 +1,6 @@
 import type { KeyboardEvent } from "react";
 import type { Entry, EntryStatus } from "../../core/entry";
-import { PickIcon, icons } from "../icons";
+import { Icon } from "../icons";
 import { cx } from "../primitives/cx";
 import { Kbd } from "../primitives/kbd";
 import { PRIORITY_LABEL, PriorityIcon } from "../primitives/priority-icon";
@@ -22,7 +22,7 @@ export function EntryList({ entries, selectedId, onOpen }: EntryListProps) {
     return (
       <div className="empty">
         <span className="ei">
-          <PickIcon />
+          <Icon name="pick" />
         </span>
         <span>
           No entries yet. Press <Kbd>P</Kbd> and click anything on the page.
@@ -58,7 +58,6 @@ export function EntryList({ entries, selectedId, onOpen }: EntryListProps) {
               .slice()
               .reverse()
               .map((e) => {
-                const VpIcon = icons[e.viewport];
                 return (
                   <button
                     key={e.id}
@@ -74,7 +73,7 @@ export function EntryList({ entries, selectedId, onOpen }: EntryListProps) {
                     <span className="t">{e.title}</span>
                     <span className="r">
                       <span title={viewportLabel(e.viewport)}>
-                        <VpIcon size="s" />
+                        <Icon name={e.viewport} size="s" />
                       </span>
                       <span className="num">{clock(e.created)}</span>
                     </span>

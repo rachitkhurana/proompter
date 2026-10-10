@@ -11,14 +11,12 @@ export const STATUS_LABEL: Record<Status, string> = {
 
 export interface StatusIconProps extends Omit<ComponentPropsWithRef<"span">, "children"> {
   status: Status;
-  /** Accessible name. Omit when a visible label sits next to the icon. */
-  label?: string;
 }
 
-export function StatusIcon({ status, label, className, ...rest }: StatusIconProps) {
-  const a11y = label ? { role: "img", "aria-label": label } : { "aria-hidden": true as const };
+/** Decorative: a visible label always sits next to it. */
+export function StatusIcon({ status, className, ...rest }: StatusIconProps) {
   return (
-    <span {...rest} {...a11y} className={cx("st", status, className)}>
+    <span {...rest} aria-hidden="true" className={cx("st", status, className)}>
       <i />
     </span>
   );

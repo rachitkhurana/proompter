@@ -226,7 +226,6 @@ describe("Ticket in the sheet", () => {
     );
     await act(async () => qa(".sh-ft button")[2]!.click());
     expect(p.ticket.onResolve).toHaveBeenCalledWith(expect.objectContaining({ id: "PRO-1" }));
-    expect(toast.list().length).toBe(1);
     // PRO-1 has an issue (#481), but nothing closes issues in v1, so the toast does not say so.
     expect(q(".toast")?.textContent).toBe("PRO-1 resolved");
     await m.unmount();

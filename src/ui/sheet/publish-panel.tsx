@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Entry, Session } from "../../core/entry";
-import { FileIcon, GhIcon } from "../icons";
+import { Icon } from "../icons";
 import { Button } from "../primitives/button";
 import { Chip } from "../primitives/chip";
 import { PriorityIcon } from "../primitives/priority-icon";
@@ -62,7 +62,7 @@ export function PublishPanel({ session, entries, pending, onWrite }: PublishPane
         </div>
         <div>
           <Button variant="pri" disabled={!canWrite} onClick={() => void write()}>
-            <FileIcon size="s" />
+            <Icon name="file" size="s" />
             Write {files} file{files === 1 ? "" : "s"}
           </Button>
         </div>
@@ -95,7 +95,7 @@ export function PublishPanel({ session, entries, pending, onWrite }: PublishPane
         )}
         <div>
           <Button disabled>
-            <GhIcon size="s" />
+            <Icon name="gh" size="s" />
             Open {issues.length} issue{issues.length === 1 ? "" : "s"}
           </Button>
         </div>

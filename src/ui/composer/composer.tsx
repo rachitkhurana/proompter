@@ -8,7 +8,7 @@ import { cleanDescription, entryPath } from "../../core/serialize";
 import { RedactError, type EntryStore, type NewEntry } from "../../core/store";
 import { VIEWPORTS, type PickSurface, type ViewportId } from "../../core/surface";
 import { getDockPlacement } from "../dock/placement";
-import { ChevIcon, CodeIcon, FileIcon, Icon, LayersIcon, PlanIcon, TagIcon, XIcon } from "../icons";
+import { Icon } from "../icons";
 import { Button, IconButton } from "../primitives/button";
 import { Chip } from "../primitives/chip";
 import { cx } from "../primitives/cx";
@@ -16,6 +16,7 @@ import { Kbd } from "../primitives/kbd";
 import { Menu, type MenuItem } from "../primitives/menu";
 import { PRIORITY_LABEL, PriorityIcon } from "../primitives/priority-icon";
 import { toast } from "../primitives/toast";
+import { reducedMotion } from "../../core/motion";
 import { composerCss } from "./composer-styles";
 import {
   DEFAULT_TAGS,
@@ -120,14 +121,6 @@ const isMac = () => {
 };
 
 const clock = (ms: number) => new Date(ms).toTimeString().slice(0, 8);
-
-const reducedMotion = () => {
-  try {
-    return !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-  } catch {
-    return false;
-  }
-};
 
 /**
  * The composer (DESIGN §7): anchored to the target and growing out of it, clear of the dock. Title is required;
@@ -349,7 +342,7 @@ export function Composer({
           ? `Plugin ${e.plugin} failed to redact this entry. Nothing was saved.`
           : "Not saved: something went wrong. Your text is still here.",
       );
-      toast("Couldn’t save this entry", { icon: <XIcon /> });
+      toast("Couldn’t save this entry", { icon: <Icon name="x" /> });
     }
   };
 
@@ -369,7 +362,7 @@ export function Composer({
       await navigator.clipboard.writeText(primary.source);
       toast(`Copied ${shortSource(primary.source)}`);
     } catch {
-      toast("Couldn’t copy to the clipboard", { icon: <XIcon /> });
+      toast("Couldn’t copy to the clipboard", { icon: <Icon name="x" /> });
     }
   };
 
@@ -394,12 +387,12 @@ export function Composer({
   const tagItems: MenuItem[] = tagChoices.map((t) => ({
     key: t,
     label: t,
-    icon: <TagIcon size="s" />,
+    icon: <Icon name="tag" size="s" />,
     checked: selectedTags.includes(t),
   }));
   const planItems: MenuItem[] = [
     { key: NO_PLAN_KEY, label: "Not linked", checked: plan === null },
-    ...planSections.map((p) => ({ key: p, label: p, icon: <PlanIcon size="s" />, checked: plan === p })),
+    ...planSections.map((p) => ({ key: p, label: p, icon: <Icon name="plan" size="s" />, checked: plan === p })),
   ];
 
   const name = targetName(commit.kind, resolved.length, primary?.label ?? "");
@@ -441,7 +434,7 @@ export function Composer({
             {`${size.width}×${size.height}`}
           </Chip>
           <IconButton label="Discard" onClick={discard}>
-            <XIcon size="s" />
+            <Icon name="x" size="s" />
           </IconButton>
         </div>
 
@@ -518,7 +511,7 @@ export function Composer({
             onSelect={(k) => setSelectedTags((cur) => (cur.includes(k) ? cur.filter((t) => t !== k) : [...cur, k]))}
             onOpenChange={track("tags")}
             trigger={
-              <Chip as="button" icon={<TagIcon size="s" />}>
+              <Chip as="button" icon={<Icon name="tag" size="s" />}>
                 {selectedTags.length ? selectedTags.join(", ") : "Tags"}
               </Chip>
             }
@@ -532,14 +525,14 @@ export function Composer({
               onSelect={(k) => setPlan(k === NO_PLAN_KEY ? null : k)}
               onOpenChange={track("plan")}
               trigger={
-                <Chip as="button" icon={<PlanIcon size="s" />}>
+                <Chip as="button" icon={<Icon name="plan" size="s" />}>
                   {plan ?? "Test plan"}
                 </Chip>
               }
             />
           ) : null}
           {task ? (
-            <Chip accent icon={<CodeIcon size="s" />} title="Task, from the host's plugin">
+            <Chip accent icon={<Icon name="code" size="s" />} title="Task, from the host's plugin">
               {task}
             </Chip>
           ) : null}
@@ -547,13 +540,13 @@ export function Composer({
 
         <details className="pm-ctx">
           <summary>
-            <LayersIcon size="s" />
+            <Icon name="layers" size="s" />
             <span>
               Context attached: {plural(preview.console.length, "console line", "console lines")},{" "}
               {plural(preview.network.length, "request", "requests")}, <span className="pm-bad">{failed} failed</span>
             </span>
             <span className="pm-car">
-              <ChevIcon size="s" />
+              <Icon name="chev" size="s" />
             </span>
           </summary>
           <div className="pm-ctx-in">
@@ -618,7 +611,7 @@ export function Composer({
 
         <div className="pm-comp-ft">
           <span className="pm-hint">
-            <FileIcon size="xs" />
+            <Icon name="file" size="xs" />
             <span className="mono">reviews/…/entries</span>
           </span>
           <Button variant="ghost" onClick={discard}>

@@ -1,9 +1,8 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import type { Rect } from "../../core/surface";
+import type { DockEdge } from "../dock/dock-math";
 import { Button } from "../primitives/button";
 import { cx } from "../primitives/cx";
-
-export type DockEdge = "l" | "r" | null;
 
 /**
  * Where the multi bar sits: 10px above the dock (or below it when the dock is in the top half), centred on it;

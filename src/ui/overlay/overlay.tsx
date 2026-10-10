@@ -1,18 +1,31 @@
 import type { PickEngine } from "../../core/pick";
 import { findBySelector, shortSource } from "../../core/resolve";
 import type { PickSurface, Rect, ViewportId } from "../../core/surface";
+import type { DockEdge } from "../dock/dock-math";
 import { BoxCatcher } from "./box-catcher";
 import { usePickSnapshot, useLast, useRelayout } from "./hooks";
 import { HoverBox, HoverLabel } from "./hover";
-import { MultiBar, type DockEdge } from "./multi-bar";
+import { MultiBar } from "./multi-bar";
 import { overlayCss } from "./overlay-styles";
 import type { PinModel } from "./pin-layout";
 import { Pins, type PulseRequest } from "./pins";
-import { SelectionBox } from "./selection";
 
 /** Renders the overlay's CSS. Mount it once, inside the shadow root. */
 export function OverlayStyles() {
   return <style data-proompter-overlay="">{overlayCss}</style>;
+}
+
+/** A multi-select box with its numbered badge. */
+export function SelectionBox({ rect, index }: { rect: Rect; index: number }) {
+  return (
+    <div
+      className="pm-selb"
+      style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
+      aria-hidden="true"
+    >
+      <b>{index}</b>
+    </div>
+  );
 }
 
 export interface OverlayProps {
