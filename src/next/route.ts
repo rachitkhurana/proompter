@@ -24,7 +24,7 @@
  *   are serialised per session, and images must be real PNGs.
  *
  * ## API
- * - `POST { session, entry }` or `{ session, entries: [...] }`: writes `session.md`, `entries/NNN-slug.md`
+ * - `POST { session, entry }`: writes `session.md`, `entries/NNN-slug.md`
  *   and `assets/*.png`. Idempotent (identical files are not rewritten); a renamed title moves the file (the
  *   old `NNN-*.md` is deleted); every write is temp file + rename. Answers `{ ok, files: string[] }` with the
  *   paths (relative to the session folder) that were created or changed.
@@ -33,7 +33,7 @@
  */
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import type { Entry, Session } from "../core/entry";
+import { ENTRY_INTENTS, ENTRY_KINDS, ENTRY_PRIORITIES, ENTRY_STATUSES, type Entry, type Session } from "../core/entry";
 import { assetNames, entryPath, pad, parse, parseSession, serialize, serializeSession } from "../core/serialize";
 import { SESSION_ID } from "../core/store";
 
@@ -153,43 +153,20 @@ function checkSession(v: unknown): Session {
   return s;
 }
 
-const KINDS = ["element", "multi", "box", "text", "note"] as const;
-const STATUSES = ["open", "progress", "resolved"] as const;
-const INTENTS = ["fix", "change", "question", "approve"] as const;
-const PRIORITIES = ["blocking", "important", "minor"] as const;
-
-function oneOf<T extends string>(v: unknown, list: readonly T[], what: string): T {
-  if (typeof v === "string" && (list as readonly string[]).includes(v)) return v as T;
+const bad = (what: string): never => {
   throw new Refusal(`bad ${what}`);
-}
-function str(v: unknown, what: string): string {
-  if (typeof v !== "string") throw new Refusal(`bad ${what}`);
-  return v;
-}
-function optStrField(v: unknown, what: string): string | undefined {
-  if (v === undefined) return undefined;
-  return str(v, what);
-}
-function bool(v: unknown, what: string): boolean {
-  if (typeof v !== "boolean") throw new Refusal(`bad ${what}`);
-  return v;
-}
-function num(v: unknown, what: string): number {
-  if (typeof v !== "number" || !Number.isFinite(v)) throw new Refusal(`bad ${what}`);
-  return v;
-}
-function objArray(v: unknown, what: string): Record<string, unknown>[] {
-  if (!Array.isArray(v) || !v.every(isObj)) throw new Refusal(`bad ${what}`);
-  return v as Record<string, unknown>[];
-}
-function strArray(v: unknown, what: string): string[] {
-  if (!Array.isArray(v) || !v.every((s) => typeof s === "string")) throw new Refusal(`bad ${what}`);
-  return v as string[];
-}
-function count(v: unknown, what: string): number {
-  if (typeof v !== "number" || !Number.isInteger(v) || v < 0) throw new Refusal(`bad ${what}`);
-  return v;
-}
+};
+const oneOf = <T extends string>(v: unknown, list: readonly T[], what: string): T =>
+  typeof v === "string" && (list as readonly string[]).includes(v) ? (v as T) : bad(what);
+const str = (v: unknown, what: string): string => (typeof v === "string" ? v : bad(what));
+const optStrField = (v: unknown, what: string): string | undefined => (v === undefined ? undefined : str(v, what));
+const bool = (v: unknown, what: string): boolean => (typeof v === "boolean" ? v : bad(what));
+const num = (v: unknown, what: string): number => (typeof v === "number" && Number.isFinite(v) ? v : bad(what));
+const count = (v: unknown, what: string): number => (typeof v === "number" && Number.isInteger(v) && v >= 0 ? v : bad(what));
+const objArray = (v: unknown, what: string): Record<string, unknown>[] =>
+  Array.isArray(v) && v.every(isObj) ? (v as Record<string, unknown>[]) : bad(what);
+const strArray = (v: unknown, what: string): string[] =>
+  Array.isArray(v) && v.every((s) => typeof s === "string") ? (v as string[]) : bad(what);
 function checkSummary(v: unknown): NonNullable<Entry["context"]["summary"]> {
   if (!isObj(v)) throw new Refusal("bad context summary");
   return {
@@ -241,10 +218,10 @@ function checkEntry(v: unknown, session: Session): Entry {
     id: `PRO-${n}`,
     n,
     session: session.id,
-    status: oneOf(v.status, STATUSES, "status"),
-    intent: oneOf(v.intent, INTENTS, "intent"),
-    priority: oneOf(v.priority, PRIORITIES, "priority"),
-    kind: oneOf(v.kind, KINDS, "kind"),
+    status: oneOf(v.status, ENTRY_STATUSES, "status"),
+    intent: oneOf(v.intent, ENTRY_INTENTS, "intent"),
+    priority: oneOf(v.priority, ENTRY_PRIORITIES, "priority"),
+    kind: oneOf(v.kind, ENTRY_KINDS, "kind"),
     title: str(v.title, "title"),
     description: str(v.description, "description"),
     viewport: v.viewport as Entry["viewport"],
@@ -461,8 +438,7 @@ export function createProompterRoute(opts: RouteOptions = {}) {
       }
       if (!isObj(body)) throw new Refusal("bad body", 400, "request");
       const session = checkSession(body.session);
-      const list = Array.isArray(body.entries) ? body.entries : body.entry !== undefined ? [body.entry] : [];
-      const entries = list.map((e) => checkEntry(e, session));
+      const entries = body.entry !== undefined ? [checkEntry(body.entry, session)] : [];
       const cwd = cwdOf();
       const files = new Set<string>();
       await withLock(path.resolve(cwd, "reviews", session.id), async () => {
