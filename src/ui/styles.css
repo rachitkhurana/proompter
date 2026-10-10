@@ -637,6 +637,284 @@
   overflow-wrap: anywhere;
 }
 
+/* ====================================================================================================
+   Kit surfaces. Every number is copied from design/prototype.html. Classes carry the `pm-` prefix so they
+   can't collide with the primitives above; tokens come from `.pp`. The blocks follow the order the shell
+   renders them in (stage, overlay, dock, composer, sheet, ticket, command), so on equal specificity a later
+   block wins. The focus ring below stays last.
+   ==================================================================================================== */
+
+/* ---------- device stage: stage, bezel, clip, caption, the "can't be framed" notice ---------- */
+.pp .pm-stage{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;background:radial-gradient(80% 60% at 50% 40%,#131316 0,var(--canvas) 70%)}
+.pp .pm-dwrap{position:relative;flex:none;background:#000;border-radius:var(--br,20px);padding:var(--bz,8px);box-shadow:0 0 0 1px rgba(255,255,255,.09),inset 0 0 0 1px rgba(255,255,255,.04),0 50px 100px -30px rgba(0,0,0,.9);transition:width .45s var(--ease-drawer),height .45s var(--ease-drawer)}
+.pp .pm-dclip{position:relative;width:100%;height:100%;overflow:hidden;border-radius:var(--cr,0)}
+.pp .pm-dclip iframe{border:0;display:block;transform-origin:0 0;background:#0c0e13}
+.pp .pm-dclip iframe[data-blocked]{visibility:hidden}
+.pp .pm-devcap{position:absolute;left:50%;translate:-50% 0;display:flex;gap:8px;align-items:center;font-size:12px;line-height:16px;color:var(--fg-3);white-space:nowrap}
+.pp .pm-devcap b{color:var(--fg-2);font-weight:500}
+.pp .pm-devcap .dot{width:3px;height:3px;border-radius:50%;background:var(--fg-4)}
+.pp .pm-notice{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:12px;padding:24px;text-align:center;background:#0c0e13}
+.pp .pm-notice p{margin:0;max-width:300px;font:400 12.5px/18px var(--sans);color:var(--fg-2)}
+.pp .pm-notice b{display:block;margin-bottom:4px;font:500 13px/18px var(--sans);color:var(--fg)}
+
+/* ---------- pick overlay: hover box and label, selection boxes, multi bar, box-select catcher, pins ---------- */
+.pp .pm-ovl{position:fixed;inset:0;pointer-events:none;z-index:40}
+.pp .pm-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.pp .pm-hov{position:fixed;border-radius:6px;box-shadow:0 0 0 1.5px var(--acc),0 0 0 4px var(--acc-soft);background:rgba(255,99,99,.06);opacity:0;transition:opacity .12s var(--ease),left .09s var(--ease),top .09s var(--ease),width .09s var(--ease),height .09s var(--ease)}
+.pp .pm-hov.on{opacity:1}
+.pp .pm-hlab{position:fixed;display:flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:6px;background:var(--acc-solid);color:var(--acc-fg);font:500 11.5px/16px var(--sans);white-space:nowrap;opacity:0;translate:0 2px;transition:opacity .12s var(--ease),translate .15s var(--ease)}
+.pp .pm-hlab.on{opacity:1;translate:0 0}
+.pp .pm-hlab .mono{font-size:10.5px;opacity:.8}
+.pp .pm-selb{position:fixed;border-radius:6px;box-shadow:0 0 0 1.5px var(--acc);background:var(--acc-soft)}
+.pp .pm-selb b{position:absolute;top:-8px;left:-8px;width:18px;height:18px;border-radius:50%;background:var(--acc-solid);color:var(--acc-fg);font:600 10px/18px var(--sans);text-align:center;box-shadow:0 0 0 2px var(--canvas)}
+.pp .pm-catch{position:fixed;z-index:45;cursor:crosshair;pointer-events:auto;touch-action:none}
+.pp .pm-drag{position:fixed;z-index:46;border-radius:4px;box-shadow:0 0 0 1.5px var(--acc);background:var(--acc-soft);pointer-events:none}
+
+.pp .pm-subbar{position:fixed;z-index:61;display:flex;align-items:center;gap:8px;height:42px;padding:0 6px 0 14px;border-radius:14px;background:var(--mat-1);backdrop-filter:var(--blur-1);-webkit-backdrop-filter:var(--blur-1);box-shadow:var(--sh-2),var(--edge);font:500 12.5px/1 var(--sans);transition:opacity .16s var(--ease),scale .16s var(--ease)}
+.pp .pm-subbar:not(.on){opacity:0;scale:.96;pointer-events:none}
+
+.pp .pm-pin{position:fixed;pointer-events:auto;width:24px;height:24px;margin:-12px 0 0 -12px;padding:0;border:0;border-radius:12px 12px 12px 3px;display:grid;place-items:center;color:#fff;font:600 10.5px/1 var(--sans);cursor:pointer;box-shadow:0 0 0 2px rgba(9,9,11,.9),0 6px 14px -2px rgba(0,0,0,.55);transition:scale .16s var(--ease)}
+.pp .pm-pin.fresh{animation:pm-pin-in .32s var(--ease) both}
+.pp .pm-pin:active{scale:.94}
+.pp .pm-pin.blocking{background:var(--p-blocking)}
+.pp .pm-pin.important{background:#d4891a}
+.pp .pm-pin.minor{background:#52525b}
+.pp .pm-pin.done{background:#27272a;color:var(--fg-3)}
+.pp .pm-pin-ring{position:absolute;inset:-2px;border-radius:inherit;box-shadow:0 0 0 0 var(--acc-line);animation:pm-ring .9s var(--ease) 2;pointer-events:none}
+.pp .pm-pin-card{position:absolute;left:18px;top:-6px;width:248px;padding:10px 12px;border-radius:12px;background:var(--mat-1);backdrop-filter:var(--blur-1);-webkit-backdrop-filter:var(--blur-1);box-shadow:var(--sh-2),var(--edge);text-align:left;color:var(--fg);opacity:0;scale:.96;transform-origin:0 12px;transition:opacity .14s var(--ease),scale .18s var(--ease);pointer-events:none}
+.pp .pm-pin-card b{display:block;font:500 13px/18px var(--sans)}
+.pp .pm-pin-card > span{display:flex;gap:6px;align-items:center;margin-top:4px;font:400 11.5px/16px var(--sans);color:var(--fg-3)}
+.pp .pm-pin-card i.dot{display:block;width:3px;height:3px;border-radius:50%;background:var(--fg-4)}
+@media (hover:hover){.pp .pm-pin:hover .pm-pin-card{opacity:1;scale:1}}
+.pp .pm-pin:focus-visible .pm-pin-card{opacity:1;scale:1}
+@keyframes pm-pin-in{from{opacity:0;scale:.6}to{opacity:1;scale:1}}
+@keyframes pm-ring{to{box-shadow:0 0 0 12px transparent}}
+
+/* ---------- dock (under `.pp .dock`: higher specificity than the primitives' `.pp .ib`, `.pp .seg`) ----------
+   Differences from the prototype: tooltips are the <Tooltip> primitive, and the settle after a drag is the
+   in-house spring, so `.tip` and `.settling` are gone. */
+.pp .dock{position:fixed;left:50%;bottom:20px;translate:-50% 0;z-index:60;display:flex;align-items:center;gap:2px;padding:5px;border-radius:16px;background:var(--mat-1);backdrop-filter:var(--blur-1);-webkit-backdrop-filter:var(--blur-1);box-shadow:var(--sh-2),var(--edge);touch-action:none;user-select:none;-webkit-user-select:none}
+.pp .dock.free{translate:none;bottom:auto}
+.pp .dock.dragging{box-shadow:var(--sh-3),var(--edge);cursor:grabbing}
+.pp .dock.intro{animation:pp-dock-in .45s var(--ease) both}
+@keyframes pp-dock-in{from{opacity:0;translate:-50% 12px;scale:.97}}
+.pp .dock .tw{display:grid;grid-template-columns:1fr;transition:grid-template-columns .32s var(--ease-drawer),opacity .2s var(--ease)}
+.pp .dock .tw-in{display:flex;align-items:center;gap:2px;min-width:0;overflow:hidden}
+.pp .dock.v .tw{grid-template-columns:none;grid-template-rows:1fr;transition:grid-template-rows .32s var(--ease-drawer),opacity .2s var(--ease)}
+.pp .dock.v .tw-in{flex-direction:column;min-height:0}
+.pp .dock.col .tw{grid-template-columns:0fr;opacity:0}
+.pp .dock.v.col .tw{grid-template-rows:0fr}
+.pp .dock.col .tw-in{visibility:hidden;transition:visibility 0s .32s}
+.pp .dock .nm-w{display:grid;grid-template-columns:1fr;transition:grid-template-columns .32s var(--ease-drawer),opacity .2s var(--ease)}
+.pp .dock .nm-w .nm{overflow:hidden;white-space:nowrap;min-width:0}
+.pp .dock.col .nm-w{grid-template-columns:0fr;opacity:0}
+.pp .dock.col .brand{gap:0;padding:0 4px}
+.pp .dock .brand{position:relative;display:flex;align-items:center;gap:8px;height:30px;padding:0 10px 0 4px;border-radius:10px;font:600 13px/1 var(--sans);letter-spacing:-.01em;color:var(--fg);cursor:grab;transition:background-color .12s var(--ease),gap .32s var(--ease-drawer),padding .32s var(--ease-drawer)}
+@media (hover:hover){.pp .dock .brand:hover{background:var(--fill-2)}}
+.pp .dock .brand:active .logo{scale:.92}
+/* The logo mark is shared with the large surfaces' headers (`.pm-surface .logo`). */
+.pp .dock .logo,.pp .pm-surface .logo{width:20px;height:20px;border-radius:6px;background:linear-gradient(180deg,#ff7a7a,#ff5050);color:#fff;display:grid;place-items:center;flex:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(0,0,0,.4)}
+.pp .dock .logo{transition:scale .12s var(--ease)}
+.pp .dock .logo .ic,.pp .pm-surface .logo svg{width:12px;height:12px;stroke-width:2.4}
+.pp .dock .lbadge{min-width:16px;height:16px;padding:0 4px;margin-left:6px;border-radius:8px;background:var(--fill-3);color:var(--fg);font:600 10px/16px var(--sans);text-align:center}
+.pp .dock .lbadge[hidden]{display:none}
+.pp .dock .sep{width:1px;height:20px;background:var(--line-2);margin:0 4px;flex:none}
+.pp .dock .grip{all:unset;cursor:grab;width:16px;height:30px;display:grid;place-items:center;color:var(--fg-3);border-radius:6px;transition:color .12s var(--ease)}
+.pp.pp .dock .grip:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+@media (hover:hover){.pp .dock .grip:hover{color:var(--fg-2)}}
+.pp .dock.dragging .grip{cursor:grabbing}
+.pp .dock.v{flex-direction:column;padding:5px}
+.pp .dock.v .sep{width:20px;height:1px;margin:4px 0}
+.pp .dock.v .seg{flex-direction:column}
+.pp .dock.v .nm-w{display:none}
+.pp .dock.v .brand{height:30px;padding:0;width:30px;justify-content:center}
+.pp .dock.v .lbadge{position:absolute;top:-4px;right:-6px;margin:0;min-width:16px;height:16px;padding:0 4px;background:var(--acc-solid);color:var(--acc-fg);font-size:9.5px;line-height:16px;box-shadow:0 0 0 2px #1d1d21}
+.pp .dock.v .grip{width:30px;height:16px}
+.pp .dock.v .grip svg{rotate:90deg}
+@media (max-width:760px){
+  .pp .dock:not(.free){left:12px;right:12px;translate:none;flex-wrap:wrap;justify-content:center}
+}
+
+/* ---------- composer ----------
+   Deviations from the prototype, all small: `--p-urgent` is `--p-blocking` (D2.5); the open animation uses
+   `@starting-style` instead of a class added a frame later; `.pm-ctx` can scroll if a very long log would
+   push the panel past `max-height`. */
+/* The large-surface material, shared by the composer, the sheet and the command menu. */
+.pp .pm-comp,.pp .pm-surface{background:var(--mat-2);backdrop-filter:var(--blur-2);-webkit-backdrop-filter:var(--blur-2);box-shadow:var(--sh-3),var(--edge);border-radius:16px}
+.pp .pm-comp{position:fixed;z-index:90;width:min(500px,calc(100vw - 24px));display:flex;flex-direction:column;max-height:calc(100vh - 24px);opacity:0;scale:.96;transition:opacity .16s var(--ease),scale .2s var(--ease);pointer-events:none}
+.pp .pm-comp.on{opacity:1;scale:1;pointer-events:auto}
+@starting-style{.pp .pm-comp.on{opacity:0;scale:.96}}
+.pp .pm-comp-hd{display:flex;align-items:center;gap:8px;padding:12px 12px 0 16px;flex:none}
+.pp .pm-target{display:flex;align-items:center;gap:8px;min-width:0;flex:1;font:500 12px/16px var(--sans);color:var(--fg-2)}
+.pp .pm-ti{width:22px;height:22px;border-radius:6px;background:var(--acc-soft);color:var(--acc);display:grid;place-items:center;flex:none}
+.pp .pm-nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pp .pm-comp-bd{padding:12px 16px 4px;display:grid;gap:4px;overflow:auto;min-height:0}
+.pp .pm-in-title{all:unset;width:100%;font:600 16px/24px var(--sans);letter-spacing:-.012em;color:var(--fg)}
+.pp .pm-in-title::placeholder{color:var(--fg-3)}
+.pp .pm-in-desc{all:unset;width:100%;min-height:60px;font:400 13.5px/21px var(--sans);color:var(--fg-2);white-space:pre-wrap}
+.pp .pm-in-desc::placeholder{color:var(--fg-3)}
+.pp .pm-err{font:400 12px/16px var(--sans);color:var(--p-blocking)}
+/* The quote bar: the composer's (`.pm-quote`) and the ticket's/sheet's (`.quote`) share it. */
+.pp .pm-quote,.pp .pm-surface .quote{margin:2px 0 6px;padding:2px 0 2px 12px;box-shadow:inset 2px 0 0 var(--acc);color:var(--fg-2);font-style:italic}
+.pp .pm-quote{white-space:pre-wrap}
+.pp .pm-props{display:flex;flex-wrap:wrap;gap:6px;padding:8px 16px 14px;flex:none}
+.pp .pm-ctx{box-shadow:inset 0 1px 0 var(--line);flex:0 1 auto;min-height:0;overflow:auto}
+.pp .pm-ctx summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;height:40px;padding:0 16px;font:400 12px/16px var(--sans);color:var(--fg-3);transition:color .12s var(--ease)}
+.pp .pm-ctx summary::-webkit-details-marker{display:none}
+@media (hover:hover){.pp .pm-ctx summary:hover{color:var(--fg-2)}}
+.pp .pm-ctx summary .pm-car{margin-left:auto;transition:rotate .2s var(--ease)}
+.pp .pm-ctx[open] summary .pm-car{rotate:90deg}
+.pp .pm-ctx .pm-bad{color:var(--p-blocking)}
+.pp .pm-ctx-in{padding:0 16px 14px;display:grid;gap:12px}
+.pp .pm-comp-ft{display:flex;align-items:center;gap:8px;padding:10px 12px 10px 16px;box-shadow:inset 0 1px 0 var(--line);flex:none}
+.pp .pm-comp-ft .pm-hint{margin-right:auto}
+/* The footer hint: the composer's (`.pm-hint`) and the large surfaces' (`.hint`) share it. */
+.pp .pm-hint,.pp .pm-surface .hint{display:inline-flex;align-items:center;gap:6px;font:400 12px/16px var(--sans);color:var(--fg-3)}
+.pp .pm-lbl{font:500 11px/16px var(--sans);color:var(--fg-3);letter-spacing:.01em}
+/* The console log: the composer's (`.pm-log`) and the ticket's (`.log`) share it. The row rule differs
+   (descendant vs. child combinator), so it stays per use. */
+.pp .pm-log,.pp .pm-sheet .log{display:grid;gap:2px;font:400 11px/18px var(--mono);color:var(--fg-2)}
+.pp .pm-log div{display:grid;grid-template-columns:auto auto minmax(0,1fr);gap:10px;min-width:0}
+.pp .pm-log span,.pp .pm-sheet .log span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pp .pm-log .e,.pp .pm-sheet .log .e{color:var(--p-blocking)}
+.pp .pm-log .w,.pp .pm-sheet .log .w{color:var(--p-important)}
+.pp .pm-log .g,.pp .pm-sheet .log .g{color:var(--ok)}
+.pp .pm-log .m,.pp .pm-sheet .log .m{color:var(--fg-3)}
+
+/* ---------- large surfaces (sheet and command menu), the entries list and the Publish tab ----------
+   Inner prototype names are scoped under `.pm-surface` / `.pm-sheet`, so nothing collides with the composer
+   or the dock. */
+.pp .pm-surface{color:var(--fg)}
+.pp .pm-surface .empty{display:grid;justify-items:center;gap:10px;padding:48px 24px;text-align:center;color:var(--fg-3);font:400 12.5px/18px var(--sans)}
+.pp .pm-surface .empty .ei{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--fill-2);color:var(--fg-2)}
+.pp .pm-vh{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+
+/* sheet */
+.pp .pm-sheet{position:fixed;top:12px;bottom:12px;right:12px;z-index:70;width:min(460px,calc(100vw - 24px));display:flex;flex-direction:column;overflow:hidden;translate:calc(100% + 24px) 0;transition:translate .38s var(--ease-drawer),opacity .14s var(--ease)}
+.pp .pm-sheet.left{right:auto;left:12px;translate:calc(-100% - 24px) 0}
+.pp .pm-sheet.on{translate:0 0}
+.pp .pm-sheet.flip{transition:none}
+.pp.pp .pm-sheet:focus,.pp.pp .pm-sheet:focus-visible{outline:none}
+.pp .pm-sheet .sh-hd{display:flex;align-items:center;gap:10px;height:56px;padding:0 10px 0 16px;flex:none}
+.pp .pm-sheet .sh-hd .t{flex:1;min-width:0}
+.pp .pm-sheet .sh-hd .t b{display:block;font:600 13.5px/18px var(--sans);letter-spacing:-.008em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pp .pm-sheet .sh-hd .t span{display:block;font:400 11.5px/16px var(--mono);color:var(--fg-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pp .pm-sheet .seg.sh-tabs{margin:0 12px 8px;flex:none}
+.pp .pm-sheet .sh-bd{flex:1;overflow:auto;overscroll-behavior:contain;box-shadow:inset 0 1px 0 var(--line)}
+.pp .pm-sheet .sh-ft{flex:none;display:flex;align-items:center;gap:8px;padding:10px 12px;box-shadow:inset 0 1px 0 var(--line)}
+.pp .pm-sheet .sh-ft .sp{flex:1}
+
+/* list */
+.pp .pm-sheet .grp{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:8px;height:34px;padding:0 16px;font:500 12px/1 var(--sans);color:var(--fg-2);background:rgba(28,28,31,.92);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:inset 0 -1px 0 var(--line)}
+.pp .pm-sheet .grp .n{color:var(--fg-3);font-weight:400}
+.pp .pm-sheet .row{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:grid;grid-template-columns:14px 52px 14px minmax(0,1fr) auto;align-items:center;gap:10px;height:40px;padding:0 16px;box-shadow:inset 0 -1px 0 var(--line);transition:background-color .1s var(--ease)}
+@media (hover:hover){.pp .pm-sheet .row:hover{background:var(--fill-1)}}
+.pp .pm-sheet .row.sel{background:var(--fill-2)}
+.pp .pm-sheet .row .id{font:400 11.5px/1 var(--mono);color:var(--fg-3)}
+.pp .pm-sheet .row .t{font:400 13px/20px var(--sans);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pp .pm-sheet .row.resolved .t{color:var(--fg-3)}
+.pp .pm-sheet .row .r{display:flex;align-items:center;gap:8px;color:var(--fg-3);font:400 11.5px/1 var(--sans)}
+
+/* publish */
+.pp .pm-sheet .pub{padding:20px;display:grid;gap:20px}
+.pp .pm-sheet .pub h3{margin:0 0 4px;display:flex;align-items:center;gap:8px;font:600 15px/22px var(--sans);letter-spacing:-.01em}
+.pp .pm-sheet .pub p{margin:0;font:400 13px/20px var(--sans);color:var(--fg-2)}
+.pp .pm-sheet .pub section{display:grid;gap:10px}
+.pp .pm-sheet .tree{padding:10px 14px;border-radius:10px;background:rgba(0,0,0,.3);box-shadow:inset 0 0 0 1px var(--line);font:400 11.5px/20px var(--mono);color:var(--fg-2);overflow-x:auto}
+.pp .pm-sheet .tree div{white-space:nowrap}
+.pp .pm-sheet .tree .a{color:var(--ok)}
+.pp .pm-sheet .tree .m{color:var(--p-important)}
+.pp .pm-sheet .ilist{border-radius:10px;box-shadow:inset 0 0 0 1px var(--line);overflow:hidden}
+.pp .pm-sheet .irow{display:grid;grid-template-columns:16px minmax(0,1fr) auto;gap:10px;align-items:center;height:40px;padding:0 12px;box-shadow:inset 0 -1px 0 var(--line);font:400 13px/1 var(--sans)}
+.pp .pm-sheet .irow:last-child{box-shadow:none}
+.pp .pm-sheet .irow span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---------- ticket (the entry detail view inside the sheet; scoped under `.pm-sheet`) ----------
+   Differences from the prototype: the snapshot is a PNG (`<img>`), not a live HTML iframe, so the highlight
+   box is gone and the Element/Viewport toggle switches between the two PNGs the capture produced. */
+.pp .pm-sheet .tk{display:flex;flex-direction:column;flex:1;height:100%;min-height:0}
+.pp .pm-sheet .tk-crumb{display:flex;align-items:center;gap:6px;height:44px;padding:0 10px 0 12px;font:400 12px/1 var(--sans);color:var(--fg-3);box-shadow:inset 0 -1px 0 var(--line);flex:none}
+.pp .pm-sheet .tk-crumb b{color:var(--fg-2);font-weight:500}
+.pp .pm-sheet .tk-crumb .sp{flex:1}
+.pp .pm-sheet .tk-crumb .ttl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.pp .pm-sheet .tk-main{padding:20px 20px 4px;display:grid;gap:10px}
+.pp .pm-sheet .tk-title{margin:0;font:600 18px/26px var(--sans);letter-spacing:-.016em;text-wrap:balance}
+.pp .pm-sheet .tk-desc{margin:0;font:400 13.5px/22px var(--sans);color:var(--fg-2);max-width:62ch;white-space:pre-wrap}
+.pp .pm-sheet .tk-sec{padding:16px 20px;display:grid;gap:10px;box-shadow:inset 0 1px 0 var(--line)}
+.pp .pm-sheet .tk-sec>h3{margin:0;display:flex;align-items:center;gap:8px;font:500 12px/16px var(--sans);color:var(--fg-3)}
+.pp .pm-sheet .tk-sec>h3 .sp{flex:1}
+.pp .pm-sheet .kv{display:grid;grid-template-columns:96px minmax(0,1fr);row-gap:2px;column-gap:12px;align-items:center;margin:0}
+.pp .pm-sheet .kv dt{font:400 12.5px/30px var(--sans);color:var(--fg-3)}
+.pp .pm-sheet .kv dd{margin:0;min-width:0;display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.pp .pm-sheet .kv .val{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:8px;height:28px;padding:0 8px;margin-left:-8px;border-radius:7px;font:400 13px/1 var(--sans);color:var(--fg);max-width:calc(100% + 8px);transition:background-color .12s var(--ease)}
+.pp .pm-sheet .kv .val.ro{cursor:default}
+@media (hover:hover){.pp .pm-sheet .kv .val:not(.ro):hover{background:var(--fill-2)}}
+.pp .pm-sheet .kv .val[aria-expanded="true"]{background:var(--fill-2)}
+.pp .pm-sheet .kv .val>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pp .pm-sheet .kv .val.mono{font:400 12px/1 var(--mono)}
+.pp .pm-sheet .kv .val .mute{color:var(--fg-3)}
+.pp .pm-sheet .crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:2px;font:400 12.5px/20px var(--sans);color:var(--fg-3)}
+.pp .pm-sheet .crumbs>span:last-child{color:var(--fg)}
+.pp .pm-sheet .shot{position:relative;aspect-ratio:16/9;max-width:100%;border-radius:10px;overflow:hidden;background:#0c0e13;box-shadow:inset 0 0 0 1px var(--line-2)}
+.pp .pm-sheet .snap{aspect-ratio:auto;min-height:150px;display:grid;place-items:center;transition:height .25s var(--ease)}
+.pp .pm-sheet .snap img{display:block;width:100%;height:auto;max-height:300px;object-fit:contain;opacity:0;transition:opacity .22s var(--ease)}
+.pp .pm-sheet .snap img.ld{opacity:1}
+.pp .pm-sheet .snap .mode{position:absolute;right:8px;top:8px;z-index:1;display:flex;gap:2px;padding:2px;border-radius:8px;background:rgba(9,9,11,.78);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:inset 0 0 0 1px var(--line-2)}
+.pp .pm-sheet .snap .mode button{all:unset;cursor:pointer;height:22px;padding:0 8px;border-radius:6px;font:500 11.5px/22px var(--sans);color:var(--fg-3)}
+.pp .pm-sheet .snap .mode button.on{background:var(--fill-3);color:var(--fg)}
+.pp .pm-sheet .snap-empty{position:absolute;inset:0;display:grid;place-items:center;align-content:center;gap:8px;color:var(--fg-3);font:400 12.5px/18px var(--sans);text-align:center;padding:16px}
+.pp .pm-sheet .shot .cap{position:absolute;left:8px;bottom:8px;display:flex;gap:6px}
+.pp .pm-sheet .shot .cap .chip{background:rgba(9,9,11,.8);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.pp .pm-sheet .ctabs{display:flex;gap:2px}
+.pp .pm-sheet .ctabs button{all:unset;cursor:pointer;height:24px;padding:0 8px;border-radius:6px;font:500 12px/1 var(--sans);color:var(--fg-3);display:flex;align-items:center;gap:6px}
+.pp .pm-sheet .ctabs button.on{background:var(--fill-2);color:var(--fg)}
+.pp .pm-sheet .ctabs .bad{color:var(--p-blocking);font-weight:400}
+.pp .pm-sheet .log>div{display:grid;grid-template-columns:auto auto minmax(0,1fr);gap:10px;min-width:0}
+.pp .pm-sheet .log-none{font:400 12px/18px var(--sans);color:var(--fg-3)}
+.pp .pm-sheet .act{display:grid;gap:0;position:relative}
+.pp .pm-sheet .act>div{display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:10px;align-items:start;padding:5px 0;font:400 12.5px/20px var(--sans);color:var(--fg-2)}
+.pp .pm-sheet .act>div b{color:var(--fg);font-weight:500}
+.pp .pm-sheet .act>div time{font:400 11.5px/20px var(--sans);color:var(--fg-3)}
+.pp .pm-sheet .act .dot{width:20px;height:20px;display:grid;place-items:center;color:var(--fg-3)}
+.pp .pm-sheet .act .dot i{width:6px;height:6px;border-radius:50%;background:var(--fg-4);box-shadow:0 0 0 3px #1a1a1d}
+.pp .pm-sheet .md{margin:0;padding:12px 14px;border-radius:10px;background:rgba(0,0,0,.3);box-shadow:inset 0 0 0 1px var(--line);font:400 11px/18px var(--mono);color:var(--fg-2);white-space:pre-wrap;word-break:break-word;max-height:300px;overflow:auto}
+
+/* ---------- command menu ----------
+   The prototype toggles an `.on` class; here the command menu mounts and unmounts its content, so the same
+   fade and scale run as `data-state` keyframes (opacity .16s, scale .2s, both `--ease`; the scrim fades .2s).
+   Uses the base surface rules above (`.pm-surface`, `.logo`, `.hint`, `.empty`). */
+.pp .pm-scrim{position:fixed;inset:0;z-index:84;background:rgba(0,0,0,.32)}
+.pp .pm-scrim[data-state="closed"],.pp .pm-cmd[data-state="closed"]{pointer-events:none}
+
+.pp .pm-cmd{position:fixed;left:50%;top:16vh;translate:-50% 0;z-index:90;width:min(620px,calc(100vw - 24px));max-height:min(520px,72vh);display:flex;flex-direction:column;overflow:hidden;pointer-events:auto}
+.pp.pp .pm-cmd:focus,.pp.pp .pm-cmd:focus-visible{outline:none}
+
+.pp .pm-cmd .cmd-in{display:flex;align-items:center;gap:12px;height:54px;padding:0 16px;box-shadow:inset 0 -1px 0 var(--line);color:var(--fg-3);flex:none}
+.pp .pm-cmd .cmd-in input{all:unset;flex:1;min-width:0;font:400 15px/1 var(--sans);letter-spacing:-.006em;color:var(--fg)}
+.pp .pm-cmd .cmd-in input::placeholder{color:var(--fg-3)}
+.pp.pp .pm-cmd .cmd-in input:focus-visible{outline:none}
+.pp .pm-cmd .cmd-ls{flex:1;overflow:auto;padding:6px}
+.pp .pm-cmd .cmd-sec{padding:10px 10px 6px;font:500 11.5px/1 var(--sans);color:var(--fg-3)}
+.pp .pm-cmd .cmd-it{box-sizing:border-box;width:100%;cursor:pointer;display:grid;grid-template-columns:26px auto minmax(0,1fr) auto;align-items:center;gap:10px;height:40px;padding:0 10px;border-radius:9px;font:400 13px/1 var(--sans);color:var(--fg)}
+.pp .pm-cmd .cmd-it.kb{background:var(--fill-2)}
+.pp .pm-cmd .cmd-it .ci{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;background:var(--fill-2);color:var(--fg-2);box-shadow:var(--edge)}
+.pp .pm-cmd .cmd-it .sub{color:var(--fg-3);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pp .pm-cmd .cmd-it .r{display:flex;align-items:center;gap:4px;color:var(--fg-3);font-size:12px;justify-self:end}
+.pp .pm-cmd .cmd-it > span:nth-child(2){overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px}
+.pp .pm-cmd .cmd-ft{display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;box-shadow:inset 0 1px 0 var(--line);flex:none}
+.pp .pm-cmd .cmd-ft .sp{flex:1}
+.pp .pm-cmd .cmd-ft .hint kbd{margin-left:0}
+
+/* Open and close animations; the closing content waits out `Command`'s own 200ms phase before it unmounts. */
+.pp .pm-scrim[data-state="open"]{animation:pm-scrim-in .2s var(--ease) both}
+.pp .pm-scrim[data-state="closed"]{animation:pm-scrim-out .2s var(--ease) both}
+@keyframes pm-scrim-in{from{opacity:0}}
+@keyframes pm-scrim-out{to{opacity:0}}
+.pp .pm-cmd[data-state="open"]{animation:pm-cmd-in .2s var(--ease) both}
+.pp .pm-cmd[data-state="closed"]{animation:pm-cmd-out .2s var(--ease) both}
+@keyframes pm-cmd-in{0%{opacity:0;scale:.97}80%{opacity:1}100%{scale:1}}
+@keyframes pm-cmd-out{0%{opacity:1;scale:1}80%{opacity:0}100%{scale:.97}}
+
 /* Focus ring (prototype: `.pp :focus-visible`). Kept LAST and written `.pp.pp` (specificity 0,3,0): the
    `all: unset` on .btn, .ib, .chip, .seg-t, .mi etc. would otherwise reset the outline. */
 .pp.pp :focus-visible {
