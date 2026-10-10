@@ -100,3 +100,35 @@ All v1 tasks are merged into `v1`, locally only: nothing has been pushed, no PR 
 - **Unicode in sub-agent edits:** escapes can turn into raw U+2028/2029/0085/FEFF. Run `grep -rnP '[\x{2028}\x{2029}\x{0085}\x{FEFF}]' src e2e` before merging.
 - **e2e workers:** e2e runs with `workers: 1`, because the flow specs share `examples/playground/reviews/`.
 - **Commits and pushes:** only the orchestrator commits, one commit per file. Never push.
+
+## Deep simplification pass (D9, after close-out)
+
+Merged into `v1` at `4ea856b`. Before merging, the full suite passed:
+- typecheck, lint and build;
+- 800 unit tests (2 skipped, both release-only), down from 813. Only tests of removed internals were deleted.
+- 54 e2e, now including the new real-composer visual baseline `composer-real.png`; every baseline unchanged;
+- Storybook;
+- the release check-pack: 42 files, exact exports, `package.json` byte-identical.
+
+| Module | Before | After |
+| --- | --- | --- |
+| pick, surface, resolve | 1130 | 1105 |
+| capture | 874 | 848 |
+| store, serialize, plugins, entry | 1851 | 1805 |
+| sinks | 363 | 363 |
+| composer | 930 | 699 |
+| sheet, ticket, command | 1583 | 1289 |
+| shell, root, labels | 1657 | 1667 |
+| dock, spring, motion | 1104 | 974 |
+| overlay, viewports | 878 | 782 |
+| primitives, icons, shadow, fonts | 1703 | 1462 |
+| next | 1233 | 1197 |
+
+Non-test TS in `src` went from 13,366 to 12,251 lines (−1,115, −8.3%). `styles.css` went from 686 to 956 (+270), because the CSS-in-TS
+moved into it, so the net is about −845 (−6%).
+
+Visible changes, all small and deliberate:
+- Sheet rows now show the focus ring under keyboard focus. Before, they had none, which was an a11y gap.
+- The composer's "copy source" failure uses the shared clipboard message.
+- Multi entries with one element read "1 element".
+- A failed IndexedDB write shows a toast: "Couldn't save locally. The entry is kept until you close this tab."
