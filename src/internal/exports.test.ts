@@ -14,7 +14,7 @@ describe("package.json exports", () => {
   // Run with `node scripts/release-exports.mjs strip` first (CI does; `prepack` does it for a real release).
   it.runIf(process.env.PROOMPTER_RELEASE === "1")("expose only the public entry points", () => {
     expect(Object.keys(pkg.exports).sort()).toEqual(
-      [".", "./next", "./next/route", "./github", "./package.json"].sort(),
+      [".", "./next", "./next/route", "./vite", "./github", "./package.json"].sort(),
     );
   });
 
