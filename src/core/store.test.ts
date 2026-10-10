@@ -187,6 +187,15 @@ describe("update and resolve", () => {
     expect(r.activity.at(-1)?.text).toBe("resolution edited");
   });
 
+  it("replies are patchable, logged, and removable with null", async () => {
+    const { store } = make();
+    const c = await store.create(draft());
+    const u = (await store.update(c.id, { replies: "- claude (d): hi" }))!;
+    expect(u.replies).toBe("- claude (d): hi");
+    expect(u.activity.at(-1)?.text).toBe("replies edited");
+    expect((await store.update(c.id, { replies: null }))!.replies).toBeUndefined();
+  });
+
   it("an empty or whitespace-only title is ignored, the rest of the patch still applies", async () => {
     const { store } = make();
     const c = await store.create(draft());
