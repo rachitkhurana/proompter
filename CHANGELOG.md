@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Vite and plain React:** new `@rachitkay/proompter/vite` export with a `proompter()` plugin. It stamps source
+  locations and serves the file writer on the Vite dev server, so the kit works in any React 19 app built with
+  Vite, not just Next.js. See "Setup: Vite" in the README.
+- The npm page no longer lists the private `./internal/fixtures` export (0.0.1 and 0.0.2 did).
+
 ## 0.0.2 (2026-10-10)
 
 - **Accessibility:** the publish view's list of pending files can now take keyboard focus, so long paths that
