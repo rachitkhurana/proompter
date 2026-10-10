@@ -1,9 +1,9 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { CliError, listEntries, listLine, resolveEntry, targetFor, taskText, testFile, findEntry } from "../../src/cli/core";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { CliError, replyEntry, listEntries, listLine, resolveEntry, targetFor, taskText, testFile, findEntry } from "../../src/cli/core";
 import { makeEntry, makeSession } from "../../src/core/entry-fixtures.test-util";
 import { entryPath, parse, parseSession, serialize, serializeSession } from "../../src/core/serialize";
 
@@ -83,9 +83,48 @@ describe("cli core", () => {
     expect((await resolveEntry(t, `${S1}/PRO-1`, { note: "Fixed the crop." })).files).toEqual([]);
   });
 
+  it("--require-test: only a real test file inside the repo counts", async () => {
+    const plan = (testPlan: string) => {
+      put(S1, { id: "PRO-7", n: 7, title: "Plan test", testPlan });
+    };
+    writeFileSync(path.join(root, "README.md"), "");
+    plan("README.md");
+    await expect(resolveEntry(t, `${S1}/PRO-7`, { requireTest: true })).rejects.toMatchObject({ code: 2 });
+    mkdirSync(path.join(root, "e2e/dir.spec.ts"), { recursive: true });
+    plan("e2e/dir.spec.ts");
+    await expect(resolveEntry(t, `${S1}/PRO-7`, { requireTest: true })).rejects.toMatchObject({ code: 2 });
+    writeFileSync(path.join(root, "e2e/x.spec.ts"), "");
+    plan("e2e/x.spec.ts");
+    await expect(resolveEntry(t, `${S1}/PRO-7`, { requireTest: true })).resolves.toMatchObject({ ref: `${S1}/PRO-7` });
+    symlinkSync(path.join(root, "README.md"), path.join(root, "e2e/link.spec.ts"));
+    plan("e2e/link.spec.ts");
+    await expect(resolveEntry(t, `${S1}/PRO-7`, { requireTest: true })).rejects.toMatchObject({ code: 2 });
+  });
+
+  it("rejects unknown --status and --priority values", async () => {
+    await expect(listEntries(t, { status: "done" })).rejects.toMatchObject({ code: 2 });
+    await expect(listEntries(t, { priority: "huge" })).rejects.toMatchObject({ code: 2 });
+  });
+
+  it("an ambiguous ref lists each ref once and counts the entries", async () => {
+    await expect(findEntry(t, "PRO-1")).rejects.toMatchObject({ message: expect.stringContaining("2 entries share this id") });
+  });
+
+  it("task shows status, resolution and replies, and the closing instruction per client", async () => {
+    await resolveEntry(t, `${S1}/PRO-1`, { note: "Cropped it." });
+    await replyEntry(t, `${S1}/PRO-1`, "Thanks", "me");
+    const cli = await taskText(t, `${S1}/PRO-1`);
+    expect(cli).toContain("- Status: resolved");
+    expect(cli).toContain("already resolved");
+    expect(cli).toContain("## Resolution\nCropped it.");
+    expect(cli).toMatch(/## Replies\n- me \(.*\): Thanks/);
+    expect(cli).toContain("run `proompter resolve");
+    expect(await taskText(t, `${S1}/PRO-1`, { closing: "mcp" })).toContain(`call resolve_entry with ref "${S1}/PRO-1"`);
+  });
+
   it("--require-test refuses without an existing test file", async () => {
     await expect(resolveEntry(t, `${S1}/PRO-1`, { requireTest: true })).rejects.toBeInstanceOf(CliError);
-    await expect(resolveEntry(t, `${S1}/PRO-2`, { requireTest: true })).rejects.toMatchObject({ code: 2, message: expect.stringContaining("does not exist") });
+    await expect(resolveEntry(t, `${S1}/PRO-2`, { requireTest: true })).rejects.toMatchObject({ code: 2, message: expect.stringContaining("not a test file") });
     mkdirSync(path.join(root, "e2e"));
     writeFileSync(path.join(root, "e2e/btn.spec.ts"), "");
     await expect(resolveEntry(t, `${S1}/PRO-2`, { requireTest: true })).resolves.toMatchObject({ ref: `${S1}/PRO-2` });
@@ -94,6 +133,9 @@ describe("cli core", () => {
 
 describe("cli bin (built)", () => {
   const bin = path.resolve(__dirname, "../../dist/cli/index.js");
+  beforeAll(() => {
+    if (!existsSync(bin)) throw new Error(`${bin} is missing: run pnpm build first`);
+  });
   const run = (...args: string[]) => spawnSync("node", [bin, ...args], { cwd: root, encoding: "utf8" });
 
   it("list --dir works end to end, with exit codes", () => {
@@ -102,6 +144,9 @@ describe("cli bin (built)", () => {
     expect(run("show", "PRO-9").status).toBe(1);
     expect(run("show", "PRO-1").status).toBe(2);
     expect(run("bogus").status).toBe(2);
+    expect(run("list", "--dir", path.join(root, "nope")).status).toBe(2);
+    expect(run("list", "--dir", path.join(root, "nope")).stderr).toContain("does not exist");
+    expect(run("list", "--status", "done").status).toBe(2);
     expect(run("list", "--nope").status).toBe(2);
     expect(run("--help").stdout).toContain("Usage:");
     expect(JSON.parse(run("list", "--json").stdout)).toHaveLength(3);
