@@ -57,8 +57,6 @@ export interface ComposerProps {
   store: EntryStore;
   /** Host plugins: task chip, test plan menu, extra frontmatter, redaction. */
   plugins?: readonly ProompterPlugin[];
-  /** `branch@sha` for the `Build:` line. Defaults to the store session's. */
-  build?: string;
   /** Tag choices in the Tags menu. Defaults to the prototype's seven. */
   tags?: readonly string[];
   /** Exit animation length, ms (0 when the user prefers reduced motion). Default 160. */
@@ -153,7 +151,6 @@ export function Composer({
   capture,
   store,
   plugins,
-  build,
   tags: tagChoices = DEFAULT_TAGS,
   exitMs = 160,
   onClose,
@@ -259,7 +256,7 @@ export function Composer({
     return () => clearTimeout(t);
   }, []);
 
-  // Esc discards, unless a menu took it first (Radix closes the menu and marks the event handled).
+  // Esc discards, unless a menu took it first (the menu closes itself and marks the event handled).
   // Clicking outside discards, unless it landed in a menu or a toast. The listener is added a tick late so the
   // press that opened the composer can't close it.
   useEffect(() => {
@@ -308,7 +305,7 @@ export function Composer({
         // An entry without a picture is better than no entry.
       }
       const session = store.getState().session;
-      const buildLine = build ?? (session.branch ? (session.sha ? `${session.branch}@${session.sha}` : session.branch) : undefined);
+      const buildLine = (session.branch ? (session.sha ? `${session.branch}@${session.sha}` : session.branch) : undefined);
       const extra = pluginContext(plugins);
       const draft: NewEntry = {
         kind: commit.kind,
