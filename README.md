@@ -4,7 +4,7 @@ A review layer you turn on over your own app. Pick any element on any viewport, 
 and get a markdown file in your repo with the source location, console, network and a snapshot. A human
 can read the file and an AI agent can act on it.
 
-> Status: 0.0.1, the first release. The design is in [DESIGN.md](DESIGN.md), changes in [CHANGELOG.md](CHANGELOG.md).
+> Status: early (0.0.x). Works with Next.js and with plain React on Vite. The design is in [DESIGN.md](DESIGN.md), changes in [CHANGELOG.md](CHANGELOG.md).
 
 ## Install
 
@@ -16,11 +16,12 @@ npm i -D @rachitkay/proompter
 
 - Node 22.18 or newer (the Next loader `require()`s ESM-only parsers)
 - React 19
-- Next 15.3 or newer (only for `@rachitkay/proompter/next`)
+- Next 15.3 or newer (only for `@rachitkay/proompter/next`), or Vite 5 or newer (only for `@rachitkay/proompter/vite`)
 
-## Setup
+## Setup: Next.js
 
-Three steps. All of them are behind one environment flag, so a normal build contains none of it.
+Three steps. All of them are behind one environment flag, so a normal build contains none of it. Using Vite
+instead? See [Setup: Vite](#setup-vite-plain-react).
 
 **1. Config.** Stamp every element with its source location.
 
@@ -70,6 +71,56 @@ from another device on your network (a real phone, say), list its host names:
 
 Start your app with `NEXT_PUBLIC_PROOMPTER=true next dev`, then press `⌘⇧.` (or call
 `window.__proompter.open()`) to show the kit.
+
+## Setup: Vite (plain React)
+
+Two steps, behind `VITE_PROOMPTER`. One plugin does what `withProompter` and the route do in Next: it stamps
+source locations and serves the file writer on the dev server.
+
+**1. Plugin.** Put it before the React plugin, so it sees your source before JSX is compiled.
+
+```ts
+// vite.config.ts
+import { proompter } from "@rachitkay/proompter/vite";
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
+
+export default defineConfig({ plugins: [proompter(), react()] });
+```
+
+**2. Component.** Render the kit next to your app, imported from inside the flag check, so a normal build drops it.
+
+```tsx
+// src/main.tsx
+import { lazy, StrictMode, Suspense } from "react";
+import { createRoot } from "react-dom/client";
+import { App } from "./app";
+
+const Kit =
+  import.meta.env.VITE_PROOMPTER === "true"
+    ? lazy(() => import("@rachitkay/proompter").then((m) => ({ default: m.Proompter })))
+    : null;
+
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <App />
+    {Kit && (
+      <Suspense fallback={null}>
+        <Kit session={{ reviewer: "rachit" }} />
+      </Suspense>
+    )}
+  </StrictMode>,
+);
+```
+
+Start with `VITE_PROOMPTER=true vite` (or put `VITE_PROOMPTER=true` in `.env.development.local`), then press `⌘⇧.`.
+
+- The route is on the Vite dev server only, at `/api/proompter`, and it writes inside `<cwd>/reviews/` with the
+  same guards as in Next. `vite build` and `vite preview` have no route.
+- Options: `proompter({ enabled, include, exclude, root, allowedHosts })`. `enabled` overrides the env var, and
+  `include`/`exclude` take the same globs as `withProompter`.
+- The flag is the plugin's decision: it defines `import.meta.env.VITE_PROOMPTER` as `"true"` or `""`, so your
+  check and the stamping always agree.
 
 ## Shortcuts
 
@@ -172,7 +223,9 @@ for a worked example (route → task).
 ### Is it safe in production? Does it cost anything when off?
 
 With `NEXT_PUBLIC_PROOMPTER` unset, `withProompter` returns your config untouched (no loader), the
-`process.env` check in your layout is a build-time `false`, and the bundler drops the dynamic import with it. The served
+`process.env` check in your layout is a build-time `false`, and the bundler drops the dynamic import with it. With
+Vite and `VITE_PROOMPTER` unset, the plugin stamps nothing, adds no route, and `import.meta.env.VITE_PROOMPTER` is
+`""`, so the same happens in `src/main.tsx`. The served
 HTML has no `data-src`, no Proompter script and no listeners. The route answers `404` outside
 `NODE_ENV=development` with the flag on, and it only ever writes inside `<repo>/reviews/`, so path
 traversal is refused. End-to-end tests check all of this against a production build.
@@ -229,8 +282,9 @@ pnpm e2e         # Playwright; starts the playground itself (see below)
 
 The playground (`examples/playground`) is a Next 16 app with a mock feed ported from `design/prototype.html`.
 `pnpm e2e` starts it twice: `next dev` with `NEXT_PUBLIC_PROOMPTER=true` on :3100 for most specs, and a
-production build with the flag unset on :3101 for the zero-cost check. The specs write under
-`examples/playground/reviews/` (gitignored) and clean up after themselves.
+production build with the flag unset on :3101 for the zero-cost check. The Vite example (`examples/vite`) runs
+as `vite` dev with the flag on at :3102 and as `vite preview` of a flag-unset build at :3103. The specs write under
+each example's `reviews/` (gitignored) and clean up after themselves.
 
 Visual baselines live in `e2e/__screenshots__/visual.spec.ts/<platform>/`, one set per OS because rendering
 differs. The macOS set is committed. A platform with no baselines (CI runs on Linux) uses
@@ -243,7 +297,7 @@ See [RELEASING.md](RELEASING.md) for the steps.
 
 `./internal/fixtures` is a private export the playground's e2e routes use. `npm pack` and `npm publish` run
 `scripts/release-exports.mjs`, which builds without it and strips it from `exports`, so the published
-package exposes exactly `.`, `./next`, `./next/route`, `./github` and `./package.json`. CI checks that with
+package exposes exactly `.`, `./next`, `./next/route`, `./vite`, `./github` and `./package.json`. CI checks that with
 `PROOMPTER_RELEASE=1`.
 
 MIT
