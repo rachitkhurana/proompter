@@ -25,6 +25,19 @@ async function expectClean(page: Page, what: string) {
   const results = await new AxeBuilder({ page }).include("proompter-root").analyze();
   const report = results.violations.map((v) => `${v.id} (${v.impact}): ${v.nodes.map((n) => String(n.target)).join(" | ")}`);
   expect(report, `axe violations on ${what}`).toEqual([]);
+  // Translucent glass (backdrop-filter) surfaces make axe answer "incomplete" instead of passing or failing.
+  // That is not a pass: treat an unresolved colour-contrast check as a failure too.
+  // Ignored: "shortTextContent" (the pins' 1-2 digit numbers, which axe can't judge as text) and "bgOverlap"
+  // (stacked translucent panels and scrims, which axe can't resolve; src/ui/contrast.test.ts checks the token
+  // pairs instead). Every other reason (bgImage, bgGradient, bgFilter, ...) fails.
+  // Matched on axe's message text (its `messageKey` isn't exposed on the result nodes we get back).
+  // Overlapping glass/scrims, icon-only (SVG) content and 1-2 digit pin numbers: axe cannot judge these.
+  const IGNORED = /partially obscured by another element|partially overlaps other elements|content is too short|only non-text characters|contains an image node/;
+  const backdropIssue = (n: { any: Array<{ message?: string }> }) => n.any.some((c) => !IGNORED.test(c.message ?? ""));
+  const unresolved = results.incomplete
+    .filter((v) => v.id === "color-contrast")
+    .flatMap((v) => v.nodes.filter(backdropIssue).map((n) => `${String(n.target)} [${n.any[0]?.message ?? ""}]`));
+  expect(unresolved, `axe could not resolve colour contrast on ${what}`).toEqual([]);
 }
 
 test.describe("axe", () => {
@@ -59,6 +72,24 @@ test.describe("axe", () => {
     await expect(page.getByRole("button", { name: "Back to entries" })).toBeVisible();
     await page.waitForTimeout(400);
     await expectClean(page, "the ticket");
+  });
+
+  test("property menu (ticket Status)", async ({ page }) => {
+    await open(page);
+    await page.keyboard.press("e");
+    await page.getByRole("button", { name: /^PRO-1: / }).click();
+    await page.getByRole("button", { name: /^Status:/ }).click();
+    await expect(page.getByRole("menu", { name: "Status" })).toBeVisible();
+    await page.waitForTimeout(400);
+    await expectClean(page, "an open property menu");
+  });
+
+  test("toast", async ({ page }) => {
+    await open(page);
+    await page.keyboard.press("f"); // "Motion frozen on the page"
+    await expect(page.getByText("Motion frozen on the page")).toBeVisible();
+    await page.waitForTimeout(300);
+    await expectClean(page, "a toast");
   });
 
   test("command menu", async ({ page }) => {
