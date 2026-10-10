@@ -20,3 +20,37 @@ jobs:
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm build
+      # DESIGN 11.7: a release package exposes exactly ".", "./next", "./next/route", "./github", "./package.json".
+      - name: Release exports (unit test on the stripped package.json)
+        run: |
+          node scripts/release-exports.mjs strip
+          PROOMPTER_RELEASE=1 pnpm exec vitest run src/internal/exports.test.ts
+      - name: Release tarball (release build, then a dry-run pack)
+        run: |
+          node scripts/release-exports.mjs prepack
+          npm pack --dry-run --json --ignore-scripts > "$RUNNER_TEMP/pack.json"
+          node scripts/release-exports.mjs check-pack "$RUNNER_TEMP/pack.json"
+      - name: Restore package.json
+        if: always()
+        run: node scripts/release-exports.mjs restore
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      # Visual baselines are per platform; the macOS ones are committed, so Linux writes its own on first run.
+      - run: pnpm e2e --update-snapshots=missing
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results

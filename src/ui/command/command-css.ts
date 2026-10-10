@@ -13,7 +13,7 @@ export const COMMAND_CSS = /* css */ `
 
 .pp .pm-cmd .cmd-in{display:flex;align-items:center;gap:12px;height:54px;padding:0 16px;box-shadow:inset 0 -1px 0 var(--line);color:var(--fg-3);flex:none}
 .pp .pm-cmd .cmd-in input{all:unset;flex:1;min-width:0;font:400 15px/1 var(--sans);letter-spacing:-.006em;color:var(--fg)}
-.pp .pm-cmd .cmd-in input::placeholder{color:var(--fg-4)}
+.pp .pm-cmd .cmd-in input::placeholder{color:var(--fg-3)}
 .pp.pp .pm-cmd .cmd-in input:focus-visible{outline:none}
 .pp .pm-cmd .cmd-ls{flex:1;overflow:auto;padding:6px}
 .pp .pm-cmd .cmd-sec{padding:10px 10px 6px;font:500 11.5px/1 var(--sans);color:var(--fg-3)}

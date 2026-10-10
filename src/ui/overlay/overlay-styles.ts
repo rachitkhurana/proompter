@@ -11,11 +11,11 @@ export const overlayCss = /* css */ `
 .pp .pm-ovl{position:fixed;inset:0;pointer-events:none;z-index:40}
 .pp .pm-hov{position:fixed;border-radius:6px;box-shadow:0 0 0 1.5px var(--acc),0 0 0 4px var(--acc-soft);background:rgba(255,99,99,.06);opacity:0;transition:opacity .12s var(--ease),left .09s var(--ease),top .09s var(--ease),width .09s var(--ease),height .09s var(--ease)}
 .pp .pm-hov.on{opacity:1}
-.pp .pm-hlab{position:fixed;display:flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:6px;background:var(--acc);color:#fff;font:500 11.5px/16px var(--sans);white-space:nowrap;opacity:0;translate:0 2px;transition:opacity .12s var(--ease),translate .15s var(--ease)}
+.pp .pm-hlab{position:fixed;display:flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:6px;background:var(--acc-solid);color:var(--acc-fg);font:500 11.5px/16px var(--sans);white-space:nowrap;opacity:0;translate:0 2px;transition:opacity .12s var(--ease),translate .15s var(--ease)}
 .pp .pm-hlab.on{opacity:1;translate:0 0}
 .pp .pm-hlab .mono{font-size:10.5px;opacity:.8}
 .pp .pm-selb{position:fixed;border-radius:6px;box-shadow:0 0 0 1.5px var(--acc);background:var(--acc-soft)}
-.pp .pm-selb b{position:absolute;top:-8px;left:-8px;width:18px;height:18px;border-radius:50%;background:var(--acc);color:#fff;font:600 10px/18px var(--sans);text-align:center;box-shadow:0 0 0 2px var(--canvas)}
+.pp .pm-selb b{position:absolute;top:-8px;left:-8px;width:18px;height:18px;border-radius:50%;background:var(--acc-solid);color:var(--acc-fg);font:600 10px/18px var(--sans);text-align:center;box-shadow:0 0 0 2px var(--canvas)}
 .pp .pm-catch{position:fixed;z-index:45;cursor:crosshair;pointer-events:auto;touch-action:none}
 .pp .pm-drag{position:fixed;z-index:46;border-radius:4px;box-shadow:0 0 0 1.5px var(--acc);background:var(--acc-soft);pointer-events:none}
 

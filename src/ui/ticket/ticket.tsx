@@ -184,7 +184,7 @@ export function Ticket({
         </div>
 
         <div className="tk-sec">
-          <h4>Properties</h4>
+          <h3>Properties</h3>
           <dl className="kv">
             <dt>Status</dt>
             <dd>
@@ -304,7 +304,7 @@ export function Ticket({
         </div>
 
         <div className="tk-sec">
-          <h4>Where</h4>
+          <h3>Where</h3>
           <div className="crumbs">
             {crumbParts.map((part, i) => (
               <span key={i} style={{ display: "contents" }}>
@@ -369,7 +369,7 @@ export function Ticket({
         </div>
 
         <div className="tk-sec">
-          <h4>
+          <h3>
             Captured context
             <span className="sp" />
             <TabList
@@ -388,7 +388,7 @@ export function Ticket({
                 },
               ]}
             />
-          </h4>
+          </h3>
           <div className="log" role="tabpanel" aria-label={ctx === "console" ? "Console" : "Network"}>
             {ctx === "console" ? (
               entry.context.console.length ? (
@@ -422,7 +422,7 @@ export function Ticket({
         </div>
 
         <div className="tk-sec">
-          <h4>Activity</h4>
+          <h3>Activity</h3>
           <div className="act">
             {entry.activity.map((a, i) => (
               <div key={i}>
@@ -437,13 +437,13 @@ export function Ticket({
         </div>
 
         <div className="tk-sec">
-          <h4>
+          <h3>
             File
             <span className="sp" />
             <Button variant="ghost" size="sm" aria-expanded={showMd} onClick={() => setShowMd((v) => !v)}>
               {showMd ? "Hide" : "Show"} markdown
             </Button>
-          </h4>
+          </h3>
           {showMd ? (
             <pre className="md" tabIndex={0} aria-label="Entry markdown">
               {serialize(entry)}

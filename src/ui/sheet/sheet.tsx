@@ -173,7 +173,7 @@ export function Sheet({
               <LogoIcon />
             </span>
             <div className="t">
-              <b>{session.title}</b>
+              <b role="heading" aria-level={2}>{session.title}</b>
               <span>{sessionSubtitle(session)}</span>
             </div>
             <IconButton label="Close" onClick={onClose}>

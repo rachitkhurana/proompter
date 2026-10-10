@@ -152,6 +152,11 @@ export function Dock({
   const [intro, setIntro] = useState(true);
   const [tooltipSide, setTooltipSide] = useState<TooltipSide>("top");
 
+  // Reduced motion turns every animation off, so `animationend` never fires and the intro class would stay.
+  useEffect(() => {
+    if (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches) setIntro(false);
+  }, []);
+
   const dockRef = useRef<HTMLDivElement>(null);
   const posRef = useRef(pos);
   const collapsedRef = useRef(collapsed);

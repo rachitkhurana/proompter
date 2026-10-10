@@ -3,10 +3,9 @@ import { expect, test, type Page } from "@playwright/test";
 /**
  * T04: pick an avatar inside a card, on Responsive (the live page) and on Mobile (a scaled iframe).
  *
- * The playground has no mock page yet (T10 ports it), so this runs against T04's own fixture route,
- * `examples/playground/app/fixtures/pick/page.tsx`: two identical hand-stamped cards plus a small harness that
- * mounts the pick engine, overlay and viewport stage from the package source. When T08's root component lands,
- * switch the spec to the real kit and the real dock.
+ * This runs against T04's own fixture route, `examples/playground/app/fixtures/pick/page.tsx`: two identical
+ * hand-stamped cards plus a small harness that mounts the pick engine, overlay and viewport stage from the
+ * package source. It pins the engine on its own; the full kit on the real mock feed is covered by flow.spec.ts.
  */
 
 const FIXTURE = "/fixtures/pick";
@@ -51,7 +50,9 @@ test("picks an avatar inside a card on Responsive", async ({ page }) => {
   const p = await picked(page);
   expect(p).toMatchObject({ kind: "element", viewport: "responsive", inherited: false, label: "img · avatar" });
   expect(p.source).toMatch(/pick\/page\.tsx:24:11$/);
-  expect(p.crumb).toBe("PickFixture › PostCard › Avatar › img · avatar");
+  // The playground now runs the loader (withProompter), which stamps the root layout's <body> with
+  // data-comp="RootLayout": the real chain starts there, like any app's would.
+  expect(p.crumb).toBe("RootLayout › PickFixture › PostCard › Avatar › img · avatar");
 
   // Two cards share every data-src, so the selector has to count: it must hit the second card's avatar, only.
   expect(p.selector).toContain("article:nth-of-type(2)");

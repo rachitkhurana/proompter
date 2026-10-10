@@ -44,7 +44,11 @@ export default defineConfig([
   // (No `treeshake: true`: the rollup pass strips module-level directives.)
   {
     ...shared,
-    entry: { index: "src/index.ts", "internal/fixtures": "src/internal/fixtures.ts" },
+    // The private fixtures entry (playground /fixtures/* e2e routes) is not part of a release build (DESIGN 11.7).
+    entry: {
+      index: "src/index.ts",
+      ...(process.env.PROOMPTER_RELEASE === "1" ? {} : { "internal/fixtures": "src/internal/fixtures.ts" }),
+    },
     banner: { js: '"use client";' },
     clean: true,
   },
