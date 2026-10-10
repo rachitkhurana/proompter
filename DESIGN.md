@@ -334,3 +334,7 @@ the frontmatter of `migration/_tasks/T-*.md`.
    - redaction
    - serializer round-trips (parse(serialize(e)) == e)
    - the loader's output on fixture files, including source maps
+7. **Published exports are exact.** With `PROOMPTER_RELEASE=1`, `package.json` `exports` keys are exactly
+   `.`, `./next`, `./next/route` and the reserved `./github`. The test-only `./internal/fixtures` export
+   (used by the playground's `/fixtures/*` e2e routes) must be removed or gated out of the release build.
+   A unit test asserts this, and it passes in CI.
