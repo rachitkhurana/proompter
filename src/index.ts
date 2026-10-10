@@ -11,3 +11,4 @@ export type {
   Serialize,
   StoreState,
 } from "./ui/proompter";
+export type { Entry, ProompterPlugin, Session } from "./core/entry";
