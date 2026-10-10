@@ -4,9 +4,9 @@ import { expect, test, type Page } from "@playwright/test";
  * Visual baselines at 1440x900 for the dock, composer, ticket and sheet, on the kit fixture (/fixtures/kit:
  * seeded in-memory entries, so the content is the same every run).
  *
- * Baselines are not committed yet. The first run creates them in e2e/__screenshots__/ (Playwright reports the
- * first run as failed: "A snapshot doesn't exist, writing actual"); commit them, and every run after compares.
- * Regenerate on purpose with `pnpm e2e --update-snapshots`. Ideally generate them on the CI image (Linux).
+ * Baselines are per platform: e2e/__screenshots__/visual.spec.ts/<platform>/*.png. The macOS set is committed.
+ * A platform with none (CI on Linux) runs with `--update-snapshots=missing`, which writes its own and passes;
+ * later runs on that platform compare. Regenerate on purpose with `pnpm e2e --update-snapshots`.
  */
 test.use({ viewport: { width: 1440, height: 900 } });
 test.setTimeout(90_000);
