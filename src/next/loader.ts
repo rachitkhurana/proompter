@@ -22,6 +22,7 @@
  * Never throws into the build: on a parse failure the source passes through untouched.
  */
 import path from "node:path";
+import { globToRegExp } from "../core/glob";
 import type { parse } from "@babel/parser";
 import type remapping from "@jridgewell/remapping";
 import type MagicString from "magic-string";
@@ -429,57 +430,7 @@ function composeMaps(own: SourceMapObject, inputMap: unknown): SourceMapObject {
 
 /* ----------------------------------------------------------- file selection */
 
-/**
- * Glob syntax, matched against the whole repo-relative POSIX path:
- * - `*` (no slash), `**` (anything, incl. slashes), `?` (one non-slash char)
- * - `{a,b}` alternation, e.g. `app/**\/*.{tsx,jsx}`
- * - a pattern whose last segment has no `*`/`?` also matches everything beneath it, so a bare
- *   directory works: `exclude: ["app/admin"]` matches `app/admin/page.tsx` (like `app/admin/**`).
- */
-export function globToRegExp(glob: string): RegExp {
-  const g = glob.replace(/^\.\//, "").replace(/\/+$/, "");
-  // Braces are alternation only when balanced; otherwise they are literal.
-  let balance = 0;
-  let balanced = true;
-  for (const ch of g) {
-    if (ch === "{") balance++;
-    else if (ch === "}" && --balance < 0) balanced = false;
-  }
-  balanced = balanced && balance === 0;
-  let depth = 0;
-  let re = "";
-  for (let i = 0; i < g.length; i++) {
-    const c = g.charAt(i);
-    if (balanced && c === "{") {
-      depth++;
-      re += "(?:";
-    } else if (balanced && c === "}") {
-      depth--;
-      re += ")";
-    } else if (balanced && c === "," && depth > 0) {
-      re += "|";
-    } else if (c === "*") {
-      if (g.charAt(i + 1) === "*") {
-        i++;
-        if (g.charAt(i + 1) === "/") {
-          i++;
-          re += "(?:.*/)?";
-        } else {
-          re += ".*";
-        }
-      } else {
-        re += "[^/]*";
-      }
-    } else if (c === "?") {
-      re += "[^/]";
-    } else {
-      re += c.replace(/[.+^${}()|[\]\\]/g, "\\$&");
-    }
-  }
-  const lastSegment = g.slice(g.lastIndexOf("/") + 1);
-  const dirLike = !/[*?]/.test(lastSegment);
-  return new RegExp(`^${re}${dirLike ? "(?:/.*)?" : ""}$`);
-}
+export { globToRegExp }; // moved to core/glob.ts (also used by the client-side repo plugin)
 
 /** Should this repo-relative POSIX path be stamped? */
 export function shouldStamp(relPath: string, options: Pick<LoaderOptions, "include" | "exclude"> = {}): boolean {
