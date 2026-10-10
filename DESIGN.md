@@ -38,7 +38,7 @@ src/
   next/loader.ts        → Turbopack/webpack loader that stamps data-src
   core/                 → framework-free engine: surface, resolver, capture, store, serializer
   ui/                   → React UI rendered into the shadow root
-  ui/primitives/        → Button, IconButton, Chip, Menu, Tooltip, Kbd, Segmented, Sheet (hand-built; Menu/Dialog on Radix, restyled — see D1)
+  ui/primitives/        → Button, IconButton, Chip, Menu, Tooltip, Kbd, Segmented, Sheet (all hand-built; no Radix — see D5)
   ui/styles.css         → Tailwind 4 source → compiled to a string at build time
 examples/playground/    → Next 16 app with a Gamorite-like mock page (the prototype's host markup)
 ```
@@ -49,6 +49,13 @@ examples/playground/    → Next 16 app with a Gamorite-like mock page (the prot
   inlined as a string export, so there's no CSS file for the host to import.
 - **TypeScript:** pinned to 5.9.x, not 7.x. tsup's dts build and typescript-eslint need the TS JS API,
   which the native 7.x port doesn't ship, and typescript-eslint requires TS <6.1.
+- **D5. No Radix (2026-10-10, supersedes D1.2):** Proompter uses no Radix packages. Radix Dialog's
+  modal mode locked host scroll, injected a host `<style>` and set `aria-hidden`/`pointer-events` on the
+  host. Radix Menu always inserts `data-radix-focus-guard` spans into the host `document.body`, even with
+  `modal={false}`. Its roving focus also fails inside a shadow root, so keyboard navigation was already
+  ours. Both break §1.2. The Menu is hand-built (task T02b) with the same API: roles, keyboard, typeahead,
+  dismiss, placement and scale-in. Runtime dependencies are `@babel/parser`, `magic-string`,
+  `@jridgewell/remapping`, `html-to-image` and `bippy`.
 - **D2. UI kit rulings (T02, 2026-10-10):**
   1. Tokens sit on a `.pp` wrapper inside the shadow root (with `all: initial`), not on `:root`.
   2. **Fonts:** while the kit is enabled, inject one `<style data-proompter-fonts>` into `document.head`,
@@ -75,8 +82,7 @@ examples/playground/    → Next 16 app with a Gamorite-like mock page (the prot
 - **Dependencies:**
   - `html-to-image` (snapshots)
   - `bippy` (dev owner stack, optional)
-  - `@radix-ui/react-dropdown-menu`, `@radix-ui/react-dialog` (and `@radix-ui/react-popover` only if
-    needed; see D1)
+  - no Radix (D5)
   - `@babel/parser`, `magic-string` (loader)
 
   Keep the client bundle small: lazy-load the UI chunk on first open.
