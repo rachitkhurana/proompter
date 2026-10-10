@@ -5,7 +5,9 @@ const PROD_PORT = 3101; // production build with the flag unset (DESIGN 11.1)
 
 export default defineConfig({
   testDir: "e2e",
-  fullyParallel: true,
+  // One worker: the flow specs share one dev server and one reviews/ folder on disk, so they must not overlap.
+  fullyParallel: false,
+  workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? "github" : "list",
