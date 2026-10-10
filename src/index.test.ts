@@ -16,7 +16,14 @@ describe("smoke", () => {
     expect(styles).toContain("pm-root");
   });
 
+  it("isProompterFrame is true only with the frame param", () => {
+    expect(entry.isProompterFrame()).toBe(false);
+    window.history.replaceState(null, "", "/?__proompter_frame=1");
+    expect(entry.isProompterFrame()).toBe(true);
+    window.history.replaceState(null, "", "/");
+  });
+
   it("keeps the stylesheet out of the entry's exports", () => {
-    expect(Object.keys(entry)).toEqual(["Proompter"]);
+    expect(Object.keys(entry)).toEqual(["Proompter", "isProompterFrame"]);
   });
 });
