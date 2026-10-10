@@ -41,5 +41,5 @@ export const composerCss = /* css */ `
 .pp .pm-log .e{color:var(--p-blocking)}
 .pp .pm-log .w{color:var(--p-important)}
 .pp .pm-log .g{color:var(--ok)}
-.pp .pm-log .m{color:var(--fg-4)}
+.pp .pm-log .m{color:var(--fg-3)}
 `;
