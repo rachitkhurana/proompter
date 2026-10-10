@@ -152,6 +152,14 @@ describe("shortcuts", () => {
     expect(press("0").used).toBe(false);
   });
 
+  it("Alt+K toggles the command menu by physical key (Option+K types a character on Mac), but not in a field", () => {
+    expect(press("\u02da", { init: { altKey: true, code: "KeyK" } }).a.toggleCommand).toHaveBeenCalledOnce();
+    expect(press("k", { init: { altKey: true, code: "KeyK" } }).a.toggleCommand).toHaveBeenCalledOnce();
+    expect(press("k", { init: { altKey: true, code: "KeyK" }, target: field("input") }).a.toggleCommand).not.toHaveBeenCalled();
+    expect(press("k", { init: { altKey: true, metaKey: true, code: "KeyK" } }).a.toggleCommand).not.toHaveBeenCalled();
+    expect(press("k", { init: { code: "KeyK" } }).a.toggleCommand).not.toHaveBeenCalled();
+  });
+
   it("⌘⇧K / Ctrl+Shift+K toggles the command menu, even while typing", () => {
     expect(press("K", { init: { metaKey: true, shiftKey: true } }).a.toggleCommand).toHaveBeenCalledOnce();
     expect(press("K", { init: { ctrlKey: true, shiftKey: true } }).a.toggleCommand).toHaveBeenCalledOnce();
