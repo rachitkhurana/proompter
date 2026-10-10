@@ -21,11 +21,18 @@ jobs:
       - run: pnpm test
       - run: pnpm build
       # DESIGN 11.7: a release package exposes exactly ".", "./next", "./next/route", "./github", "./package.json".
-      - name: Release exports
+      - name: Release exports (unit test on the stripped package.json)
         run: |
           node scripts/release-exports.mjs strip
           PROOMPTER_RELEASE=1 pnpm exec vitest run src/internal/exports.test.ts
-          node scripts/release-exports.mjs restore
+      - name: Release tarball (release build, then a dry-run pack)
+        run: |
+          node scripts/release-exports.mjs prepack
+          npm pack --dry-run --json --ignore-scripts > "$RUNNER_TEMP/pack.json"
+          node scripts/release-exports.mjs check-pack "$RUNNER_TEMP/pack.json"
+      - name: Restore package.json
+        if: always()
+        run: node scripts/release-exports.mjs restore
 
   e2e:
     runs-on: ubuntu-latest
@@ -38,7 +45,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm e2e
+      # Visual baselines are per platform; the macOS ones are committed, so Linux writes its own on first run.
+      - run: pnpm e2e --update-snapshots=missing
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
