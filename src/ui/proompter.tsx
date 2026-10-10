@@ -5,6 +5,8 @@
  * - Frame mode (`?__proompter_frame=1`): nothing is drawn; it only exposes a capture to the parent kit.
  * - Otherwise it installs `window.__proompter` and the `⌘⇧.` listener, and loads the UI chunk (dock, sheet,
  *   fonts, everything else) with `import()` the first time the kit is opened.
+ * - Outside development (a deployed preview, D15) the kit is dormant until `enable()` or the chord: no capture,
+ *   no UI chunk. The choice persists in `localStorage["proompter:enabled"]`.
  *
  * Imports here must stay type-only or tiny: the UI lives in `./shell/ui`.
  */
@@ -27,6 +29,36 @@ export type {
 
 /** Same name as `FRAME_PARAM` in core/surface; repeated here to keep that module out of the entry chunk. */
 const FRAME_PARAM = "__proompter_frame";
+
+const ENABLED_KEY = "proompter:enabled";
+const isDev = () => process.env.NODE_ENV === "development";
+const stored = () => {
+  try {
+    return localStorage.getItem(ENABLED_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
+
+// One active flag for every mounted <Proompter> (D15). The stored key decides on load; `override` is what
+// enable()/disable() decided since, so it also holds when storage throws. Development is always active.
+let override: boolean | null = null;
+const listeners = new Set<() => void>();
+const isActive = () => isDev() || (override ?? stored());
+const subscribeActive = (cb: () => void) => {
+  listeners.add(cb);
+  return () => void listeners.delete(cb);
+};
+function setActiveFlag(v: boolean) {
+  override = v;
+  try {
+    if (v) localStorage.setItem(ENABLED_KEY, "1");
+    else localStorage.removeItem(ENABLED_KEY);
+  } catch {
+    /* private mode: the choice lasts for this page only */
+  }
+  listeners.forEach((l) => l());
+}
 
 const KitUI = lazy(() => import("./shell/ui"));
 
@@ -89,7 +121,8 @@ const onChord = (ev: KeyboardEvent) => {
   const top = live[live.length - 1];
   if (!top) return;
   ev.preventDefault();
-  top.toggle();
+  if (top.enabled()) top.toggle();
+  else top.enable();
 };
 
 function register(api: ProompterApi): () => void {
@@ -102,6 +135,7 @@ function register(api: ProompterApi): () => void {
     const top = live[live.length - 1];
     if (top) window.__proompter = top;
     else {
+      override = null;
       document.removeEventListener("keydown", onChord, true);
       delete window.__proompter;
     }
@@ -111,14 +145,24 @@ function register(api: ProompterApi): () => void {
 function HostMode(props: ProompterProps) {
   const [open, setOpen] = useState(!!props.defaultOpen);
   const [box] = useState<DepsBox>(() => ({}));
+  const active = useSyncExternalStore(subscribeActive, isActive, () => false);
 
   // Nothing global exists until this mounts: no listener, no `window.__proompter`.
   useEffect(() => {
     const api: ProompterApi = {
-      open: () => setOpen(true),
+      open: () => isActive() && setOpen(true),
       close: () => setOpen(false),
-      toggle: () => setOpen((o) => !o),
-      entries: () => box.deps?.store.getSnapshot().entries ?? [],
+      toggle: () => isActive() && setOpen((o) => !o),
+      entries: () => (isActive() ? (box.deps?.store.getSnapshot().entries ?? []) : []),
+      enable: () => {
+        if (!isDev()) setActiveFlag(true);
+        setOpen(true);
+      },
+      disable: () => {
+        if (!isDev()) setActiveFlag(false);
+        setOpen(false);
+      },
+      enabled: isActive,
     };
     return register(api);
   }, [box]);
@@ -127,6 +171,7 @@ function HostMode(props: ProompterProps) {
   // The UI chunk reuses this instance, so the buffers also cover the time before the first open.
   const { redact, queries } = props;
   useEffect(() => {
+    if (!active) return;
     let cancelled = false;
     const cancelIdle = whenIdle(() => {
       void import("../core/capture").then(({ createCapture }) => {
@@ -141,9 +186,9 @@ function HostMode(props: ProompterProps) {
     };
     // Hooks given on the first render are the ones the page keeps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [box]);
+  }, [box, active]);
 
-  if (!open) return null;
+  if (!open || !active) return null;
   return (
     <Suspense fallback={null}>
       <KitUI options={props} box={box} onToggleKit={() => setOpen((o) => !o)} />
