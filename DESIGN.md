@@ -214,7 +214,8 @@ examples/vite/          → plain React app on Vite 8 with @vitejs/plugin-react 
 - **v1 gaps (T17):**
   - `isProompterFrame()` export, for apps that double-mount providers in device frames.
   - Esc during the composer's exit animation goes to the Esc ladder.
-  - The D11 focusout guard is narrowed, so app inputs still get blur.
+  - The D11 focusout guard is narrowed to app modals (`[aria-modal="true"]`, `[role=dialog]`,
+    `[role=alertdialog]`; Radix sets the role without `aria-modal`), so other app inputs still get blur.
   - An `Alt+K` fallback for the command menu (Firefox owns `Ctrl+Shift+K`).
 - **Peer dependencies:** `react >=19`, `react-dom >=19`, `next >=15.3` (optional, only for `./next`), `vite >=5`
   (optional, only for `./vite`, D14).
