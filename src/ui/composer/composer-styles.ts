@@ -17,9 +17,9 @@ export const composerCss = /* css */ `
 .pp .pm-nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pp .pm-comp-bd{padding:12px 16px 4px;display:grid;gap:4px;overflow:auto;min-height:0}
 .pp .pm-in-title{all:unset;width:100%;font:600 16px/24px var(--sans);letter-spacing:-.012em;color:var(--fg)}
-.pp .pm-in-title::placeholder{color:var(--fg-4)}
+.pp .pm-in-title::placeholder{color:var(--fg-3)}
 .pp .pm-in-desc{all:unset;width:100%;min-height:60px;font:400 13.5px/21px var(--sans);color:var(--fg-2);white-space:pre-wrap}
-.pp .pm-in-desc::placeholder{color:var(--fg-4)}
+.pp .pm-in-desc::placeholder{color:var(--fg-3)}
 .pp .pm-err{font:400 12px/16px var(--sans);color:var(--p-blocking)}
 .pp .pm-quote{margin:2px 0 6px;padding:2px 0 2px 12px;box-shadow:inset 2px 0 0 var(--acc);color:var(--fg-2);font-style:italic;white-space:pre-wrap}
 .pp .pm-props{display:flex;flex-wrap:wrap;gap:6px;padding:8px 16px 14px;flex:none}
