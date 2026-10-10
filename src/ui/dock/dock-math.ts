@@ -126,19 +126,15 @@ export function defaultPosition(size: Size, viewport: Size): { x: number; y: num
 }
 
 /** Arrow-key step for the grip, or null for any other key. */
+const KEY_STEPS = new Map<string, [number, number]>([
+  ["ArrowLeft", [-KEY_STEP, 0]],
+  ["ArrowRight", [KEY_STEP, 0]],
+  ["ArrowUp", [0, -KEY_STEP]],
+  ["ArrowDown", [0, KEY_STEP]],
+]);
+
 export function keyStep(key: string): [number, number] | null {
-  switch (key) {
-    case "ArrowLeft":
-      return [-KEY_STEP, 0];
-    case "ArrowRight":
-      return [KEY_STEP, 0];
-    case "ArrowUp":
-      return [0, -KEY_STEP];
-    case "ArrowDown":
-      return [0, KEY_STEP];
-    default:
-      return null;
-  }
+  return KEY_STEPS.get(key) ?? null;
 }
 
 /** Parse a stored position. Anything malformed is `null` (default position). */
