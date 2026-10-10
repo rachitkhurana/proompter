@@ -96,7 +96,6 @@
   "dependencies": {
     "@babel/parser": "8.0.7",
     "@jridgewell/remapping": "2.3.5",
-    "@radix-ui/react-dropdown-menu": "2.1.25",
     "bippy": "0.7.3",
     "html-to-image": "1.11.13",
     "magic-string": "1.4.3"
