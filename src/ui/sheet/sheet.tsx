@@ -9,7 +9,7 @@ import { sessionSubtitle } from "../shell/format";
 import { reducedMotion } from "../../core/motion";
 import { Ticket } from "../ticket/ticket";
 import { EntryList } from "./entry-list";
-import { PublishPanel } from "./publish-panel";
+import { PublishPanel, type PublishGithub } from "./publish-panel";
 
 export type SheetTab = "entries" | "publish";
 
@@ -40,6 +40,8 @@ export interface SheetProps {
   onSelect(id: string | null): void;
   onClose(): void;
   onWrite?(): Promise<void>;
+  /** GitHub sync for the Publish tab; absent: the tab is as in v1. */
+  github?: PublishGithub;
   ticket: SheetTicketProps;
 }
 
@@ -60,6 +62,7 @@ export function Sheet({
   onSelect,
   onClose,
   onWrite,
+  github,
   ticket,
 }: SheetProps) {
   const ref = useRef<HTMLElement>(null);
@@ -190,7 +193,7 @@ export function Sheet({
           />
           <div className="sh-bd">
             {tab === "publish" ? (
-              <PublishPanel session={session} entries={entries} pending={pending} onWrite={onWrite} />
+              <PublishPanel session={session} entries={entries} pending={pending} onWrite={onWrite} github={github} />
             ) : (
               <EntryList entries={entries} selectedId={selectedId} onOpen={(id) => onSelect(id)} />
             )}
