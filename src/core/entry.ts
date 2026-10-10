@@ -138,6 +138,8 @@ export interface ProompterPlugin {
   context?(): Record<string, unknown>;
   testPlan?: string[];
   redact?(entry: Entry): Entry;
+  /** CSS selectors to black out in PNG snapshots, on top of inputs and `[data-proompter-redact]`. */
+  redactSnapshot?: string[];
 }
 
 /** Store events. The files sink (T09) listens to these. */
