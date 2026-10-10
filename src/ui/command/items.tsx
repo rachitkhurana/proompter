@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { Entry } from "../../core/entry";
 import type { PickMode } from "../../core/pick";
 import { VIEWPORT_ORDER, VIEWPORTS, type ViewportId } from "../../core/surface";
-import { FreezeIcon, InboxIcon, PublishIcon, icons } from "../icons";
+import { Icon, type IconName } from "../icons";
 import { Kbd } from "../primitives/kbd";
 import { PriorityIcon } from "../primitives/priority-icon";
 import { viewportLabel } from "../shell/format";
@@ -33,7 +33,7 @@ export interface CommandContext {
   onPublish(): void;
 }
 
-const TOOLS: ReadonlyArray<{ tool: CommandTool; icon: keyof typeof icons; label: string; key: string }> = [
+const TOOLS: ReadonlyArray<{ tool: CommandTool; icon: IconName; label: string; key: string }> = [
   { tool: "pick", icon: "pick", label: "Pick element", key: "P" },
   { tool: "multi", icon: "multi", label: "Select several elements", key: "M" },
   { tool: "box", icon: "area", label: "Box select", key: "B" },
@@ -50,11 +50,10 @@ export function buildCommandItems(c: CommandContext): CommandItem[] {
   const here = `on ${viewportLabel(c.viewport).toLowerCase()}`;
 
   for (const t of TOOLS) {
-    const Icon = icons[t.icon];
     out.push({
       id: `tool-${t.tool}`,
       section: "Review",
-      icon: <Icon size="s" />,
+      icon: <Icon name={t.icon} size="s" />,
       label: t.label,
       sub: here,
       right: <Kbd>{t.key}</Kbd>,
@@ -64,7 +63,7 @@ export function buildCommandItems(c: CommandContext): CommandItem[] {
   out.push({
     id: "freeze",
     section: "Review",
-    icon: <FreezeIcon size="s" />,
+    icon: <Icon name="freeze" size="s" />,
     label: c.frozen ? "Resume motion" : "Freeze motion",
     sub: "pause animations on the page",
     right: <Kbd>F</Kbd>,
@@ -72,12 +71,11 @@ export function buildCommandItems(c: CommandContext): CommandItem[] {
   });
 
   VIEWPORT_ORDER.forEach((v, i) => {
-    const Icon = icons[v];
     const size = VIEWPORTS[v].size;
     out.push({
       id: `viewport-${v}`,
       section: "Viewport",
-      icon: <Icon size="s" />,
+      icon: <Icon name={v} size="s" />,
       label: VIEWPORTS[v].label,
       sub: size ? `${size[0]}×${size[1]}` : "fills the window",
       right: c.viewport === v ? "Current" : <Kbd>{String(i + 1)}</Kbd>,
@@ -90,14 +88,13 @@ export function buildCommandItems(c: CommandContext): CommandItem[] {
     .slice()
     .reverse()
     .forEach((e) => {
-      const Icon = icons[e.viewport];
       out.push({
         id: `entry-${e.id}`,
         section: "Entries",
         icon: <PriorityIcon priority={e.priority} />,
         label: e.title,
         sub: `${e.id} · ${viewportLabel(e.viewport)}`,
-        right: <Icon size="s" />,
+        right: <Icon name={e.viewport} size="s" />,
         run: () => c.onOpenEntry(e.id),
       });
     });
@@ -105,7 +102,7 @@ export function buildCommandItems(c: CommandContext): CommandItem[] {
   out.push({
     id: "all-entries",
     section: "Session",
-    icon: <InboxIcon size="s" />,
+    icon: <Icon name="inbox" size="s" />,
     label: "All entries",
     sub: `${c.entries.length} in this session`,
     right: <Kbd>E</Kbd>,
@@ -114,7 +111,7 @@ export function buildCommandItems(c: CommandContext): CommandItem[] {
   out.push({
     id: "publish",
     section: "Session",
-    icon: <PublishIcon size="s" />,
+    icon: <Icon name="publish" size="s" />,
     label: "Publish session",
     sub: `${c.pendingFiles} file${c.pendingFiles === 1 ? "" : "s"} to write`,
     run: c.onPublish,
