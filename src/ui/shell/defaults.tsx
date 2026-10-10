@@ -7,6 +7,7 @@ import { createFilesSink, DEFAULT_ENDPOINT, type FilesSink } from "../../core/si
 import { serialize, entryPath as entryFile } from "../../core/serialize";
 import { createStore, type EntryStore as CoreStore, type StoreState as CoreState } from "../../core/store";
 import { Composer } from "../composer/composer";
+import { toast } from "../primitives/toast";
 import type { EntryStore, PendingFile, ProompterDeps, ProompterProps, StoreState } from "../proompter-deps";
 
 const NO_PENDING: readonly PendingFile[] = [];
@@ -65,6 +66,7 @@ export function createDefaultDeps(options: ProompterProps): ProompterDeps {
   const core = createStore({
     session: { title: options.session?.title ?? "Review", reviewer: options.session?.reviewer ?? "reviewer" },
     plugins: options.plugins,
+    onWriteError: () => toast("Couldn't save locally. The entry is kept until you close this tab."),
     beforeCreate: () => (sink ? Promise.race([sink.hydrated, new Promise<void>((r) => setTimeout(r, HYDRATE_WAIT_MS))]) : undefined),
   });
   // Outside dev there is no route: `enabled: false` skips the GET (no failing request in the host's console).
@@ -82,8 +84,6 @@ export function createDefaultDeps(options: ProompterProps): ProompterDeps {
       p.surface ? (
         <Composer
           ref={p.discardRef}
-          handleEscape={false}
-          toast={false}
           commit={p.commit}
           surface={p.surface}
           viewport={p.viewport}
