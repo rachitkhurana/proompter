@@ -2,8 +2,13 @@ name: CI
 
 on:
   push:
-    branches: [main, v1]
   pull_request:
+
+env:
+  # Linux visual baselines are not committed yet: `missing` writes them (and never fails on them), and the job
+  # uploads them as the `linux-visual-baselines` artifact. Commit them to e2e/__screenshots__/visual.spec.ts/linux/,
+  # then set this to `none` so visual changes fail CI.
+  VISUAL_SNAPSHOTS: missing
 
 jobs:
   verify:
@@ -13,7 +18,7 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22 # the latest 22.x; engines require >=22.18
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
@@ -45,8 +50,13 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
-      # Visual baselines are per platform; the macOS ones are committed, so Linux writes its own on first run.
-      - run: pnpm e2e --update-snapshots=missing
+      - run: pnpm e2e --update-snapshots=${{ env.VISUAL_SNAPSHOTS }}
+      - uses: actions/upload-artifact@v4
+        if: always() && env.VISUAL_SNAPSHOTS == 'missing'
+        with:
+          name: linux-visual-baselines
+          path: e2e/__screenshots__/visual.spec.ts/linux/
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
