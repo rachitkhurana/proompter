@@ -24,6 +24,7 @@ import { createDefaultDeps } from "./defaults";
 import type { DepsBox } from "./deps-box";
 import { isToggleChord } from "./chord";
 import { tailPath, viewportLabel } from "./format";
+import { returnFocusFromFrame } from "./focus";
 import { handleKeydown, type KeyActions, type KeyState } from "./shortcuts";
 import { useRoute } from "./use-route";
 
@@ -117,6 +118,10 @@ function Kit({ options, box, onToggleKit }: ShellProps) {
   }, [engine, surface]);
   useEffect(() => () => engine.dispose(), [engine]);
   useEffect(() => engine.setBusy(draft !== null), [engine, draft]);
+  // After a save or discard, focus may have been restored into the device frame: take it back.
+  useEffect(() => {
+    if (draft === null) returnFocusFromFrame();
+  }, [draft]);
   useFreeze(surface, frozen);
 
   // -- capture -----------------------------------------------------------------------------------------
@@ -254,7 +259,9 @@ function Kit({ options, box, onToggleKit }: ShellProps) {
   // -- keyboard ----------------------------------------------------------------------------------------
   const keyState = (): KeyState => ({
     menuOpen: !!container?.querySelector('[role="menu"]:not([data-state="closed"])'),
-    composerOpen: draft !== null,
+    // A composer that is saving or discarding is already `aria-hidden` and playing its 160ms exit; it no longer
+    // owns the keyboard, so shortcuts pressed right after ⌘↵ or Esc are not lost.
+    composerOpen: draft !== null && !container?.querySelector('.pm-comp[aria-hidden="true"]'),
     commandOpen,
     mode,
     sheetOpen: sheet.open,
@@ -283,6 +290,7 @@ function Kit({ options, box, onToggleKit }: ShellProps) {
     live.current.surface = surface;
     live.current.entries = entries;
     live.current.onCommit = (commit) => {
+      returnFocusFromFrame(); // a pick inside a device frame leaves focus there; keys must reach the host again
       setCommandOpen(false);
       setDraft({ commit, key: ++draftSeq.current });
     };
