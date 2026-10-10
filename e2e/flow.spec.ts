@@ -32,6 +32,9 @@ async function pickAndFile(page: Page, scope: Page | ReturnType<typeof frameOf>,
   await composer.getByLabel("Title").fill(title);
   await page.keyboard.press("ControlOrMeta+Enter");
   await expect(composer).toBeHidden();
+  // Gone for good once the exit animation ends, not just aria-hidden, and focus is not stuck in it.
+  await expect(page.locator(".pm-comp")).toHaveCount(0);
+  expect(await page.evaluate(() => !!document.querySelector("proompter-root")?.shadowRoot?.activeElement?.closest?.(".pm-comp"))).toBe(false);
 }
 
 test("11.2: picking the avatar in the post card writes entries/001-*.md and a PNG", async ({ page }) => {
@@ -61,9 +64,13 @@ test("11.2: picking the avatar in the post card writes entries/001-*.md and a PN
   expect(sessionMd).toContain("proompter: 1");
   expect(sessionMd).toContain("playground");
 
-  const png = await waitForFile(() => path.join(session, "assets"), "001-", ".png");
-  expect(readFileSync(png).subarray(0, 8).equals(PNG_MAGIC)).toBe(true);
-  expect(path.basename(png)).toBe(assetNames(1, "responsive").element);
+  // Both the element crop and the full viewport are written; wait for each by exact name.
+  const names = assetNames(1, "responsive");
+  for (const name of [names.element, names.viewport]) {
+    const png = await waitForFile(() => path.join(session, "assets"), name, "");
+    expect(path.basename(png)).toBe(name);
+    expect(readFileSync(png).subarray(0, 8).equals(PNG_MAGIC)).toBe(true);
+  }
 });
 
 for (const [name, id, key] of [
@@ -89,9 +96,8 @@ for (const [name, id, key] of [
     expect(entry.target?.sourceInherited).toBe(false);
     await expect(frame.locator(entry.target?.selector ?? "")).toHaveCount(1);
 
-    const png = await waitForFile(() => path.join(session, "assets"), "001-", ".png");
+    const png = await waitForFile(() => path.join(session, "assets"), assetNames(1, id).element, "");
     expect(readFileSync(png).subarray(0, 8).equals(PNG_MAGIC)).toBe(true);
-    expect(path.basename(png)).toBe(assetNames(1, id).element);
 
     // Pins belong to the viewport they were filed on.
     const pin = page.locator(".pm-pin[data-id='1']");
@@ -102,6 +108,10 @@ for (const [name, id, key] of [
     await page.keyboard.press(key);
     await expect(page.getByRole("radio", { name, exact: true })).toBeChecked();
     await expect(pin).toBeVisible();
+    // ... and not on the other device viewport either.
+    await page.keyboard.press(key === "3" ? "4" : "3");
+    await expect(page.getByRole("radio", { name: key === "3" ? "Mobile" : "Tablet", exact: true })).toBeChecked();
+    await expect(pin).toHaveCount(0);
   });
 }
 
