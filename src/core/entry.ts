@@ -108,6 +108,8 @@ export interface Entry {
   quote?: string;
   task?: string;
   testPlan?: string;
+  /** The note left by `proompter resolve --note` (T15), written as a `## Resolution` section. */
+  resolution?: string;
   tags: string[];
   issue: string | null;
   created: string; // ISO
