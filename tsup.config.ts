@@ -35,6 +35,7 @@ const shared = {
   dts: true,
   sourcemap: true,
   target: "es2022",
+  shims: true, // `import.meta.url` in the CJS loader build (resolveLoaderPath)
   esbuildPlugins: [inlineCss],
 } satisfies Options;
 
@@ -52,6 +53,7 @@ export default defineConfig([
     ...shared,
     entry: {
       "next/index": "src/next/index.ts",
+      "next/loader": "src/next/loader.ts",
       "next/route": "src/next/route.ts",
       "github/index": "src/github/index.ts",
     },
