@@ -32,17 +32,15 @@ export interface HoverLabelProps {
   inherited: boolean;
   /** Steps walked up the tree; shown as `↓N`. */
   walked: number;
-  /** Width to clamp against. Defaults to the window. */
-  containerWidth?: number;
 }
 
 /** The label above the hover box: sits 28px above (or 6px below near the top edge) and never leaves the screen. */
-export function HoverLabel({ rect, visible, label, source, inherited, walked, containerWidth }: HoverLabelProps) {
+export function HoverLabel({ rect, visible, label, source, inherited, walked }: HoverLabelProps) {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el || !rect) return;
-    const max = (containerWidth ?? window.innerWidth) - el.offsetWidth - 8;
+    const max = window.innerWidth - el.offsetWidth - 8;
     el.style.left = `${Math.max(8, Math.min(rect.left, max))}px`;
   });
   if (!rect) return null;
