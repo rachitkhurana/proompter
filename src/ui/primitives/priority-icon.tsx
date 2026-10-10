@@ -12,14 +12,12 @@ export const PRIORITY_LABEL: Record<Priority, string> = {
 
 export interface PriorityIconProps extends Omit<ComponentPropsWithRef<"span">, "children"> {
   priority: Priority;
-  /** Accessible name. Omit when a visible label sits next to the icon (the icon is then decorative). */
-  label?: string;
 }
 
-export function PriorityIcon({ priority, label, className, ...rest }: PriorityIconProps) {
-  const a11y = label ? { role: "img", "aria-label": label } : { "aria-hidden": true as const };
+/** Decorative: a visible label always sits next to it. */
+export function PriorityIcon({ priority, className, ...rest }: PriorityIconProps) {
   return (
-    <span {...rest} {...a11y} className={cx("prio", priority, className)}>
+    <span {...rest} aria-hidden="true" className={cx("prio", priority, className)}>
       {priority === "blocking" ? "!" : (
         <>
           <i />
