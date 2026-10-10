@@ -7,7 +7,7 @@ import { Command } from "./command";
 import { buildCommandItems } from "./items";
 
 /**
- * The command menu (`⌘K`). Type to filter, Up/Down to move, Enter to run, Esc to close. Running a command
+ * The command menu (`⌘⇧K`). Type to filter, Up/Down to move, Enter to run, Esc to close. Running a command
  * toasts it here; in the kit it does what the dock button does.
  */
 const meta: Meta = {
