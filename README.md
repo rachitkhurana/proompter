@@ -4,12 +4,12 @@ A review layer you turn on over your own app. Pick any element on any viewport, 
 and get a markdown file in your repo with the source location, console, network and a snapshot. A human
 can read the file and an AI agent can act on it.
 
-> Status: v1 in progress. The design is in [DESIGN.md](DESIGN.md), the work in [tasks/](tasks/).
+> Status: 0.0.1, the first release. The design is in [DESIGN.md](DESIGN.md), changes in [CHANGELOG.md](CHANGELOG.md).
 
 ## Install
 
 ```sh
-pnpm add -D @rachitkay/proompter
+npm i -D @rachitkay/proompter
 ```
 
 ### Requirements
@@ -239,7 +239,9 @@ on purpose with `pnpm e2e --update-snapshots`, and commit the result for your pl
 
 ### Releasing
 
-`./internal/fixtures` is a private export the playground's e2e routes use. `pnpm pack` and `pnpm publish` run
+See [RELEASING.md](RELEASING.md) for the steps.
+
+`./internal/fixtures` is a private export the playground's e2e routes use. `npm pack` and `npm publish` run
 `scripts/release-exports.mjs`, which builds without it and strips it from `exports`, so the published
 package exposes exactly `.`, `./next`, `./next/route`, `./github` and `./package.json`. CI checks that with
 `PROOMPTER_RELEASE=1`.
