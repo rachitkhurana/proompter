@@ -176,6 +176,17 @@ describe("update and resolve", () => {
     expect([u.id, u.n, u.session]).toEqual([c.id, c.n, c.session]);
   });
 
+  it("resolution is patchable, logged, and removable with null", async () => {
+    const { store } = make();
+    const c = await store.create(draft());
+    const u = (await store.update(c.id, { resolution: "Cropped it." }))!;
+    expect(u.resolution).toBe("Cropped it.");
+    expect(u.activity.at(-1)?.text).toBe("resolution edited");
+    const r = (await store.update(c.id, { resolution: null }))!;
+    expect(r.resolution).toBeUndefined();
+    expect(r.activity.at(-1)?.text).toBe("resolution edited");
+  });
+
   it("an empty or whitespace-only title is ignored, the rest of the patch still applies", async () => {
     const { store } = make();
     const c = await store.create(draft());
