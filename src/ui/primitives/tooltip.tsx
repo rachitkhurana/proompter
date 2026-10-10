@@ -70,14 +70,12 @@ export class TooltipWarmth {
 
 interface TooltipContextValue {
   warmth: TooltipWarmth;
-  delay: number;
   /** True inside a `<TooltipProvider>`, which reports group enter/leave itself. */
   grouped: boolean;
 }
 
 const defaultContext: TooltipContextValue = {
   warmth: new TooltipWarmth(),
-  delay: TOOLTIP_DELAY_MS,
   grouped: false,
 };
 const TooltipContext = createContext<TooltipContextValue>(defaultContext);
@@ -86,21 +84,8 @@ const TooltipContext = createContext<TooltipContextValue>(defaultContext);
  * Scopes the warm state to a group of triggers (one per dock). Renders a `display: contents` wrapper
  * whose pointerenter/pointerleave define "the pointer is inside the group".
  */
-export function TooltipProvider({
-  children,
-  delay = TOOLTIP_DELAY_MS,
-  cooldownMs = TOOLTIP_COOLDOWN_MS,
-  warmAfterMs = TOOLTIP_WARM_AFTER_MS,
-}: {
-  children?: ReactNode;
-  delay?: number;
-  cooldownMs?: number;
-  warmAfterMs?: number;
-}) {
-  const value = useMemo(
-    () => ({ warmth: new TooltipWarmth(cooldownMs, warmAfterMs), delay, grouped: true }),
-    [delay, cooldownMs, warmAfterMs],
-  );
+export function TooltipProvider({ children }: { children?: ReactNode }) {
+  const value = useMemo(() => ({ warmth: new TooltipWarmth(), grouped: true }), []);
   return (
     <TooltipContext value={value}>
       <div
@@ -144,8 +129,6 @@ export interface TooltipProps {
   content: ReactNode;
   /** Preferred side. Flips to the opposite side when there's no room. */
   side?: TooltipSide;
-  /** Override the first-show delay (ms). */
-  delay?: number;
   disabled?: boolean;
   /** One element that forwards `ref` and DOM event props (a button, chip, ...). */
   children: ReactElement<TriggerProps>;
@@ -195,7 +178,7 @@ function place(trigger: Element, width: number, preferred: TooltipSide): Placeme
  * Opens on hover (mouse and pen only) and on keyboard focus; Esc or leaving closes it.
  * Renders into the shadow container, positioned `fixed` so no ancestor can clip it.
  */
-export function Tooltip({ content, side: preferredSide = "top", delay, disabled, children }: TooltipProps) {
+export function Tooltip({ content, side: preferredSide = "top", disabled, children }: TooltipProps) {
   const ctx = useContext(TooltipContext);
   const container = useShadowContainer();
   const id = useId();
@@ -208,7 +191,6 @@ export function Tooltip({ content, side: preferredSide = "top", delay, disabled,
   const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const phaseRef = useRef<Phase>("closed");
   phaseRef.current = phase;
-  const wait = delay ?? ctx.delay;
   const { warmth } = ctx;
 
   const open = useCallback(() => {
@@ -221,8 +203,8 @@ export function Tooltip({ content, side: preferredSide = "top", delay, disabled,
       setPhase("open");
     };
     if (warmth.warm) show(true);
-    else showTimer.current = setTimeout(() => show(false), wait);
-  }, [disabled, wait, warmth]);
+    else showTimer.current = setTimeout(() => show(false), TOOLTIP_DELAY_MS);
+  }, [disabled, warmth]);
 
   const close = useCallback(() => {
     clearTimeout(showTimer.current);
