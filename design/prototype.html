@@ -487,7 +487,7 @@ button.chip{cursor:pointer;transition:background-color .12s var(--ease),color .1
     </div>
     <button type="button" class="ib tip" id="b-rot" data-tip="Rotate  R" aria-label="Rotate device"></button>
     <span class="sep"></span>
-    <button type="button" class="ib tip" id="b-cmd" data-tip="Command menu  ⌘K" aria-label="Command menu"></button>
+    <button type="button" class="ib tip" id="b-cmd" data-tip="Command menu  ⌘⇧K" aria-label="Command menu"></button>
     <button type="button" class="ib tip" id="b-inbox" data-tip="Entries  E" aria-label="Entries"></button>
     </div></div>
   </div>
@@ -1195,7 +1195,7 @@ function renderCmd() {
 
 /* ---------- keyboard ---------- */
 function onKey(ev) {
-  if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'k') { ev.preventDefault(); S.cmd ? closeCmd() : openCmd(); return; }
+  if ((ev.metaKey || ev.ctrlKey) && ev.shiftKey && ev.key.toLowerCase() === 'k') { ev.preventDefault(); S.cmd ? closeCmd() : openCmd(); return; }
   if (ev.key === 'Escape') {
     if (S.menu) return closeMenu();
     if (S.comp) return closeComp();
