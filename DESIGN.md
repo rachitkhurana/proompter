@@ -37,7 +37,7 @@ src/
   next/loader.ts        → Turbopack/webpack loader that stamps data-src
   core/                 → framework-free engine: surface, resolver, capture, store, serializer
   ui/                   → React UI rendered into the shadow root
-  ui/primitives/        → Button, IconButton, Chip, Menu, Tooltip, Kbd, Segmented, Sheet (vendored shadcn/Radix, restyled)
+  ui/primitives/        → Button, IconButton, Chip, Menu, Tooltip, Kbd, Segmented, Sheet (hand-built; Menu/Dialog on Radix, restyled — see D1)
   ui/styles.css         → Tailwind 4 source → compiled to a string at build time
 examples/playground/    → Next 16 app with a Gamorite-like mock page (the prototype's host markup)
 ```
@@ -50,11 +50,28 @@ examples/playground/    → Next 16 app with a Gamorite-like mock page (the prot
 - **Dependencies:**
   - `html-to-image` (snapshots)
   - `bippy` (dev owner stack, optional)
-  - `motion` (springs)
-  - `@radix-ui/*` primitives
+  - `@radix-ui/react-dropdown-menu`, `@radix-ui/react-dialog` (and `@radix-ui/react-popover` only if
+    needed; see D1)
   - `@babel/parser`, `magic-string` (loader)
 
   Keep the client bundle small: lazy-load the UI chunk on first open.
+
+- **D1. Dependency ruling (Rachit, 2026-10-10):**
+  1. **No `motion` dependency.** The prototype uses no animation library, so match it with:
+     - CSS transitions and keyframes, using the prototype's easing tokens (`--ease`, `--ease-drawer`)
+     - the Web Animations API for anything driven by code
+     - for the dock's release and edge snap, a small in-house spring at `src/core/spring.ts`
+       (~50 lines): damping 1.0, response 0.35, velocity handoff, rAF-driven, cancellable, honours
+       reduced motion, unit-tested
+  2. **Radix: per-primitive packages only, and only the ones we use:**
+     - `@radix-ui/react-dropdown-menu` for the property, status and tag menus
+     - `@radix-ui/react-dialog` for the command menu's focus trap
+     - `@radix-ui/react-popover` only if the composer needs it for focus handling; otherwise the
+       composer is custom-positioned, as in the prototype
+
+     Never the umbrella `radix-ui` package. Tooltips, the segmented control, chips and the sheet are
+     hand-built, as in the prototype. Every portal uses `container` = the shadow root.
+  3. Any new runtime dependency needs sign-off.
 
 ## 3. Turning it on
 

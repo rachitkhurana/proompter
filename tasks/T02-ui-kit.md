@@ -22,5 +22,11 @@
   - `Toast` (Sonner-style, max 3)
 - Icons: port every path from the prototype's `P` object as typed React components.
 
+- Dependencies per DESIGN §2 **D1**: `Menu` uses `@radix-ui/react-dropdown-menu`; the command menu's
+  focus trap (T08) uses `@radix-ui/react-dialog`. Never the umbrella `radix-ui`. `Tooltip`, `Segmented`,
+  `Chip` and the sheet are hand-built, as in the prototype. Every Radix portal gets `container` = the
+  shadow container. No `motion`: CSS transitions/keyframes with the prototype's easing tokens, and the
+  Web Animations API for code-driven motion.
+
 **Done when:** each primitive has a story with all its states, axe is clean, and a story shows that host
 CSS (`* { color: red !important }` outside) can't reach the shadow tree.

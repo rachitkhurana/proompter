@@ -1,6 +1,6 @@
 # T05 Dock
 
-**Owns:** `src/ui/dock/**`, its stories and tests.
+**Owns:** `src/ui/dock/**`, `src/core/spring.ts`, its stories and tests.
 
 **Do:** DESIGN §7, Dock, matching the prototype exactly.
 - **Dragging:** 1:1 under the pointer from the grab offset, rubber-banding past the edges, velocity
@@ -15,6 +15,9 @@
   - the multi-select bar sits next to the dock
   - the sheet opens on the side away from the dock
 - **Reduced motion:** opacity only.
+- **Spring (DESIGN §2 D1, no `motion` dependency):** `src/core/spring.ts`, ~50 lines: damping 1.0,
+  response 0.35, velocity handoff from the drag, rAF-driven, cancellable, honours reduced motion.
+  Unit-tested. Use it for release and edge snap; everything else uses CSS transitions or WAAPI.
 
 **Done when:** there are stories for horizontal, vertical-left, vertical-right, collapsed and
 collapsed-vertical (with a badge), and a Playwright test covers drag, edge snap and collapse.

@@ -15,4 +15,7 @@
 - The playground is a Next 16 app with the App Router. It depends on `@rachitkay/proompter: workspace:*`.
 - CI runs install, typecheck, lint, test and build on Node 22.
 
+- Dependencies follow DESIGN §2 **D1**: no `motion`, no umbrella `radix-ui` (T02 adds the per-primitive
+  Radix packages it uses). The hand-back lists the final dependencies and devDependencies with exact versions.
+
 **Done when:** `pnpm i && pnpm build` emits `dist/` with both entries; `pnpm test` runs one passing smoke test.
