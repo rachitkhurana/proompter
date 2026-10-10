@@ -37,6 +37,20 @@ describe("withProompter: disabled", () => {
     const fn = () => ({ a: 1 });
     expect(withProompter(fn, { enabled: false })).toBe(fn);
   });
+  it("defines an unset NEXT_PUBLIC_PROOMPTER as \"\", so Next inlines it and the layout's import folds away", () => {
+    const saved = process.env.NEXT_PUBLIC_PROOMPTER;
+    try {
+      delete process.env.NEXT_PUBLIC_PROOMPTER;
+      withProompter(config, { enabled: false });
+      expect(process.env.NEXT_PUBLIC_PROOMPTER).toBe("");
+      process.env.NEXT_PUBLIC_PROOMPTER = "true";
+      withProompter(config, { enabled: false });
+      expect(process.env.NEXT_PUBLIC_PROOMPTER).toBe("true"); // a set value is never touched
+    } finally {
+      if (saved === undefined) delete process.env.NEXT_PUBLIC_PROOMPTER;
+      else process.env.NEXT_PUBLIC_PROOMPTER = saved;
+    }
+  });
 });
 
 describe("withProompter: enabled", () => {
