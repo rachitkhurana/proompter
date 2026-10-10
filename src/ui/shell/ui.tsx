@@ -20,14 +20,13 @@ import { Overlay } from "../overlay/overlay";
 import type { PinModel } from "../overlay/pin-layout";
 import type { PulseRequest } from "../overlay/pins";
 import { toast } from "../primitives/toast";
-import type { ProompterDeps, ProompterProps } from "../proompter-deps";
+import type { DepsBox, ProompterDeps, ProompterProps } from "../proompter-deps";
 import { ShadowRoot, useShadowContainer } from "../shadow-root";
 import { reducedMotion } from "../../core/motion";
 import { Sheet, type SheetTab, type SheetTicketProps } from "../sheet/sheet";
-import { DEFAULT_TAGS } from "../ticket/labels";
+import { DEFAULT_TAGS } from "../labels";
 import { ViewportStage } from "../viewports/viewport-stage";
 import { createDefaultDeps } from "./defaults";
-import type { DepsBox } from "./deps-box";
 import { isToggleChord } from "./chord";
 import { tailPath, viewportLabel } from "./format";
 import { returnFocusFromFrame } from "./focus";
@@ -61,7 +60,7 @@ export default function ProompterUI(props: ShellProps) {
 
 function Kit({ options, box, onToggleKit }: ShellProps) {
   const container = useShadowContainer();
-  const deps: ProompterDeps = useState(() => box.get(() => options.deps ?? createDefaultDeps(options)))[0];
+  const deps: ProompterDeps = useState(() => (box.deps ??= options.deps ?? createDefaultDeps(options)))[0];
   const { store, serialize, entryPath, composer } = deps;
   const { session, entries, pending } = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   const reviewer = options.session?.reviewer ?? session.reviewer;
@@ -140,9 +139,7 @@ function Kit({ options, box, onToggleKit }: ShellProps) {
   // The host window's capture belongs to <Proompter> (it starts when the page is idle and stops when
   // <Proompter> unmounts); this reuses it, and only creates one if the UI opened before the idle task ran.
   const [hostCapture] = useState(
-    () =>
-      box.getCapture() ??
-      box.setCapture(createCapture({ win: window, redact: options.redact, queries: options.queries })),
+    () => (box.capture ??= createCapture({ win: window, redact: options.redact, queries: options.queries })),
   );
   useEffect(() => {
     hostCapture.enable();
@@ -343,32 +340,24 @@ function Kit({ options, box, onToggleKit }: ShellProps) {
   );
   const planOptions = useMemo(() => Array.from(new Set(plugins.flatMap((p) => p.testPlan ?? []))), [plugins]);
 
+  // Running a command closes the menu first (focus goes back to where it was), then does the work.
+  const thenClose =
+    <A extends unknown[]>(run: (...args: A) => void) =>
+    (...args: A) => {
+      setCommandOpen(false);
+      run(...args);
+    };
   const commandItems = buildCommandItems({
     viewport,
     frozen,
     entries,
     pendingFiles: pending.length,
-    onTool: (tool) => {
-      setCommandOpen(false);
-      toggleTool(tool);
-    },
-    onFreeze: () => {
-      setCommandOpen(false);
-      toggleFreeze();
-    },
-    onViewport: (v) => {
-      setCommandOpen(false);
-      changeViewport(v);
-    },
-    onOpenEntry: openTicket,
-    onAllEntries: () => {
-      setCommandOpen(false);
-      setSheet({ open: true, tab: "entries", selected: null });
-    },
-    onPublish: () => {
-      setCommandOpen(false);
-      setSheet({ open: true, tab: "publish", selected: null });
-    },
+    onTool: thenClose(toggleTool),
+    onFreeze: thenClose(toggleFreeze),
+    onViewport: thenClose(changeViewport),
+    onOpenEntry: openTicket, // closes the menu itself
+    onAllEntries: thenClose(() => setSheet({ open: true, tab: "entries", selected: null })),
+    onPublish: thenClose(() => setSheet({ open: true, tab: "publish", selected: null })),
   });
 
   const write = store.write;
