@@ -658,6 +658,57 @@ describe("kind is escaped like every other frontmatter value (T09)", () => {
   });
 });
 
+describe("serialize: section headings inside free text are escaped", () => {
+  const stable = (e: Entry) => {
+    const md = serialize(e);
+    const back = parse(md);
+    expect(serialize(back)).toBe(md);
+    return back;
+  };
+  it("a description with ## Resolution on a multi entry with Targets", () => {
+    const description = "Intro\n## Resolution\nnot a real one\n## Targets\n### 1. fake";
+    const back = stable(makeEntry({ kind: "multi", targets: [makeTarget(), makeTarget({ label: "Second" })], description, resolution: "Real." }));
+    expect(back.description).toBe(description);
+    expect(back.resolution).toBe("Real.");
+    expect(back.targets).toHaveLength(2);
+  });
+  it("a description ending in a lone heading", () => {
+    expect(stable(makeEntry({ description: "Text\n## Resolution" })).description).toBe("Text\n## Resolution");
+    expect(stable(makeEntry({ description: "Text\n## Replies", replies: "- a (d): b" })).description).toBe("Text\n## Replies");
+  });
+  it("a description with ## Replies, and a resolution containing ## Replies", () => {
+    expect(stable(makeEntry({ description: "## Replies\nx" })).description).toBe("## Replies\nx");
+    const back = stable(makeEntry({ resolution: "Done.\n## Replies\nstill the note", replies: "- a (d): ## Replies" }));
+    expect(back.resolution).toBe("Done.\n## Replies\nstill the note");
+    expect(back.replies).toBe("- a (d): ## Replies");
+  });
+  it("already-backslashed lines survive, and a quote with a heading is stable", () => {
+    expect(stable(makeEntry({ description: "\\## Resolution\n\\\\## Targets" })).description).toBe("\\## Resolution\n\\\\## Targets");
+    expect(stable(makeEntry({ kind: "text", quote: "## Resolution\n## Targets" })).quote).toBe("## Resolution\n## Targets");
+  });
+});
+
+describe("serialize: replies (T16)", () => {
+  it("round-trips a ## Replies section after ## Resolution and before ## Context", () => {
+    const replies = "- claude (2026-10-10T12:00:00Z): Looking.\n- rachit (2026-10-10T12:05:00Z): Thanks";
+    const { md, back } = roundTrip(makeEntry({ resolution: "Done.", replies }));
+    expect(back.replies).toBe(replies);
+    expect(back.resolution).toBe("Done.");
+    expect(md.indexOf("## Resolution")).toBeLessThan(md.indexOf("## Replies"));
+    expect(md.indexOf("## Replies")).toBeLessThan(md.indexOf("## Context"));
+  });
+
+  it("works alone, is omitted when blank, and works for multi entries", () => {
+    expect(roundTrip(makeEntry({ replies: "- a (d): b" })).back.replies).toBe("- a (d): b");
+    expect(serialize(makeEntry({ replies: " \n" }))).not.toContain("## Replies");
+    const multi = makeEntry({ kind: "multi", targets: [makeTarget(), makeTarget({ label: "Second" })], replies: "- a (d): b" });
+    const { back } = roundTrip(multi);
+    expect(back.replies).toBe("- a (d): b");
+    expect(back.targets).toHaveLength(2);
+    expect(back.description).not.toContain("Replies");
+  });
+});
+
 describe("serialize: resolution (T15)", () => {
   it("round-trips a ## Resolution section before ## Context", () => {
     const { md, back } = roundTrip(makeEntry({ status: "resolved", resolution: "Cropped the avatar.\n\nSee commit abc." }));
