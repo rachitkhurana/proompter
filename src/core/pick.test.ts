@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { boxTargets, dragRect, PickEngine, type PickCommit, type PickEngineOptions } from "./pick";
-import { findBySelector } from "./resolve";
+import { findBySelector, resolveTarget } from "./resolve";
 import { createFrameSurface, createPageSurface, type FrameLike } from "./surface";
 import { boxAll, html, setRect } from "./test-dom";
 
@@ -233,6 +233,233 @@ describe("tree walk", () => {
     engine!.setMode("text");
     key(document.body, "ArrowUp");
     expect(engine!.getSnapshot().hover).toBeNull();
+  });
+});
+
+describe("keyboard picking (D8)", () => {
+  const start = (opts: Partial<PickEngineOptions> = {}, markup = PAGE) => {
+    const s = setup(opts, markup);
+    s.engine.setMode("pick", true);
+    return s;
+  };
+
+  it("starts on main when entered by key, and waits for the pointer when entered otherwise", () => {
+    setup();
+    engine!.setMode("pick");
+    expect(hoverEl()).toBeNull();
+    engine!.setMode("idle");
+    engine!.setMode("pick", true);
+    expect(hoverEl()).toBe($("main"));
+    expect(engine!.getSnapshot().hover!.walked).toBe(0);
+  });
+
+  it("falls back to [role=main], then the first eligible child of body, never the kit", () => {
+    start({}, `<proompter-root></proompter-root><div id="a" role="main"><b id="b">x</b></div>`);
+    expect(hoverEl()).toBe($("#a"));
+    engine!.dispose();
+    start({}, `<proompter-root></proompter-root><script></script><div id="c"><b>x</b></div>`);
+    setRect(document.querySelector("script")!, 0, 0, 0, 0);
+    engine!.setMode("idle");
+    engine!.setMode("pick", true);
+    expect(hoverEl()).toBe($("#c"));
+  });
+
+  it("with no target yet, the first navigation key lands on the start target", () => {
+    setup();
+    engine!.setMode("pick");
+    const e = key(document.body, "ArrowDown");
+    expect(e.defaultPrevented).toBe(true);
+    expect(hoverEl()).toBe($("main"));
+  });
+
+  it("→ ← move between element siblings; ↓ goes to the first child", () => {
+    start();
+    key(document.body, "ArrowDown");
+    expect(hoverEl()).toBe($("#card"));
+    key(document.body, "ArrowDown");
+    expect(hoverEl()).toBe($("#header"));
+    key(document.body, "ArrowRight");
+    expect(hoverEl()).toBe($("#body"));
+    key(document.body, "ArrowRight");
+    expect(hoverEl()).toBe($("#share"));
+    key(document.body, "ArrowRight");
+    expect(hoverEl()).toBe($("#field"));
+    key(document.body, "ArrowRight"); // last sibling: stays
+    expect(hoverEl()).toBe($("#field"));
+    key(document.body, "ArrowLeft");
+    key(document.body, "ArrowLeft");
+    key(document.body, "ArrowLeft");
+    expect(hoverEl()).toBe($("#header"));
+    key(document.body, "ArrowLeft"); // first sibling: stays
+    expect(hoverEl()).toBe($("#header"));
+  });
+
+  it("↑ and ↓ walk back along the path; a sibling move forgets it", () => {
+    start();
+    key(document.body, "ArrowDown");
+    key(document.body, "ArrowDown");
+    key(document.body, "ArrowDown");
+    expect(hoverEl()).toBe($("#avatar-box"));
+    key(document.body, "ArrowUp");
+    expect(hoverEl()).toBe($("#header"));
+    expect(engine!.getSnapshot().hover!.walked).toBe(1);
+    key(document.body, "ArrowDown");
+    expect(hoverEl()).toBe($("#avatar-box"));
+    key(document.body, "ArrowRight");
+    expect(hoverEl()).toBe($("#name"));
+    key(document.body, "ArrowUp");
+    key(document.body, "ArrowRight");
+    expect(engine!.getSnapshot().hover!.walked).toBe(0);
+  });
+
+  it("skips siblings and children under 6x6, and never lands on the kit", () => {
+    start();
+    key(document.body, "ArrowDown");
+    key(document.body, "ArrowDown"); // header
+    setRect($("#body"), 0, 0, 5, 40);
+    key(document.body, "ArrowRight");
+    expect(hoverEl()).toBe($("#share"));
+    key(document.body, "ArrowLeft");
+    expect(hoverEl()).toBe($("#header"));
+    setRect($("#avatar-box"), 0, 0, 40, 5);
+    key(document.body, "ArrowDown");
+    expect(hoverEl()).toBe($("#name"));
+    engine!.setMode("idle");
+    engine!.setMode("pick", true);
+    key(document.body, "ArrowRight"); // main's next sibling is the kit
+    expect(hoverEl()).toBe($("main"));
+  });
+
+  it("Tab and Shift+Tab move through focusable elements in DOM order without moving focus", () => {
+    start();
+    key(document.body, "Tab");
+    expect(hoverEl()).toBe($("#share"));
+    key(document.body, "Tab");
+    expect(hoverEl()).toBe($("#field"));
+    key(document.body, "Tab");
+    expect(hoverEl()).toBe($("#field"));
+    key(document.body, "Tab", { shiftKey: true });
+    expect(hoverEl()).toBe($("#share"));
+    key(document.body, "Tab", { shiftKey: true });
+    expect(hoverEl()).toBe($("#share"));
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it("[ and ] still walk, and the target is scrolled into view (nearest)", () => {
+    start();
+    const scroll = vi.fn();
+    $("#card").scrollIntoView = scroll;
+    key(document.body, "ArrowDown");
+    expect(scroll).toHaveBeenCalledWith({ block: "nearest", inline: "nearest" });
+    key(document.body, "]");
+    expect(hoverEl()).toBe($("#header"));
+    key(document.body, "[");
+    expect(hoverEl()).toBe($("#card"));
+  });
+
+  it("consumes the keys so the page and the host never see them", () => {
+    start();
+    const seen = vi.fn();
+    document.addEventListener("keydown", seen);
+    for (const k of ["Tab", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "[", "]", "Enter", " "]) {
+      expect(key(document.body, k).defaultPrevented, k).toBe(true);
+    }
+    expect(seen).not.toHaveBeenCalled();
+    document.removeEventListener("keydown", seen);
+  });
+
+  it("Enter and Space commit the target exactly as a click would", () => {
+    const { commits } = start();
+    key(document.body, "ArrowDown");
+    key(document.body, "ArrowDown");
+    key(document.body, "Enter");
+    key(document.body, " ");
+    expect(commits).toHaveLength(2);
+    const c = commits[0]!;
+    expect(c.kind === "element" && c.target.el).toBe($("#header"));
+    expect(c.kind === "element" && c.target.selector).toBe(resolveTarget($("#header")).selector);
+  });
+
+  it("in multi mode Enter toggles the target in the selection", () => {
+    setup();
+    engine!.setMode("multi", true);
+    key(document.body, "Enter");
+    expect(engine!.getSnapshot().multi.map((t) => t.el)).toEqual([$("main")]);
+    key(document.body, "Enter");
+    expect(engine!.getSnapshot().multi).toHaveLength(0);
+  });
+
+  it("is inert while busy, when typing, composing, or with modifiers", () => {
+    const { commits } = start();
+    key(document.body, "ArrowDown");
+    key($("#field"), "Enter");
+    key($("#field"), "ArrowDown");
+    expect(key($("#field"), "Enter").defaultPrevented).toBe(false);
+    key(document.body, "Enter", { metaKey: true });
+    key(document.body, "ArrowRight", { altKey: true });
+    key(document.body, "ArrowRight", { isComposing: true });
+    expect(commits).toHaveLength(0);
+    expect(hoverEl()).toBe($("#card"));
+    engine!.setBusy(true);
+    key(document.body, "ArrowDown");
+    expect(hoverEl()).toBe($("#card"));
+  });
+
+  it("leaves the keys alone outside pick and multi mode, and Esc still exits", () => {
+    setup();
+    expect(key(document.body, "Enter").defaultPrevented).toBe(false);
+    engine!.setMode("text");
+    expect(key(document.body, "Tab").defaultPrevented).toBe(false);
+    engine!.setMode("pick", true);
+    expect(key(document.body, "Escape").defaultPrevented).toBe(true);
+    expect(engine!.mode).toBe("idle");
+  });
+
+  it("seeds on a frame surface that attaches after the shortcut, and not after a non-key entry", () => {
+    const frameLike = {
+      contentDocument: document,
+      contentWindow: window,
+      ownerDocument: document,
+      offsetWidth: 390,
+      offsetHeight: 844,
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: 390, height: 844 }) as DOMRect,
+    } as unknown as FrameLike;
+    setup();
+    engine!.attach(null);
+    engine!.setMode("pick", true); // P pressed while the device frame is still loading
+    expect(hoverEl()).toBeNull();
+    engine!.attach(createFrameSurface(frameLike, "mobile")!);
+    expect(hoverEl()).toBe($("main"));
+    engine!.setMode("idle");
+    engine!.setMode("pick");
+    engine!.attach(createFrameSurface(frameLike, "tablet")!);
+    expect(hoverEl()).toBeNull();
+  });
+
+  it("works from a device frame: keys in the host document move and commit the target", () => {
+    const hostDoc = document.implementation.createHTMLDocument("host");
+    hostDoc.body.innerHTML = `<button id="host-btn"></button>`;
+    const { commits } = setup();
+    const frame = {
+      contentDocument: document,
+      contentWindow: window,
+      ownerDocument: hostDoc,
+      offsetWidth: 390,
+      offsetHeight: 844,
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: 390, height: 844 }) as DOMRect,
+    } as unknown as FrameLike;
+    engine!.attach(createFrameSurface(frame, "mobile")!);
+    engine!.setMode("pick", true);
+    expect(hoverEl()).toBe($("main"));
+    const hostKey = (k: string) => {
+      const e = new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true });
+      hostDoc.getElementById("host-btn")!.dispatchEvent(e);
+      return e;
+    };
+    expect(hostKey("ArrowDown").defaultPrevented).toBe(true);
+    expect(hoverEl()).toBe($("#card"));
+    hostKey("Enter");
+    expect(commits).toHaveLength(1);
   });
 });
 

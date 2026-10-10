@@ -1,5 +1,5 @@
 import type { PickEngine } from "../../core/pick";
-import { findBySelector } from "../../core/resolve";
+import { findBySelector, shortSource } from "../../core/resolve";
 import type { PickSurface, Rect, ViewportId } from "../../core/surface";
 import { BoxCatcher } from "./box-catcher";
 import { usePickSnapshot, useLast, useRelayout } from "./hooks";
@@ -47,6 +47,12 @@ export function Overlay({ surface, engine, viewport, pins = [], route, pulse, on
     <>
       <OverlayStyles />
       <div className="pm-ovl">
+        {/* Keyboard picking (D8): each move of the target is announced as "<label>, <source or no source>". */}
+        <div className="pm-sr" role="status" aria-live="polite">
+          {picking && snap.hover
+            ? `${snap.hover.target.label}, ${snap.hover.target.source ? shortSource(snap.hover.target.source) : "no source"}`
+            : ""}
+        </div>
         <HoverBox rect={hoverRect} visible={picking && !!snap.hover} />
         {hover ? (
           <HoverLabel

@@ -77,6 +77,16 @@ function Kit({ options, box, onToggleKit }: ShellProps) {
   const [showReq, setShowReq] = useState<{ id: string; nonce: number } | null>(null);
   const [dockKey, setDockKey] = useState(0);
   const draftSeq = useRef(0);
+  /** True while a keydown is being handled, so a tool shortcut starts keyboard picking on the page's `main`. */
+  const byKey = useRef(false);
+  const handleKey = (ev: KeyboardEvent) => {
+    byKey.current = true;
+    try {
+      void handleKeydown(ev, keyState(), keyActions);
+    } finally {
+      byKey.current = false;
+    }
+  };
   const collapsed = useRef(loadCollapsed());
 
   const placement = useDockPlacement();
@@ -190,7 +200,7 @@ function Kit({ options, box, onToggleKit }: ShellProps) {
       saveCollapsed(false);
       setDockKey((k) => k + 1);
     }
-    engine.toggleMode(tool);
+    engine.toggleMode(tool, byKey.current);
   };
 
   const closeSheet = () => setSheet((s) => ({ ...s, open: false }));
@@ -295,13 +305,13 @@ function Kit({ options, box, onToggleKit }: ShellProps) {
       setDraft({ commit, key: ++draftSeq.current });
     };
     live.current.onModeChange = () => setDraft(null);
-    live.current.onKey = (ev) => void handleKeydown(ev, keyState(), keyActions);
+    live.current.onKey = handleKey;
     live.current.onForwardedKey = (ev) => {
       if (isToggleChord(ev)) {
         ev.preventDefault();
         onToggleKit();
       } else {
-        void handleKeydown(ev, keyState(), keyActions);
+        handleKey(ev);
       }
     };
   });

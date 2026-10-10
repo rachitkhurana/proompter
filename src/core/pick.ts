@@ -61,6 +61,10 @@ export const MAX_QUOTE = 200;
 const TYPING = "input,textarea,select,[contenteditable]";
 /** Events the page must not see while picking an element (clicks are handled separately). */
 const BLOCKED = ["pointerdown", "mousedown", "pointerup", "mouseup", "touchstart", "dblclick", "auxclick", "contextmenu"];
+/** Keys that move or commit the keyboard target (D8). */
+const NAV_KEYS = new Set(["Tab", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "[", "]", "Enter", " "]);
+const FOCUSABLE =
+  'a[href],button,input:not([type=hidden]),select,textarea,summary,[contenteditable],[tabindex]:not([tabindex="-1"])';
 const CROSSHAIR_STYLE = "data-proompter-pick";
 
 /** The rect between two screen points, whichever way the drag went. */
@@ -108,6 +112,8 @@ export class PickEngine {
   private walk: Element[] = [];
   private hoverEl: Element | null = null;
   private lastRaw: Element | null = null;
+  /** The current pick mode was entered by a shortcut (see `seed`). */
+  private keyed = false;
   private off: (() => void) | null = null;
   /** Whether the current mouse gesture started on the page (not on the kit). */
   private gestureInSurface = false;
@@ -184,6 +190,7 @@ export class PickEngine {
       this.setCrosshair(doc, false);
     };
     this.syncCrosshair();
+    this.seed(); // the frame can attach after the shortcut was pressed
   }
 
   dispose(): void {
@@ -193,7 +200,8 @@ export class PickEngine {
 
   // -- modes ---------------------------------------------------------------------------------------------
 
-  setMode(next: PickMode): void {
+  /** `byKey`: entered with a shortcut, so the target starts on the page's `main` instead of waiting for the pointer. */
+  setMode(next: PickMode, byKey = false): void {
     if (next === "note") {
       // A page note needs no target: report it and stay idle.
       this.clearHover();
@@ -208,11 +216,19 @@ export class PickEngine {
     this.set({ mode: next, multi: next === "multi" ? this.snap.multi : [] });
     this.syncCrosshair();
     this.opts.onModeChange?.(next);
+    this.keyed = byKey;
+    this.seed();
+  }
+
+  /** Keyboard entry with no target yet: land on the start target. Re-run when the surface (re)attaches. */
+  private seed() {
+    const start = this.keyed && this.picking && !this.hoverEl ? this.startTarget() : null;
+    if (start) this.showHover(start);
   }
 
   /** The dock buttons and `P M B T N`: pressing the active mode again leaves it. */
-  toggleMode(m: PickMode): void {
-    this.setMode(this.snap.mode === m ? "idle" : m);
+  toggleMode(m: PickMode, byKey = false): void {
+    this.setMode(this.snap.mode === m ? "idle" : m, byKey);
   }
 
   /** Set while the composer is open: freezes hover and clicks. */
@@ -248,11 +264,69 @@ export class PickEngine {
     return true;
   }
 
-  /** `↓` / `]` / Alt+wheel down: back along the walked path. */
+  /** `↓` / `]` / Alt+wheel down: back along the walked path, else into the first eligible child. */
   walkDown(): boolean {
     if (!this.hoverEl) return false;
-    const c = this.walk.pop();
+    const c = this.walk.pop() ?? Array.from(this.hoverEl.children).find((k) => targetFor(k) === k);
     if (c) this.showHover(c);
+    return true;
+  }
+
+  /** Where keyboard picking starts: `main`, else the first eligible child of body (never the kit). */
+  private startTarget(): Element | null {
+    const doc = this.surface?.doc;
+    if (!doc) return null;
+    const main = doc.querySelector("main,[role=main]");
+    if (main && targetFor(main) === main) return main;
+    return Array.from(doc.body?.children ?? []).find((k) => targetFor(k) === k) ?? null;
+  }
+
+  /** `←` / `→`: the previous or next eligible element sibling. */
+  private walkSibling(dir: 1 | -1) {
+    let n = this.hoverEl;
+    while (n && (n = dir > 0 ? n.nextElementSibling : n.previousElementSibling)) {
+      if (targetFor(n) !== n) continue;
+      this.walk = [];
+      return this.showHover(n);
+    }
+  }
+
+  /** Tab / Shift+Tab: the next or previous eligible focusable in DOM order. Focus itself never moves. */
+  private walkFocusable(back: boolean) {
+    const cur = this.hoverEl;
+    const all = Array.from(this.surface?.doc.querySelectorAll(FOCUSABLE) ?? []).filter((f) => targetFor(f) === f);
+    const hit = cur && (back ? all.reverse() : all).find((f) => cur.compareDocumentPosition(f) & (back ? 2 : 4));
+    if (!hit) return;
+    this.walk = [];
+    this.showHover(hit);
+  }
+
+  /** Pick-mode commit of one element, shared by a click and Enter / Space. */
+  private commitEl(el: Element) {
+    const target = resolveTarget(el);
+    if (this.snap.mode === "pick") {
+      this.opts.onCommit({ kind: "element", target });
+      return;
+    }
+    const has = this.snap.multi.some((t) => t.selector === target.selector);
+    this.set({ multi: has ? this.snap.multi.filter((t) => t.selector !== target.selector) : [...this.snap.multi, target] });
+  }
+
+  /** D8 keys. True when the key was used. With no target yet, any of them first lands on the start target. */
+  private keyNav(key: string, shift: boolean): boolean {
+    const cur = this.hoverEl;
+    if (!NAV_KEYS.has(key)) return false;
+    if (!cur) {
+      const s = this.startTarget();
+      if (s) this.showHover(s);
+    } else if (key === "Enter" || key === " ") {
+      this.commitEl(cur);
+      return true;
+    } else if (key === "Tab") this.walkFocusable(shift);
+    else if (key === "ArrowUp" || key === "[") this.walkUp();
+    else if (key === "ArrowDown" || key === "]") this.walkDown();
+    else this.walkSibling(key === "ArrowRight" ? 1 : -1);
+    this.hoverEl?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
     return true;
   }
 
@@ -291,13 +365,7 @@ export class PickEngine {
     e.stopPropagation();
     e.stopImmediatePropagation();
     if (this.snap.busy) return;
-    const target = resolveTarget(el);
-    if (this.snap.mode === "pick") {
-      this.opts.onCommit({ kind: "element", target });
-      return;
-    }
-    const has = this.snap.multi.some((t) => t.selector === target.selector);
-    this.set({ multi: has ? this.snap.multi.filter((t) => t.selector !== target.selector) : [...this.snap.multi, target] });
+    this.commitEl(el);
   }
 
   clearMulti(): void {
@@ -369,17 +437,9 @@ export class PickEngine {
     }
     const typing = !!t && !!t.closest(TYPING);
     if (typing || ev.metaKey || ev.ctrlKey || ev.altKey) return this.forward(ev, from);
-    if (this.picking && !this.snap.busy && this.hoverEl) {
-      if (ev.key === "ArrowUp" || ev.key === "[") {
-        consume();
-        this.walkUp();
-        return;
-      }
-      if (ev.key === "ArrowDown" || ev.key === "]") {
-        consume();
-        this.walkDown();
-        return;
-      }
+    if (this.picking && !this.snap.busy && !ev.isComposing && this.keyNav(ev.key, ev.shiftKey)) {
+      consume();
+      return;
     }
     this.forward(ev, from);
   }
