@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createFilesSink } from "../../core/sinks/files";
+import { createGithubSink } from "../../core/sinks/github";
 import type * as StoreModule from "../../core/store";
 import type { NewEntry } from "../../core/store";
 import { createStore } from "../../core/store";
@@ -172,6 +173,59 @@ describe("adaptStore with the files sink (INTEGRATION(T09))", () => {
       expect(fetchSpy).not.toHaveBeenCalled();
     } finally {
       vi.unstubAllGlobals();
+    }
+  });
+});
+
+describe("GitHub sync wiring (D16)", () => {
+  it("without the github prop there is no syncGithub and no github status", async () => {
+    const deps = createDefaultDeps({});
+    expect(deps.store.syncGithub).toBeUndefined();
+    expect(deps.store.getSnapshot().github).toBeUndefined();
+  });
+
+  it("with it: a pending count, a stable snapshot, and syncGithub(key) stores the key and sends it", async () => {
+    localStorage.removeItem("proompter:review-key");
+    const urls: string[] = [];
+    const auth: (string | null)[] = [];
+    const fetchSpy = vi.fn<typeof fetch>(async (input, init) => {
+      urls.push(String(input));
+      auth.push(new Headers(init?.headers).get("authorization"));
+      return new Response("{}", { status: 401, headers: { "content-type": "application/json" } });
+    });
+    const { core } = await setup();
+    const sink = createGithubSink({ store: core, key: () => localStorage.getItem("proompter:review-key"), fetch: fetchSpy });
+    const store = adaptStore(core, undefined, sink);
+    const snap = store.getSnapshot();
+    expect(snap.github).toMatchObject({ pending: 1, error: null, needsKey: false });
+    expect(store.getSnapshot()).toBe(snap);
+    expect(store.syncGithub).toBeTypeOf("function");
+
+    // A 401 asks for the key, and the snapshot says so.
+    const r = await store.syncGithub?.();
+    expect(r).toMatchObject({ ok: false, needsKey: true });
+    expect(store.getSnapshot().github).toMatchObject({ needsKey: true });
+    expect(auth[0]).toBeNull();
+  });
+
+  it("createDefaultDeps keeps the typed key in localStorage and sends it as a bearer token", async () => {
+    localStorage.removeItem("proompter:review-key");
+    const seen: (string | null)[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_i: unknown, init?: RequestInit) => {
+        seen.push(new Headers(init?.headers).get("authorization"));
+        return new Response("{}", { status: 401, headers: { "content-type": "application/json" } });
+      }),
+    );
+    try {
+      const deps = createDefaultDeps({ github: { endpoint: "/gh" } });
+      await deps.store.syncGithub?.("secret-key");
+      expect(localStorage.getItem("proompter:review-key")).toBe("secret-key");
+      expect(seen).toContain("Bearer secret-key");
+    } finally {
+      vi.unstubAllGlobals();
+      localStorage.removeItem("proompter:review-key");
     }
   });
 });
