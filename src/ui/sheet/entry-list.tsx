@@ -1,13 +1,11 @@
 import type { KeyboardEvent } from "react";
-import type { Entry, EntryStatus } from "../../core/entry";
+import { ENTRY_STATUSES, type Entry } from "../../core/entry";
 import { Icon } from "../icons";
 import { cx } from "../primitives/cx";
 import { Kbd } from "../primitives/kbd";
 import { PRIORITY_LABEL, PriorityIcon } from "../primitives/priority-icon";
 import { STATUS_LABEL, StatusIcon } from "../primitives/status-icon";
 import { clock, viewportLabel } from "../shell/format";
-
-const GROUPS: ReadonlyArray<EntryStatus> = ["open", "progress", "resolved"];
 
 export interface EntryListProps {
   entries: readonly Entry[];
@@ -44,7 +42,7 @@ export function EntryList({ entries, selectedId, onOpen }: EntryListProps) {
 
   return (
     <div onKeyDown={onKeyDown}>
-      {GROUPS.map((status) => {
+      {ENTRY_STATUSES.map((status) => {
         const list = entries.filter((e) => e.status === status);
         if (list.length === 0) return null;
         return (
