@@ -28,6 +28,10 @@ can read and an AI agent can act on. Later it can open a GitHub issue too.
    of that file.
 5. **Fast, not flashy.** Motion is under 300ms, with custom ease-out curves and springs only where a
    gesture carried momentum (see `.agents` design skills: emil-design-eng, apple-design).
+6. **Keep it simple (D9).** Write the smallest code that meets the acceptance item. Add no new
+   abstractions, layers, generic frameworks or options unless a test or a §11 item needs them. Critic rounds
+   fix real defects only, with no hardening beyond the threat model. A fix over ~50 lines needs sign-off
+   first. Close-out ends with a simplification pass, which must leave behaviour unchanged and every test green.
 
 ## 2. Package layout
 
@@ -86,8 +90,10 @@ examples/playground/    → Next 16 app with a Gamorite-like mock page (the prot
   - `--fg-3` is #8f8f98;
   - text that used `--fg-4` now uses `--fg-3`, and `--fg-4` is only for decorative strokes and dots;
   - the ticket's section headings are `h3` (heading order);
-  - primary-button text is the `--acc-fg` token, currently `var(--canvas)` (dark on coral). This is
-    provisional: Rachit may choose a darker coral with white text instead, which is a one-token swap.
+  - **Primary buttons, final (Rachit):** white text (`--acc-fg: #fff`) on a deeper coral,
+    `--acc-solid: #d63c3c` (4.59:1, AA). Hover is `#cc3b3b` and active is `#c23636`. `--acc` stays
+    `#ff6363` for everything that isn't text on a fill: the active tool, pins, the focus ring, highlights
+    and the logo.
   `design/prototype.html`'s tokens are updated to match, so the reference doesn't drift.
 - **D8. Keyboard picking (§11.5, 2026-10-10):** element picking also works with no pointer, as a full tree
   navigator.
@@ -96,7 +102,8 @@ examples/playground/    → Next 16 app with a Gamorite-like mock page (the prot
   - `↑`/`[` go to the parent. `↓`/`]` go back down the walked path, or to the first child.
   - `←`/`→` move to the previous or next sibling.
   - `Enter`/`Space` commit, which opens the composer. `Esc` exits.
-  - Every one of these keys is `preventDefault`ed, so host focus and scroll never move.
+  - Every one of these keys is `preventDefault`ed, so host focus and scroll never move. Under D9 this is
+    plain key handlers in the existing pick module, with no navigator framework.
   - Each move is announced through an `aria-live` region (label plus source).
   - An e2e runs the flow keyboard-only on Responsive and Mobile: `P` → navigate to the avatar → `Enter` → `⌘↵`
     → file on disk. This is task T04b.
