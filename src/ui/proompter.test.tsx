@@ -480,3 +480,15 @@ describe("shortcuts keep working after things close", () => {
     expect(pickPressed()).toBe("true");
   });
 });
+
+describe("default dependencies (T07's store)", () => {
+  it("opens with no injected deps: an empty session, the real store behind the sheet", async () => {
+    await mount({ session: { reviewer: "rachit", title: "Smoke pass" } });
+    await act(async () => window.__proompter?.open());
+    await until(() => sq(".dock"), "the kit to open");
+    expect(window.__proompter?.entries()).toEqual([]);
+    await press("e");
+    expect(sq(".empty")?.textContent).toContain("No entries yet");
+    expect(sq(".sh-hd b")?.textContent).toBe("Smoke pass");
+  });
+});
