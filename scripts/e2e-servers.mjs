@@ -7,14 +7,16 @@
 // :3100 is the URL Playwright waits for, and it starts last, so once it answers both servers are up.
 import { spawn, spawnSync } from "node:child_process";
 
-const DEV_PORT = 3100;
-const PROD_PORT = 3101;
+// E2E_PORT_BASE (default 3100), the same as playwright.config.ts: two checkouts can run e2e at once.
+const BASE = Number(process.env.E2E_PORT_BASE ?? 3100);
+const DEV_PORT = BASE;
+const PROD_PORT = BASE + 1;
 const DIST = ".next-prod";
 const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 const playground = (...args) => [pnpm, ["--filter", "proompter-playground", "exec", ...args]];
 const viteExample = (...args) => [pnpm, ["--filter", "proompter-vite-example", "exec", ...args]];
-const VITE_DEV_PORT = 3102;
-const VITE_PREVIEW_PORT = 3103;
+const VITE_DEV_PORT = BASE + 2;
+const VITE_PREVIEW_PORT = BASE + 3;
 
 const children = [];
 const stop = () => {
