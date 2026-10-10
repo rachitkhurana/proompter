@@ -521,6 +521,7 @@
     opacity: 0;
   }
   100% {
+    opacity: 0;
     scale: 0.96;
   }
 }
@@ -896,7 +897,7 @@
 .pp .pm-cmd[data-state="open"]{animation:pm-cmd-in .2s var(--ease) both}
 .pp .pm-cmd[data-state="closed"]{animation:pm-cmd-out .2s var(--ease) both}
 @keyframes pm-cmd-in{0%{opacity:0;scale:.97}80%{opacity:1}100%{scale:1}}
-@keyframes pm-cmd-out{0%{opacity:1;scale:1}80%{opacity:0}100%{scale:.97}}
+@keyframes pm-cmd-out{0%{opacity:1;scale:1}80%{opacity:0}100%{opacity:0;scale:.97}}
 
 /* Focus ring (prototype: `.pp :focus-visible`). Kept LAST and written `.pp.pp` (specificity 0,3,0): the
    `all: unset` on .btn, .ib, .chip, .seg-t, .mi etc. would otherwise reset the outline. */
