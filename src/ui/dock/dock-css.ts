@@ -32,7 +32,7 @@ export const DOCK_CSS = /* css */ `
 .pp .dock .lbadge{min-width:16px;height:16px;padding:0 4px;margin-left:6px;border-radius:8px;background:var(--fill-3);color:var(--fg);font:600 10px/16px var(--sans);text-align:center}
 .pp .dock .lbadge[hidden]{display:none}
 .pp .dock .sep{width:1px;height:20px;background:var(--line-2);margin:0 4px;flex:none}
-.pp .dock .grip{all:unset;cursor:grab;width:16px;height:30px;display:grid;place-items:center;color:var(--fg-4);border-radius:6px;transition:color .12s var(--ease)}
+.pp .dock .grip{all:unset;cursor:grab;width:16px;height:30px;display:grid;place-items:center;color:var(--fg-3);border-radius:6px;transition:color .12s var(--ease)}
 .pp.pp .dock .grip:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 @media (hover:hover){.pp .dock .grip:hover{color:var(--fg-2)}}
 .pp .dock.dragging .grip{cursor:grabbing}
@@ -41,7 +41,7 @@ export const DOCK_CSS = /* css */ `
 .pp .dock.v .seg{flex-direction:column}
 .pp .dock.v .nm-w{display:none}
 .pp .dock.v .brand{height:30px;padding:0;width:30px;justify-content:center}
-.pp .dock.v .lbadge{position:absolute;top:-4px;right:-6px;margin:0;min-width:16px;height:16px;padding:0 4px;background:var(--acc);color:var(--acc-fg);font-size:9.5px;line-height:16px;box-shadow:0 0 0 2px #1d1d21}
+.pp .dock.v .lbadge{position:absolute;top:-4px;right:-6px;margin:0;min-width:16px;height:16px;padding:0 4px;background:var(--acc-solid);color:var(--acc-fg);font-size:9.5px;line-height:16px;box-shadow:0 0 0 2px #1d1d21}
 .pp .dock.v .grip{width:30px;height:16px}
 .pp .dock.v .grip svg{rotate:90deg}
 @media (max-width:760px){
