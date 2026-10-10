@@ -62,6 +62,12 @@ export { GET, POST } from "@rachitkay/proompter/next/route";
 The client talks to `/api/proompter` by default. Mount the route somewhere else if you like and pass the
 URL as the component's `endpoint`.
 
+The route only answers in development (`NODE_ENV=development`) with `NEXT_PUBLIC_PROOMPTER=true`, and it
+only writes inside `<cwd>/reviews/`. It refuses cross-site requests: the kit's requests carry an
+`x-proompter: 1` header and a JSON body, and the `Host` must be `localhost`, `127.0.0.1` or `[::1]`. To review
+from another device on your network (a real phone, say), list its host names:
+`PROOMPTER_ALLOWED_HOSTS=192.168.1.20,my-mac.local`.
+
 Start your app with `NEXT_PUBLIC_PROOMPTER=true next dev`, then press `⌘⇧.` (or call
 `window.__proompter.open()`) to show the kit.
 
@@ -173,11 +179,21 @@ traversal is refused. End-to-end tests check all of this against a production bu
 
 ### What gets redacted?
 
-Redaction runs before anything is stored, and it's on by default.
+Redaction of the captured **console and network text** runs before anything is stored, and it's on by
+default. It covers:
 
-- `authorization`, `cookie` and `set-cookie` headers
-- values that look like an email address, a JWT, or a `token`, `secret`, `password` or `api key`
-- anything your own `redact(entry)` hook removes (a plugin's `redact` too)
+- the `authorization`, `proxy-authorization`, `cookie` and `set-cookie` headers (dropped)
+- query-string parameters, JSON keys, headers and `key=value` text whose key name looks sensitive: `token`,
+  `secret`, `password`/`passwd`/`pwd`, `api_key`/`api-key`, `authorization`, `credential`, `cookie`,
+  `signature`, `jwt`, `session`, an `auth` word, and the bare keys `key`, `sig` and `code`
+- `Bearer`, `Basic` and `Token` values
+- JWTs and email addresses anywhere in the text
+- anything your own `redact(entry)` hook removes. A plugin's `redact` runs after the built-in pass, on the
+  same terms.
+
+**Not covered: the PNG snapshots.** The element crop and the viewport image are pixels of your page,
+and nothing is masked in them. Don't file entries on screens that show secrets, personal data or production
+records, or you will commit them into `reviews/assets/`.
 
 It **fails closed**: if a plugin's `redact` throws or returns a different entry, nothing is stored or
 written, the number isn't used, and the composer says "Plugin <name> failed to redact this entry. Nothing
@@ -216,7 +232,10 @@ The playground (`examples/playground`) is a Next 16 app with a mock feed ported 
 production build with the flag unset on :3101 for the zero-cost check. The specs write under
 `examples/playground/reviews/` (gitignored) and clean up after themselves.
 
-Visual baselines are created by the first run (`pnpm e2e --update-snapshots`) into `e2e/__screenshots__/`.
+Visual baselines live in `e2e/__screenshots__/visual.spec.ts/<platform>/`, one set per OS because rendering
+differs. The macOS set is committed. A platform with no baselines (CI runs on Linux) uses
+`pnpm e2e --update-snapshots=missing`: it writes its own on the first run and compares on later ones. Regenerate
+on purpose with `pnpm e2e --update-snapshots`, and commit the result for your platform.
 
 ### Releasing
 
