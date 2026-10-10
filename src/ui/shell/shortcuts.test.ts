@@ -152,10 +152,18 @@ describe("shortcuts", () => {
     expect(press("0").used).toBe(false);
   });
 
-  it("⌘K / Ctrl+K toggles the command menu, even while typing", () => {
-    expect(press("k", { init: { metaKey: true } }).a.toggleCommand).toHaveBeenCalledOnce();
-    expect(press("K", { init: { ctrlKey: true } }).a.toggleCommand).toHaveBeenCalledOnce();
-    expect(press("k", { init: { metaKey: true }, target: field("input") }).a.toggleCommand).toHaveBeenCalledOnce();
+  it("⌘⇧K / Ctrl+Shift+K toggles the command menu, even while typing", () => {
+    expect(press("K", { init: { metaKey: true, shiftKey: true } }).a.toggleCommand).toHaveBeenCalledOnce();
+    expect(press("K", { init: { ctrlKey: true, shiftKey: true } }).a.toggleCommand).toHaveBeenCalledOnce();
+    expect(press("K", { init: { metaKey: true, shiftKey: true }, target: field("input") }).a.toggleCommand).toHaveBeenCalledOnce();
+  });
+
+  it("leaves plain ⌘K / Ctrl+K to the host app", () => {
+    for (const init of [{ metaKey: true }, { ctrlKey: true }]) {
+      const ev = press("k", { init });
+      expect(ev.used).toBe(false);
+      expect(ev.a.toggleCommand).not.toHaveBeenCalled();
+    }
   });
 
   it("ignores letters typed into inputs, textareas and contenteditable", () => {
@@ -184,14 +192,14 @@ describe("shortcuts", () => {
     expect(grip.a.toggleTool).not.toHaveBeenCalled();
     const esc = press("Escape", { preventFirst: true, state: { sheetOpen: true } });
     expect(esc.a.closeSheet).not.toHaveBeenCalled();
-    const cmdk = press("k", { preventFirst: true, init: { metaKey: true } });
+    const cmdk = press("K", { preventFirst: true, init: { metaKey: true, shiftKey: true } });
     expect(cmdk.a.toggleCommand).not.toHaveBeenCalled();
   });
 
-  it("leaves the keyboard to the command menu while it is open (but Esc and ⌘K still work)", () => {
+  it("leaves the keyboard to the command menu while it is open (but Esc and ⌘⇧K still work)", () => {
     expect(press("p", { state: { commandOpen: true } }).used).toBe(false);
     expect(press("2", { state: { commandOpen: true } }).used).toBe(false);
-    expect(press("k", { init: { metaKey: true }, state: { commandOpen: true } }).a.toggleCommand).toHaveBeenCalledOnce();
+    expect(press("K", { init: { metaKey: true, shiftKey: true }, state: { commandOpen: true } }).a.toggleCommand).toHaveBeenCalledOnce();
     expect(press("Escape", { state: { commandOpen: true } }).a.closeCommand).toHaveBeenCalledOnce();
   });
 
@@ -246,26 +254,26 @@ describe("while a menu or the composer owns the keyboard", () => {
     }
   });
 
-  it("Esc and ⌘K still act", () => {
+  it("Esc and ⌘⇧K still act", () => {
     expect(press("Escape", { target: item(), state: { menuOpen: true } }).a.closeMenu).toHaveBeenCalledOnce();
     expect(press("Escape", { target: chip(), state: { composerOpen: true } }).a.closeComposer).toHaveBeenCalledOnce();
     expect(
-      press("k", { init: { metaKey: true }, target: chip(), state: { composerOpen: true } }).a.toggleCommand,
+      press("K", { init: { metaKey: true, shiftKey: true }, target: chip(), state: { composerOpen: true } }).a.toggleCommand,
     ).toHaveBeenCalledOnce();
     expect(
-      press("k", { init: { ctrlKey: true }, target: item(), state: { menuOpen: true } }).a.toggleCommand,
+      press("K", { init: { ctrlKey: true, shiftKey: true }, target: item(), state: { menuOpen: true } }).a.toggleCommand,
     ).toHaveBeenCalledOnce();
   });
 });
 
 describe("input method editors", () => {
-  it("ignores keys typed while composing, Esc and ⌘K included", () => {
+  it("ignores keys typed while composing, Esc and ⌘⇧K included", () => {
     for (const k of ["p", "e", "Escape", "1"]) {
       const { a, used } = press(k, { init: { isComposing: true }, state: { sheetOpen: true } });
       expect(used).toBe(false);
       for (const fn of Object.values(a)) expect(fn).not.toHaveBeenCalled();
     }
-    expect(press("k", { init: { metaKey: true, isComposing: true } }).used).toBe(false);
+    expect(press("K", { init: { metaKey: true, shiftKey: true, isComposing: true } }).used).toBe(false);
   });
 
   it("ignores keyCode 229 (what some browsers report for IME keys)", () => {
