@@ -9,9 +9,9 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? "github" : "list",
-  // Baselines live next to the specs, one set for every OS (the kit embeds its own fonts). First run creates
-  // them (`pnpm e2e --update-snapshots`); later runs compare.
-  snapshotPathTemplate: "{testDir}/__screenshots__/{testFilePath}/{arg}{ext}",
+  // Baselines live in e2e/__screenshots__/<spec>/<platform>/. Rendering differs per OS, so each platform has its
+  // own set: macOS baselines are committed; CI (Linux) creates its own with `--update-snapshots=missing`.
+  snapshotPathTemplate: "{testDir}/__screenshots__/{testFilePath}/{platform}/{arg}{ext}",
   use: {
     baseURL: `http://localhost:${DEV_PORT}`,
     trace: "on-first-retry",
