@@ -4,7 +4,7 @@ import { Proompter } from "../proompter";
 import { createFakeDeps } from "./fake";
 
 /**
- * The whole kit on a story page, with the in-memory store and a bare composer. `⌘K`, `E`, `P`, `1`-`4`
+ * The whole kit on a story page, with the in-memory store and a bare composer. `⌘⇧K`, `E`, `P`, `1`-`4`
  * and `Esc` all work. (Inside a story the kit sits in a second shadow root, so the picker finds nothing to
  * pick on the page; use the playground's /fixtures/kit for that.)
  */
