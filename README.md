@@ -202,7 +202,7 @@ Things to know before you turn it on:
 | `R` | Rotate the device |
 | `1` `2` `3` `4` | Responsive, Desktop, Tablet, Mobile |
 | `E` | Entries sheet |
-| `⌘⇧K` | Command menu |
+| `⌘⇧K` or `Alt+K` | Command menu (`Alt+K` for Firefox, which owns `Ctrl+Shift+K`; not while typing in a field) |
 | `⌘⇧.` | Show or hide the kit |
 | `⌘↵` | Create the entry (in the composer) |
 | `↑` `[` / `↓` `]` | While picking: parent / back down |
@@ -361,6 +361,20 @@ Mobile 390×844 (plus rotate) review a same-origin `<iframe>` of the current URL
 inside the frame. Entries record the viewport and its exact size, and a pin shows only on the viewport it was
 filed on; "Show on page" switches to it first. A page that refuses to be framed (`X-Frame-Options`, CSP)
 gets an inline notice instead.
+
+### My app mounts twice in device viewports
+
+The Responsive, Tablet and Mobile views load your page in an iframe (with `?__proompter_frame` in the URL), so
+app-level side effects run twice: analytics, websockets, a toast provider. `isProompterFrame()` tells you which
+one you are in. It is tiny and safe to call anywhere (it returns `false` on the server):
+
+```tsx
+import { isProompterFrame } from "@rachitkay/proompter";
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  return isProompterFrame() ? children : <Analytics>{children}</Analytics>;
+}
+```
 
 ### Will it touch my styles?
 
