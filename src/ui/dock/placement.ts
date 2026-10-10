@@ -1,6 +1,7 @@
 import { createElement, useSyncExternalStore, type ReactElement } from "react";
 import { Toaster } from "../primitives/toast";
 import type { TooltipSide } from "../primitives/tooltip";
+import type { DockEdge } from "./dock-math";
 
 /**
  * Where the dock is, and what that means for everything around it (DESIGN section 7):
@@ -10,6 +11,12 @@ import type { TooltipSide } from "../primitives/tooltip";
  */
 
 export type DockMode = "horizontal" | "vertical-left" | "vertical-right";
+
+/** The dock's saved edge (`l`, `r`, or floating/default) as a placement mode, and back. */
+export const modeOf = (edge: DockEdge): DockMode =>
+  edge === "l" ? "vertical-left" : edge === "r" ? "vertical-right" : "horizontal";
+export const edgeOf = (mode: DockMode): DockEdge =>
+  mode === "vertical-left" ? "l" : mode === "vertical-right" ? "r" : null;
 
 export interface DockRect {
   left: number;
