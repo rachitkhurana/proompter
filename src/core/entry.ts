@@ -110,6 +110,8 @@ export interface Entry {
   testPlan?: string;
   /** The note left by `proompter resolve --note` (T15), written as a `## Resolution` section. */
   resolution?: string;
+  /** Agent replies (T16), written as a `## Replies` section of `- <who> (<date>): <text>` lines. */
+  replies?: string;
   tags: string[];
   issue: string | null;
   created: string; // ISO
