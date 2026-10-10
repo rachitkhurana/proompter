@@ -61,7 +61,17 @@
         "default": "./dist/github/index.cjs"
       }
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./internal/fixtures": {
+      "import": {
+        "types": "./dist/internal/fixtures.d.ts",
+        "default": "./dist/internal/fixtures.js"
+      },
+      "require": {
+        "types": "./dist/internal/fixtures.d.cts",
+        "default": "./dist/internal/fixtures.cjs"
+      }
+    }
   },
   "scripts": {
     "build": "tsup",

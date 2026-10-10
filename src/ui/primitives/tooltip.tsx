@@ -105,11 +105,11 @@ export function TooltipProvider({
     <TooltipContext value={value}>
       <div
         style={{ display: "contents" }}
-        onPointerEnter={(e) => {
-          if (e.pointerType !== "touch") value.warmth.enterGroup();
+        onPointerOverCapture={(e) => {
+          if (e.pointerType !== "touch" && !movesWithin(e)) value.warmth.enterGroup();
         }}
-        onPointerLeave={(e) => {
-          if (e.pointerType !== "touch") value.warmth.leaveGroup();
+        onPointerOut={(e) => {
+          if (e.pointerType !== "touch" && !movesWithin(e)) value.warmth.leaveGroup();
         }}
       >
         {children}
@@ -118,10 +118,22 @@ export function TooltipProvider({
   );
 }
 
+/**
+ * True when the pointer moved between two nodes inside `currentTarget`. Enter/leave are derived from
+ * pointerover/pointerout rather than React's onPointerEnter/onPointerLeave: React skips the synthesized
+ * "enter" when the previous element is also managed by React, which is always the case when the UI is a
+ * portal into a shadow root inside the host app's React tree (the pointer comes from a host element), so
+ * the tooltips would never open on re-entry.
+ */
+function movesWithin(e: PointerEvent<HTMLElement>): boolean {
+  const related = e.relatedTarget as Node | null;
+  return !!related && e.currentTarget.contains(related);
+}
+
 interface TriggerProps {
   ref?: Ref<HTMLElement>;
-  onPointerEnter?: (e: PointerEvent<HTMLElement>) => void;
-  onPointerLeave?: (e: PointerEvent<HTMLElement>) => void;
+  onPointerOver?: (e: PointerEvent<HTMLElement>) => void;
+  onPointerOut?: (e: PointerEvent<HTMLElement>) => void;
   onPointerDown?: (e: PointerEvent<HTMLElement>) => void;
   onFocus?: (e: FocusEvent<HTMLElement>) => void;
   onBlur?: (e: FocusEvent<HTMLElement>) => void;
@@ -266,15 +278,16 @@ export function Tooltip({ content, side: preferredSide = "top", delay, disabled,
       if (typeof r === "function") r(el);
       else if (r) (r as { current: HTMLElement | null }).current = el;
     },
-    onPointerEnter: (e: PointerEvent<HTMLElement>) => {
-      childProps.onPointerEnter?.(e);
-      if (e.pointerType !== "touch") {
+    onPointerOver: (e: PointerEvent<HTMLElement>) => {
+      childProps.onPointerOver?.(e);
+      if (e.pointerType !== "touch" && !movesWithin(e)) {
         warmth.pointerOver(); // only the pointer warms the group
         open();
       }
     },
-    onPointerLeave: (e: PointerEvent<HTMLElement>) => {
-      childProps.onPointerLeave?.(e);
+    onPointerOut: (e: PointerEvent<HTMLElement>) => {
+      childProps.onPointerOut?.(e);
+      if (movesWithin(e)) return;
       close();
       // Without a <TooltipProvider> there is no group: each trigger is its own.
       if (!ctx.grouped && e.pointerType !== "touch") warmth.leaveGroup();
