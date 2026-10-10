@@ -259,9 +259,19 @@ default. It covers:
 - anything your own `redact(entry)` hook removes. A plugin's `redact` runs after the built-in pass, on the
   same terms.
 
-**Not covered: the PNG snapshots.** The element crop and the viewport image are pixels of your page,
-and nothing is masked in them. Don't file entries on screens that show secrets, personal data or production
-records, or you will commit them into `reviews/assets/`.
+**PNG snapshots are masked too.** Each snapshot is rendered from a copy of your page, and in that copy (never
+on the live page) these elements are painted solid black, with everything inside them:
+
+- every element with `data-proompter-redact`
+- every `input`, `textarea`, `select`, `output`, `[contenteditable]`, `[role="textbox"]` and `[role="combobox"]`,
+  except buttons, checkboxes, radios, range and color inputs
+- every element matching a selector in a plugin's `redactSnapshot: string[]`
+
+Typed values are cleared from the copy too. Mark anything else with `data-proompter-redact`. It **fails closed**
+here as well: if masking or drawing fails, that picture is dropped, the entry is saved without it, and a toast says
+"Snapshot hidden: it couldn't be redacted." Not masked: content inside shadow roots or nested iframes, and text
+that is not in a field or marked. Still, don't file entries on screens that show production data you don't want
+committed into `reviews/assets/`.
 
 It **fails closed**: if a plugin's `redact` throws or returns a different entry, nothing is stored or
 written, the number isn't used, and the composer says "Plugin <name> failed to redact this entry. Nothing
