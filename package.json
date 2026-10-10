@@ -1,0 +1,116 @@
+{
+  "name": "@rachitkay/proompter",
+  "version": "0.0.0",
+  "description": "A review layer you turn on over your own app: pick any element, write what's wrong, get a markdown file with the source location, console, network and a snapshot.",
+  "license": "MIT",
+  "author": "Rachit Khurana",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rachitkhurana/proompter.git"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./next": {
+      "import": {
+        "types": "./dist/next/index.d.ts",
+        "default": "./dist/next/index.js"
+      },
+      "require": {
+        "types": "./dist/next/index.d.cts",
+        "default": "./dist/next/index.cjs"
+      }
+    },
+    "./next/route": {
+      "import": {
+        "types": "./dist/next/route.d.ts",
+        "default": "./dist/next/route.js"
+      },
+      "require": {
+        "types": "./dist/next/route.d.cts",
+        "default": "./dist/next/route.cjs"
+      }
+    },
+    "./github": {
+      "import": {
+        "types": "./dist/github/index.d.ts",
+        "default": "./dist/github/index.js"
+      },
+      "require": {
+        "types": "./dist/github/index.d.cts",
+        "default": "./dist/github/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build",
+    "e2e": "playwright test"
+  },
+  "peerDependencies": {
+    "next": ">=15.3",
+    "react": ">=19",
+    "react-dom": ">=19"
+  },
+  "peerDependenciesMeta": {
+    "next": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@babel/parser": "8.0.7",
+    "bippy": "0.7.3",
+    "html-to-image": "1.11.13",
+    "magic-string": "1.4.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.64.0",
+    "@storybook/react-vite": "10.6.1",
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "22.20.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "eslint": "10.12.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.13.0",
+    "happy-dom": "20.14.6",
+    "next": "16.4.0",
+    "postcss": "8.5.29",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "storybook": "10.6.1",
+    "tailwindcss": "4.3.3",
+    "tsup": "8.5.1",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.71.1",
+    "vite": "8.3.4",
+    "vitest": "5.0.3"
+  }
+}
