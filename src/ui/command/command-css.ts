@@ -1,6 +1,6 @@
 /**
  * CSS for the command menu. Numbers copied from design/prototype.html (`/* command menu *\/`, `.scrim`).
- * The prototype toggles an `.on` class; here Radix Dialog mounts and unmounts the content, so the same
+ * The prototype toggles an `.on` class; here the command menu mounts and unmounts its content, so the same
  * fade and scale run as `data-state` keyframes (opacity .16s, scale .2s, both `--ease`; the scrim fades .2s).
  * Needs the base surface rules in SHEET_CSS (`.pm-surface`, `.logo`, `.hint`, `.empty`).
  */
@@ -29,8 +29,8 @@ export const COMMAND_CSS = /* css */ `
 `;
 
 /**
- * The open and close animations. Kept apart because Radix waits for `animationend` before it unmounts the
- * closing content: happy-dom never fires it, so the unit tests render without this block (`animated={false}`).
+ * The open and close animations. Kept apart because the closing content waits for `animationend` before it
+ * unmounts: happy-dom never fires it, so the unit tests render without this block (`animated={false}`).
  */
 export const COMMAND_MOTION_CSS = /* css */ `
 .pp .pm-scrim[data-state="open"]{animation:pm-scrim-in .2s var(--ease) both}
