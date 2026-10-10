@@ -19,7 +19,6 @@ import { Segmented, type SegmentedItem } from "../primitives/segmented";
 import { toast } from "../primitives/toast";
 import { Tooltip, TooltipProvider, type TooltipSide } from "../primitives/tooltip";
 import { reducedMotion } from "../../core/motion";
-import { DOCK_CSS } from "./dock-css";
 import {
   capSpeed,
   defaultPosition,
@@ -435,7 +434,6 @@ export function Dock({
 
   return (
     <TooltipProvider>
-      <style>{DOCK_CSS}</style>
       <div
         ref={dockRef}
         className={cx(
