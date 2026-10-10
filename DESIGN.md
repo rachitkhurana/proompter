@@ -182,13 +182,16 @@ examples/vite/          → plain React app on Vite 8 with @vitejs/plugin-react 
     - `reviewKey` defaults to `process.env.PROOMPTER_REVIEW_KEY`, and the route answers 404 when it is unset.
     - The kit asks the reviewer for the key once and keeps it in `localStorage`.
     - The body cap and the field validation are shared with the dev route (`src/server/`).
-- **D17. Snapshot redaction (T13).** After `toPng`, each PNG is masked on a canvas: solid boxes are drawn over the
-  rectangles of these elements (html-to-image has no clone hook, and filtering nodes out would shift the layout):
-  - `[data-proompter-redact]` elements;
-  - by default, `input`, `textarea` and `[contenteditable]`;
-  - the selectors in a plugin's `redactSnapshot`.
+- **D17. Snapshot redaction (T13).** The snapshot is masked inside html-to-image's cloned DOM: it renders
+  `toSvg`, parses the SVG, blacks out the matching elements in the clone, then draws the PNG itself. The mask is
+  part of what gets rendered, so it covers the field wherever the clone lays it out. Measuring on the live page
+  failed: the clone's layout can differ (grid, for one), which leaked fields during review.
+  - Masked: `[data-proompter-redact]`; by default `input`, `textarea`, `select`, `output`, `[contenteditable]`,
+    `[role=textbox]` and `[role=combobox]`; and the selectors in a plugin's `redactSnapshot`.
+  - A masked element gets a black background and `filter: brightness(0)`, which makes the whole box and everything
+    inside it pure black. Field values are cleared in the clone.
   - The live page is never touched.
-  - It fails closed: if masking throws, that PNG is dropped. The entry is saved without it, and a toast says so.
+  - It fails closed: if any step throws, that PNG is dropped, the entry is saved without it, and a toast says so.
 - **D18. Generic repo plugin (T14).** `@rachitkay/proompter/plugins` exports `repoPlugin({ tasks, testPlan,
   context })`.
   - `tasks`: route globs mapped to repo files. They feed `taskFor`, and so the Task chip.
