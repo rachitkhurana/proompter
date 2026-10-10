@@ -18,6 +18,7 @@
  * | `title`                            | one line (line breaks become spaces)                                      |
  * | target `label` (element, text)     | not written; read back as the last part of `component` (multi and box write it in the `###` heading, one line) |
  * | `resolution`                       | a `## Resolution` section before `## Context`; blank edges dropped (T15)   |
+ * | `replies`                          | a `## Replies` section after `## Resolution`, before `## Context`; blank edges dropped (T16) |
  * | `description`                      | leading and trailing blank lines are dropped; `\r\n` becomes `\n`         |
  * | `extra` values that are not string / number / boolean / null / flat array | written as a JSON string and parsed back as that string |
  *
@@ -121,6 +122,21 @@ function trimBlankLines(s: string): string {
   while (lines.length && (lines[0] ?? "").trim() === "") lines.shift();
   return lines.join("\n").trimEnd();
 }
+
+/**
+ * Free text shares the file with the `## Resolution`, `## Replies` and `## Targets` headings, so a text line that
+ * looks like one gets an extra leading backslash on write, and loses one on read.
+ */
+const SECTION_LINE = /^(\\*)(## (?:Resolution|Replies|Targets))$/;
+const escapeSections = (lines: string[]): string[] => lines.map((l) => (SECTION_LINE.test(l) ? `\\${l}` : l));
+const unescapeSections = (s: string): string =>
+  s
+    .split("\n")
+    .map((l) => {
+      const m = SECTION_LINE.exec(l);
+      return m && (m[1] ?? "") !== "" ? l.slice(1) : l;
+    })
+    .join("\n");
 
 /** How descriptions are kept (composer, store, file): see `trimBlankLines`. */
 export const cleanDescription = trimBlankLines;
@@ -285,6 +301,7 @@ export function fileProjection(entry: Entry, session?: Session): Entry {
   if (entry.task !== undefined) out.task = entry.task;
   if (entry.testPlan !== undefined) out.testPlan = entry.testPlan;
   if (entry.resolution !== undefined && entry.resolution.trim() !== "") out.resolution = trimBlankLines(entry.resolution);
+  if (entry.replies !== undefined && entry.replies.trim() !== "") out.replies = trimBlankLines(entry.replies);
   if (hasImage) out.snapshot = { assets: { element: assetNames(n, entry.viewport).element } };
   if (extraList.length) out.extra = Object.fromEntries(extraList);
   return out;
@@ -349,9 +366,10 @@ export function serialize(entry: Entry, session?: Session): string {
 
   const blocks: string[][] = [fm, [`# ${e.title}`]];
   if (e.kind === "text") blocks.push(norm(e.quote ?? "").split("\n").map((l) => (l === "" ? ">" : `> ${l}`)));
-  if (e.description) blocks.push(e.description.split("\n"));
+  if (e.description) blocks.push(escapeSections(e.description.split("\n")));
   if ((e.kind === "multi" || e.kind === "box") && e.targets.length) blocks.push(targetBlock(e.targets));
-  if (e.resolution) blocks.push(["## Resolution", "", ...e.resolution.split("\n")]);
+  if (e.resolution) blocks.push(["## Resolution", "", ...escapeSections(e.resolution.split("\n"))]);
+  if (e.replies) blocks.push(["## Replies", "", ...escapeSections(e.replies.split("\n"))]);
   blocks.push(contextBlock(e));
   if (e.snapshot?.assets?.element) blocks.push([`![${e.viewport}](../assets/${e.snapshot.assets.element})`]);
   return `${blocks.map((b) => b.join("\n")).join("\n\n")}\n`;
@@ -576,11 +594,20 @@ function parseEntry(markdown: string): Entry {
   }
   if (ctxAt < 0) head = imageSource;
 
+  // Replies (after Resolution in the file, so taken first): the last '## Replies' runs to the end of what is left.
+  let replies: string | undefined;
+  for (let i = head.length - 1; i >= 0; i--) {
+    if (head[i] !== "## Replies") continue;
+    replies = unescapeSections(trimBlankLines(head.slice(i + 1).join("\n")));
+    head = head.slice(0, i);
+    break;
+  }
+
   // Resolution: the last '## Resolution' before '## Context' runs to the end of what is left.
   let resolution: string | undefined;
   for (let i = head.length - 1; i >= 0; i--) {
     if (head[i] !== "## Resolution") continue;
-    resolution = trimBlankLines(head.slice(i + 1).join("\n"));
+    resolution = unescapeSections(trimBlankLines(head.slice(i + 1).join("\n")));
     head = head.slice(0, i);
     break;
   }
@@ -617,7 +644,7 @@ function parseEntry(markdown: string): Entry {
     head = head.slice(i);
   }
 
-  const description = trimBlankLines(head.join("\n"));
+  const description = unescapeSections(trimBlankLines(head.join("\n")));
 
   const entry: Entry = {
     id,
@@ -649,6 +676,7 @@ function parseEntry(markdown: string): Entry {
   const testPlan = str(fields, "test_plan", false);
   if (testPlan !== undefined) entry.testPlan = testPlan;
   if (resolution) entry.resolution = resolution;
+  if (replies) entry.replies = replies;
   if (image) entry.snapshot = { assets: { element: image } };
   if (Object.keys(extra).length) entry.extra = { ...extra };
   return entry;
