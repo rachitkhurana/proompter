@@ -10,6 +10,7 @@ import { Composer } from "../composer";
 import type { EntryStore, PendingFile, ProompterDeps, ProompterProps, StoreState } from "../proompter-deps";
 
 const NO_PENDING: readonly PendingFile[] = [];
+const HYDRATE_WAIT_MS = 2000;
 
 /**
  * T07's store as the root's `EntryStore`: same data, `update`/`resolve` fire and forget.
@@ -57,12 +58,17 @@ export function adaptStore(store: CoreStore, sink?: FilesSink): EntryStore {
 }
 
 export function createDefaultDeps(options: ProompterProps): ProompterDeps {
+  // A new entry is numbered only after the disk has been read (`sink.hydrated`), so it can never take a number
+  // that already exists in `reviews/`. Capped at 2 s in case the route hangs.
+  // eslint-disable-next-line prefer-const -- assigned after the store exists; the store's beforeCreate closure reads it
+  let sink: FilesSink | undefined;
   const core = createStore({
     session: { title: options.session?.title ?? "Review", reviewer: options.session?.reviewer ?? "reviewer" },
     plugins: options.plugins,
+    beforeCreate: () => (sink ? Promise.race([sink.hydrated, new Promise<void>((r) => setTimeout(r, HYDRATE_WAIT_MS))]) : undefined),
   });
   // Outside dev there is no route: `enabled: false` skips the GET (no failing request in the host's console).
-  const sink = createFilesSink({
+  sink = createFilesSink({
     endpoint: options.endpoint ?? DEFAULT_ENDPOINT,
     store: core,
     enabled: process.env.NODE_ENV === "development",
