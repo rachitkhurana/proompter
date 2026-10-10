@@ -161,6 +161,8 @@ export function checkEntry(v: unknown, session: Session): Entry {
   if (testPlan !== undefined) entry.testPlan = testPlan;
   const resolution = optStrField(v.resolution, "resolution");
   if (resolution !== undefined) entry.resolution = resolution;
+  const replies = optStrField(v.replies, "replies");
+  if (replies !== undefined) entry.replies = replies;
   if (v.extra !== undefined) entry.extra = v.extra as Record<string, unknown>;
   if (snap !== undefined) {
     const assets = isObj(snap.assets) ? snap.assets : {};
