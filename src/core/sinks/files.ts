@@ -18,7 +18,7 @@
  * merged per entry number, never replaced:
  * - On disk and in the store: the store's entry is the base (activity, full context and images are kept) and
  *   the fields the file does carry (title, description, status, intent, priority, tags, test plan, task,
- *   issue) **come from disk**, applied through `store.update` (one activity line per changed field). This is
+ *   issue, resolution) **come from disk**, applied through `store.update` (one activity line per changed field). This is
  *   how an agent or human editing the markdown wins over a stale IndexedDB copy.
  * - Only in the store: kept, and shown as pending (or auto-written in dev).
  * - Only on disk (IndexedDB was cleared): adopted into the store with `store.hydrate` (numbers kept, no
@@ -102,6 +102,7 @@ export function diskPatch(local: Entry, disk: Entry): EntryPatch {
   if (JSON.stringify(disk.tags) !== JSON.stringify(local.tags)) p.tags = disk.tags;
   if ((disk.testPlan ?? null) !== (local.testPlan ?? null)) p.testPlan = disk.testPlan ?? null;
   if ((disk.task ?? null) !== (local.task ?? null)) p.task = disk.task ?? null;
+  if ((disk.resolution ?? null) !== (local.resolution ?? null)) p.resolution = disk.resolution ?? null;
   if (disk.issue !== local.issue) p.issue = disk.issue;
   return p;
 }
