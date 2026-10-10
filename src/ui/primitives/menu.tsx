@@ -1,7 +1,9 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { useRef, type KeyboardEvent, type ReactElement, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactElement, type ReactNode } from "react";
 import { CheckMarkIcon } from "../icons";
 import { useShadowContainer } from "../shadow-root";
+
+const bodyGuards = () => Array.from(document.body.children).filter((c) => c.hasAttribute("data-radix-focus-guard"));
 
 function enabledItems(content: HTMLElement): HTMLElement[] {
   return Array.from(content.querySelectorAll<HTMLElement>('[role^="menuitem"]:not([data-disabled])'));
@@ -62,6 +64,24 @@ export function Menu({
 }: MenuProps) {
   const container = useShadowContainer();
   const contentRef = useRef<HTMLDivElement>(null);
+
+  // Radix's MenuContent calls `useFocusGuards()` unconditionally, which appends two
+  // `<span data-radix-focus-guard tabindex="0">` to the HOST `document.body` (there is no prop to turn it off,
+  // and it ignores `container`). Non-modal menus have no use for them, and the kit must leave the host document
+  // untouched (DESIGN §1.2), so remove the ones this menu caused. If the host already had guards (its own
+  // Radix dialog), they are left alone.
+  const [isOpenState, setIsOpen] = useState(!!defaultOpen);
+  const isOpen = open ?? isOpenState;
+  const hadGuards = useRef(false);
+  useLayoutEffect(() => {
+    // Layout effects run before any passive effect of the commit, so before Radix inserts the guards.
+    if (isOpen) hadGuards.current = bodyGuards().length > 0;
+  }, [isOpen]);
+  useEffect(() => {
+    // Runs after the content's own effects (this component is its ancestor).
+    if (!isOpen || hadGuards.current) return;
+    bodyGuards().forEach((g) => g.remove());
+  }, [isOpen]);
   const checkedKey = items.find((i) => i.checked)?.key ?? "";
 
   const renderBody = (item: MenuItem) => (
@@ -121,7 +141,15 @@ export function Menu({
   });
 
   return (
-    <DropdownMenu.Root modal={false} open={open} defaultOpen={defaultOpen} onOpenChange={onOpenChange}>
+    <DropdownMenu.Root
+      modal={false}
+      open={open}
+      defaultOpen={defaultOpen}
+      onOpenChange={(o) => {
+        setIsOpen(o);
+        onOpenChange?.(o);
+      }}
+    >
       <DropdownMenu.Trigger asChild>{trigger}</DropdownMenu.Trigger>
       <DropdownMenu.Portal container={container}>
         <DropdownMenu.Content
