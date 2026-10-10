@@ -59,6 +59,7 @@ export default defineConfig([
       "next/index": "src/next/index.ts",
       "next/loader": "src/next/loader.ts",
       "next/route": "src/next/route.ts",
+      "vite/index": "src/vite/index.ts",
       "github/index": "src/github/index.ts",
     },
     clean: false,
