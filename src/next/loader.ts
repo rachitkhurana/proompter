@@ -110,7 +110,6 @@ export interface StampOptions {
 export interface LoaderContext {
   resourcePath: string;
   rootContext?: string;
-  query?: unknown;
   sourceMap?: boolean;
   async(): (error: Error | null, content?: string, map?: unknown) => void;
   getOptions?(): LoaderOptions;
@@ -279,18 +278,8 @@ function componentFunction(init: N | undefined): N | undefined {
 
 const escapeAttr = (s: string): string => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 
-function hasUseServer(program: N): boolean {
-  for (const d of asNodes(program.directives)) {
-    if (asString(asNode(d.value)?.value) === "use server") return true;
-  }
-  // Defensive: parsers that keep directives as leading string-literal statements.
-  for (const stmt of asNodes(program.body)) {
-    const expr = asNode(stmt.expression);
-    if (stmt.type !== "ExpressionStatement" || expr?.type !== "StringLiteral") break;
-    if (expr.value === "use server") return true;
-  }
-  return false;
-}
+const hasUseServer = (program: N): boolean =>
+  asNodes(program.directives).some((d) => asString(asNode(d.value)?.value) === "use server");
 
 type ParserPlugins = NonNullable<NonNullable<Parameters<typeof parse>[1]>["plugins"]>;
 
@@ -510,8 +499,7 @@ export function toRepoRelative(root: string, file: string): string {
 /* -------------------------------------------------------------------- loader */
 
 function readOptions(ctx: LoaderContext): LoaderOptions {
-  if (typeof ctx.getOptions === "function") return ctx.getOptions() ?? {};
-  return ctx.query && typeof ctx.query === "object" ? (ctx.query as LoaderOptions) : {};
+  return ctx.getOptions?.() ?? {};
 }
 
 /** Never throws: stamping is a dev aid and must not fail the host's build. */
