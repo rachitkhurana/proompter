@@ -8,6 +8,7 @@ export default defineConfig([
   globalIgnores([
     "**/dist/**",
     "**/.next/**",
+    ".claude/**",
     "**/.next-*/**",
     "**/node_modules/**",
     "**/storybook-static/**",
