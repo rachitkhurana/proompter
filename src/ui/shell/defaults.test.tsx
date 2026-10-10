@@ -1,10 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
 import { createFilesSink } from "../../core/sinks/files";
+import type * as StoreModule from "../../core/store";
 import type { NewEntry } from "../../core/store";
 import { createStore } from "../../core/store";
 import { serialize } from "../../core/serialize";
+import { toast } from "../primitives/toast";
 import { seedEntries } from "./fake";
 import { adaptStore, createDefaultDeps } from "./defaults";
+
+// The real store, but its options are recorded (to reach `onWriteError`); the toast is a spy.
+vi.mock("../../core/store", async (orig) => {
+  const m = await orig<typeof StoreModule>();
+  return { ...m, createStore: vi.fn(m.createStore) };
+});
+vi.mock("../primitives/toast", () => ({ toast: vi.fn() }));
 
 function draft(): NewEntry {
   const { id: _id, ref: _ref, n: _n, session: _s, status: _st, issue: _i, created: _c, updated: _u, activity: _a, ...rest } =
@@ -77,6 +86,15 @@ describe("createDefaultDeps", () => {
     expect(deps.entryPath(e, s)).toBe(`reviews/${s.id}/entries/001-avatar-is-cropped-on-mobile.md`);
     expect(s.reviewer).toBe("rachit");
     expect(s.title).toBe("Manual test pass");
+  });
+
+  it("warns with a toast when the store cannot save locally", () => {
+    createDefaultDeps({});
+    const opts = vi.mocked(createStore).mock.calls.at(-1)![0];
+    expect(toast).not.toHaveBeenCalled();
+    opts.onWriteError?.();
+    expect(toast).toHaveBeenCalledTimes(1);
+    expect(toast).toHaveBeenCalledWith("Couldn't save locally. The entry is kept until you close this tab.");
   });
 });
 
