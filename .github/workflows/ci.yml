@@ -29,10 +29,11 @@ jobs:
         run: |
           node scripts/release-exports.mjs strip
           PROOMPTER_RELEASE=1 pnpm exec vitest run src/internal/exports.test.ts
-      - name: Release tarball (release build, then a dry-run pack)
+      # The real publish order: prepack, pack, postpack, then npm re-reads package.json and sends it to the registry.
+      - name: Release tarball and registry manifest (dry-run pack with scripts, as release.yml publishes)
         run: |
-          node scripts/release-exports.mjs prepack
-          npm pack --dry-run --json --ignore-scripts > "$RUNNER_TEMP/pack.json"
+          # --foreground-scripts=false keeps the build's log out of the JSON on stdout.
+          PROOMPTER_KEEP_STRIPPED=1 npm pack --dry-run --json --foreground-scripts=false > "$RUNNER_TEMP/pack.json"
           node scripts/release-exports.mjs check-pack "$RUNNER_TEMP/pack.json"
       - name: Restore package.json
         if: always()
