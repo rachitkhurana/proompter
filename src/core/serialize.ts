@@ -316,7 +316,7 @@ export function serialize(entry: Entry, session?: Session): string {
   put("status", emitString(e.status));
   put("intent", emitString(e.intent));
   put("priority", emitString(e.priority));
-  put("kind", e.kind);
+  put("kind", emitString(e.kind));
   put("viewport", emitString(`${e.viewport} ${e.size.width}x${e.size.height}`));
   put("route", emitString(e.route));
   put("source", t?.source == null ? "null" : emitString(t.source));

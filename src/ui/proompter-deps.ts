@@ -109,6 +109,8 @@ export interface ProompterProps {
   queries?: CaptureOptions["queries"];
   /** Host redaction hook, forwarded to capture. */
   redact?: CaptureOptions["redact"];
+  /** URL of the dev file-writer route (`app/api/proompter/route.ts` in the host). Default `/api/proompter`. */
+  endpoint?: string;
   /** Inject the store, serializer and composer (stories, tests, fixtures). Defaults to the real ones. */
   deps?: ProompterDeps;
   /** Start with the kit shown. By default it stays hidden until `⌘⇧.` or `window.__proompter.open()`. */

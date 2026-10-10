@@ -56,6 +56,12 @@ export interface StoreOptions {
   /** IndexedDB database name. Default `proompter`. */
   dbName?: string;
   now?: () => Date;
+  /**
+   * T09: `create` waits for this (after `ready`) before it picks an entry number. The files sink passes its
+   * `hydrated` promise so numbers already on disk are adopted first. Errors are ignored; a hung promise is the
+   * caller's to time out.
+   */
+  beforeCreate?: () => Promise<unknown> | undefined;
 }
 
 export type Persistence = "pending" | "indexeddb" | "memory";
@@ -110,6 +116,12 @@ export interface EntryStore {
   /** Change fields, log the change in `activity`, emit `entry:updated`. No change: no event, same entry back. */
   update(id: string, patch: EntryPatch, who?: string): Promise<Entry | undefined>;
   resolve(id: string, who?: string): Promise<Entry | undefined>;
+  /**
+   * T09: adopt entries read from disk (parsed files) that this session does not have, keeping their numbers.
+   * Entries of another session or with a number already present are ignored. Emits no `entry:created` (they are
+   * already on disk) and numbering continues above the highest number. Returns the entries that were added.
+   */
+  hydrate(entries: readonly Entry[]): Promise<Entry[]>;
   /** Resolves when everything queued so far has been written to IndexedDB (or dropped). For tests and shutdown. */
   flush(): Promise<void>;
   /** Close the database. The store keeps working in memory. */
@@ -475,6 +487,7 @@ export function createStore(opts: StoreOptions): EntryStore {
 
     async create(draft, o = {}) {
       await ready;
+      await Promise.resolve(opts.beforeCreate?.()).catch(() => {});
       const plugins = o.plugins ?? opts.plugins;
       const created = isoSeconds(draft.created ?? now());
       const targets = draft.targets.length ? draft.targets : draft.target ? [draft.target] : [];
@@ -538,6 +551,21 @@ export function createStore(opts: StoreOptions): EntryStore {
     update: updateEntry,
 
     resolve: (id, who) => updateEntry(id, { status: "resolved" }, who),
+
+    async hydrate(entries) {
+      await ready;
+      const have = new Set(state.entries.map((e) => e.n));
+      const added: Entry[] = [];
+      for (const e of entries) {
+        if (e.session !== state.session.id || have.has(e.n)) continue;
+        have.add(e.n);
+        added.push(e);
+      }
+      if (added.length === 0) return added;
+      setState({ entries: [...state.entries, ...added].sort((a, b) => a.n - b.n) });
+      for (const e of added) persist(e);
+      return added;
+    },
 
     async flush() {
       await ready;
