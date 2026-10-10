@@ -15,6 +15,11 @@
  * - Both methods need the `x-proompter: 1` header (forces a preflight), `Sec-Fetch-Site` (if sent) must be
  *   `same-origin`, `Origin` (if sent) must be the request's own origin, and `Host` must be loopback or in
  *   `allowedHosts`: 403 otherwise. POST also needs `Content-Type: application/json` (415).
+ *   A host hitting the plain `export { GET, POST }` (e.g. a phone on the LAN at `192.168.1.20:3000`) is allowed
+ *   with the env var `PROOMPTER_ALLOWED_HOSTS=192.168.1.20,dev.example.test` (comma-separated host names, no
+ *   ports); `createProompterRoute({ allowedHosts })` does the same in code.
+ * - Error bodies are `{ ok: false, scope, error }`: scope `"request"` (403, 415, bad session or body) tells the
+ *   sink to stop and pause; scope `"entry"` (400, 413) means only that entry was refused.
  * - Bodies are capped at 20 MB (bytes counted while streaming, 413), every field is type-checked (400), writes
  *   are serialised per session, and images must be real PNGs.
  *
@@ -36,11 +41,18 @@ export const MAX_BODY_BYTES = 20 * 1024 * 1024;
 
 /** A request we refuse; `status` is the HTTP status. */
 class Refusal extends Error {
+  /**
+   * "request": the whole request is unacceptable (403, 415, a bad session or body), so the sink must stop and
+   * pause. "entry": only this entry was refused (400, 413), so the sink skips it and carries on.
+   */
+  readonly scope: "request" | "entry";
   constructor(
     message: string,
     readonly status = 400,
+    scope?: "request" | "entry",
   ) {
     super(message);
+    this.scope = scope ?? (status === 403 || status === 415 ? "request" : "entry");
   }
 }
 
@@ -127,9 +139,9 @@ const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object
 const optStr = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
 
 function checkSession(v: unknown): Session {
-  if (!isObj(v) || typeof v.id !== "string" || !SESSION_ID.test(v.id)) throw new Refusal("bad session");
+  if (!isObj(v) || typeof v.id !== "string" || !SESSION_ID.test(v.id)) throw new Refusal("bad session", 400, "request");
   if (typeof v.title !== "string" || typeof v.reviewer !== "string" || typeof v.started !== "string") {
-    throw new Refusal("bad session");
+    throw new Refusal("bad session", 400, "request");
   }
   const s: Session = { id: v.id, title: v.title, reviewer: v.reviewer, started: v.started, version: 1 };
   const branch = optStr(v.branch);
@@ -169,6 +181,25 @@ function num(v: unknown, what: string): number {
 function objArray(v: unknown, what: string): Record<string, unknown>[] {
   if (!Array.isArray(v) || !v.every(isObj)) throw new Refusal(`bad ${what}`);
   return v as Record<string, unknown>[];
+}
+function strArray(v: unknown, what: string): string[] {
+  if (!Array.isArray(v) || !v.every((s) => typeof s === "string")) throw new Refusal(`bad ${what}`);
+  return v as string[];
+}
+function count(v: unknown, what: string): number {
+  if (typeof v !== "number" || !Number.isInteger(v) || v < 0) throw new Refusal(`bad ${what}`);
+  return v;
+}
+function checkSummary(v: unknown): NonNullable<Entry["context"]["summary"]> {
+  if (!isObj(v)) throw new Refusal("bad context summary");
+  return {
+    consoleLines: count(v.consoleLines, "context summary"),
+    consoleErrors: count(v.consoleErrors, "context summary"),
+    consoleItems: strArray(v.consoleItems, "context summary"),
+    networkTotal: count(v.networkTotal, "context summary"),
+    networkFailed: count(v.networkFailed, "context summary"),
+    networkItems: strArray(v.networkItems, "context summary"),
+  };
 }
 function checkTarget(v: unknown): Entry["targets"][number] {
   if (!isObj(v)) throw new Refusal("bad target");
@@ -230,6 +261,9 @@ function checkEntry(v: unknown, session: Session): Entry {
       network: objArray(ctx.network, "context") as unknown as Entry["context"]["network"],
       queries: objArray(ctx.queries, "context") as unknown as Entry["context"]["queries"],
       ...(build !== undefined ? { build } : {}),
+      // An entry adopted from a file has empty arrays and only this summary: keep it, or the next write
+      // would replace the original Context lines with "0 lines".
+      ...(ctx.summary !== undefined ? { summary: checkSummary(ctx.summary) } : {}),
     },
     activity,
   };
@@ -402,12 +436,19 @@ export interface RouteOptions {
 
 export function createProompterRoute(opts: RouteOptions = {}) {
   const cwdOf = opts.cwd ?? (() => process.cwd());
-  const allowed = new Set((opts.allowedHosts ?? []).map((h) => hostName(h)));
+  /** `allowedHosts` plus `PROOMPTER_ALLOWED_HOSTS` (comma-separated), read per request. */
+  const allowedNow = (): ReadonlySet<string> =>
+    new Set(
+      [...(opts.allowedHosts ?? []), ...(process.env.PROOMPTER_ALLOWED_HOSTS ?? "").split(",")]
+        .map((h) => h.trim())
+        .filter((h) => h !== "")
+        .map((h) => hostName(h)),
+    );
 
   async function POST(req: Request): Promise<Response> {
     if (!enabled()) return notFound();
     try {
-      checkRequest(req, allowed);
+      checkRequest(req, allowedNow());
       if (!(req.headers.get("content-type") ?? "").toLowerCase().startsWith("application/json")) {
         throw new Refusal("content-type must be application/json", 415);
       }
@@ -416,9 +457,9 @@ export function createProompterRoute(opts: RouteOptions = {}) {
       try {
         body = JSON.parse(text);
       } catch {
-        throw new Refusal("body is not JSON");
+        throw new Refusal("body is not JSON", 400, "request");
       }
-      if (!isObj(body)) throw new Refusal("bad body");
+      if (!isObj(body)) throw new Refusal("bad body", 400, "request");
       const session = checkSession(body.session);
       const list = Array.isArray(body.entries) ? body.entries : body.entry !== undefined ? [body.entry] : [];
       const entries = list.map((e) => checkEntry(e, session));
@@ -433,38 +474,41 @@ export function createProompterRoute(opts: RouteOptions = {}) {
       });
       return json({ ok: true, files: [...files] });
     } catch (e) {
-      if (e instanceof Refusal) return json({ ok: false, error: e.message }, e.status);
-      return json({ ok: false, error: "write failed" }, 500);
+      if (e instanceof Refusal) return json({ ok: false, scope: e.scope, error: e.message }, e.status);
+      return json({ ok: false, scope: "request", error: "write failed" }, 500);
     }
   }
 
   async function GET(req: Request): Promise<Response> {
     if (!enabled()) return notFound();
     try {
-      checkRequest(req, allowed);
+      checkRequest(req, allowedNow());
       const only = new URL(req.url).searchParams.get("session");
       const root = path.resolve(cwdOf(), "reviews");
       const dirents = await fs.readdir(root, { withFileTypes: true }).catch(() => []);
-      const sessions = [];
+      const sessions: { session: Session; assets: string[]; entries: Awaited<ReturnType<typeof readEntries>> }[] = [];
       for (const d of dirents) {
         if (!d.isDirectory() || !SESSION_ID.test(d.name) || (only !== null && only !== d.name)) continue;
         const dir = path.join(root, d.name);
-        try {
-          const sessionFile = path.join(dir, "session.md");
-          if (!(await fs.lstat(sessionFile)).isFile()) continue; // never follow a symlink
-          const { session } = parseSession(await fs.readFile(sessionFile, "utf8"));
-          const assets = (await fs.readdir(path.join(dir, "assets"), { withFileTypes: true }).catch(() => []))
-            .filter((a) => a.isFile() && ASSET_FILE.test(`assets/${a.name}`))
-            .map((a) => a.name);
-          sessions.push({ session, assets, entries: await readEntries(dir) });
-        } catch {
-          // no readable session.md: not one of ours
-        }
+        // Under the session's lock, so a read never sees a half-finished rename or index rebuild.
+        await withLock(dir, async () => {
+          try {
+            const sessionFile = path.join(dir, "session.md");
+            if (!(await fs.lstat(sessionFile)).isFile()) return; // never follow a symlink
+            const { session } = parseSession(await fs.readFile(sessionFile, "utf8"));
+            const assets = (await fs.readdir(path.join(dir, "assets"), { withFileTypes: true }).catch(() => []))
+              .filter((a) => a.isFile() && ASSET_FILE.test(`assets/${a.name}`))
+              .map((a) => a.name);
+            sessions.push({ session, assets, entries: await readEntries(dir) });
+          } catch {
+            // no readable session.md: not one of ours
+          }
+        });
       }
       return json({ ok: true, sessions });
     } catch (e) {
-      if (e instanceof Refusal) return json({ ok: false, error: e.message }, e.status);
-      return json({ ok: false, error: "read failed" }, 500);
+      if (e instanceof Refusal) return json({ ok: false, scope: e.scope, error: e.message }, e.status);
+      return json({ ok: false, scope: "request", error: "read failed" }, 500);
     }
   }
 
