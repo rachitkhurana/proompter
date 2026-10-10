@@ -55,7 +55,7 @@ export type TokenName =
   | "canvas" | "mat-1" | "mat-2" | "blur-1" | "blur-2"
   | "fill-1" | "fill-2" | "fill-3" | "line" | "line-2" | "edge"
   | "fg" | "fg-2" | "fg-3" | "fg-4"
-  | "acc" | "acc-press" | "acc-soft" | "acc-line"
+  | "acc" | "acc-fg" | "acc-press" | "acc-soft" | "acc-line"
   | "p-blocking" | "p-important" | "p-minor" | "ok" | "prog"
   | "sans" | "mono" | "ease" | "ease-io" | "ease-drawer"
   | "sh-1" | "sh-2" | "sh-3";
