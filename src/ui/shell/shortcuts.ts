@@ -69,6 +69,14 @@ export function handleKeydown(ev: KeyboardEvent, state: KeyState, actions: KeyAc
     return true;
   }
 
+  // Alt+K: fallback where the browser owns Ctrl+Shift+K (Firefox). Option+K types a character on Mac, so match
+  // the physical key, and leave it alone in text fields.
+  if (ev.altKey && !ev.metaKey && !ev.ctrlKey && ev.code === "KeyK" && !eventElement(ev)?.closest(TYPING)) {
+    ev.preventDefault();
+    actions.toggleCommand();
+    return true;
+  }
+
   // Esc closes one thing: menu, composer, command menu, current mode, ticket, sheet.
   if (key === "Escape") {
     const close: keyof KeyActions | null = state.menuOpen
