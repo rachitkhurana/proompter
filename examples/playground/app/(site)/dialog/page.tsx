@@ -8,6 +8,14 @@ export default function Page() {
   return (
     <main style={{ minHeight: "150vh", padding: 24, fontFamily: "system-ui, sans-serif" }}>
       <h1>Dialog fixture</h1>
+      {/* Outside any modal: its blur handler must still run when focus moves into the kit (D11 focusout guard). */}
+      <input
+        aria-label="Outside field"
+        onBlur={() => {
+          const w = window as unknown as { __outsideBlurs?: number };
+          w.__outsideBlurs = (w.__outsideBlurs ?? 0) + 1;
+        }}
+      />
       <Dialog.Root>
         <Dialog.Trigger>Open settings</Dialog.Trigger>
         <Dialog.Portal>
