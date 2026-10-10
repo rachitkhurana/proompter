@@ -1,20 +1,7 @@
 import { useState, type ComponentPropsWithRef, type ReactNode } from "react";
 import type { Entry, EntryActivity, EntryStatus, Session } from "../../core/entry";
 import type { EntryPatch } from "../proompter-deps";
-import {
-  BackIcon,
-  ChevIcon,
-  CodeIcon,
-  CopyIcon,
-  EyeIcon,
-  GhIcon,
-  LinkIcon,
-  PlanIcon,
-  SparkleIcon,
-  TagIcon,
-  XIcon,
-  icons,
-} from "../icons";
+import { Icon } from "../icons";
 import { Button, IconButton } from "../primitives/button";
 import { Chip } from "../primitives/chip";
 import { Menu, type MenuItem } from "../primitives/menu";
@@ -116,8 +103,6 @@ export function Ticket({
   const [showMd, setShowMd] = useState(false);
 
   const t = entry.target;
-  const VpIcon = icons[entry.viewport];
-  const IntentIcon = icons[entry.intent];
   const resolved = entry.status === "resolved";
   const fails = entry.context.network.filter((n) => n.status === null || n.status >= 400);
   const crumbParts = (t?.component || targetName(entry)).split("›").map((x) => x.trim());
@@ -139,19 +124,21 @@ export function Ticket({
     icon: <PriorityIcon priority={p} />,
     checked: entry.priority === p,
   }));
-  const intentItems: MenuItem[] = INTENTS.map(({ value, label }) => {
-    const Icon = icons[value];
-    return { key: value, label, icon: <Icon size="s" />, checked: entry.intent === value };
-  });
+  const intentItems: MenuItem[] = INTENTS.map(({ value, label }) => ({
+    key: value,
+    label,
+    icon: <Icon name={value} size="s" />,
+    checked: entry.intent === value,
+  }));
   const tagItems: MenuItem[] = tags.map((tag) => ({
     key: tag,
     label: tag,
-    icon: <TagIcon size="s" />,
+    icon: <Icon name="tag" size="s" />,
     checked: entry.tags.includes(tag),
   }));
   const planItems: MenuItem[] = [
     { key: NONE, label: "Not linked", checked: !entry.testPlan },
-    ...plans.map((p) => ({ key: p, label: p, icon: <PlanIcon size="s" />, checked: entry.testPlan === p })),
+    ...plans.map((p) => ({ key: p, label: p, icon: <Icon name="plan" size="s" />, checked: entry.testPlan === p })),
   ];
 
   const elementLabel = entry.targets.length > 1 ? `${entry.targets.length} elements` : t?.label || "element";
@@ -162,17 +149,17 @@ export function Ticket({
       <style>{TICKET_CSS}</style>
       <div className="tk-crumb">
         <IconButton label="Back to entries" onClick={onBack}>
-          <BackIcon size="s" />
+          <Icon name="back" size="s" />
         </IconButton>
         <span className="ttl">{session.title}</span>
-        <ChevIcon size="xs" />
+        <Icon name="chev" size="xs" />
         <b className="mono">{entry.id}</b>
         <span className="sp" />
         <IconButton label="Copy file path" onClick={() => copy(path, "Copied the file path")}>
-          <LinkIcon size="s" />
+          <Icon name="link" size="s" />
         </IconButton>
         <IconButton label="Close" onClick={onClose}>
-          <XIcon size="s" />
+          <Icon name="x" size="s" />
         </IconButton>
       </div>
 
@@ -225,7 +212,7 @@ export function Ticket({
                 onSelect={(k) => onUpdate({ intent: k as Entry["intent"] })}
                 trigger={
                   <Value aria-label={`Intent: ${INTENT_LABEL[entry.intent]}`}>
-                    <IntentIcon size="s" />
+                    <Icon name={entry.intent} size="s" />
                     <span>{INTENT_LABEL[entry.intent]}</span>
                   </Value>
                 }
@@ -235,7 +222,7 @@ export function Ticket({
             <dd>
               {/* The prototype's Viewport row goes to where the entry was filed; the size it was filed at is not editable. */}
               <Value aria-label={`Viewport: ${viewportLabel(entry.viewport)} ${sizeLabel(entry)}. Show on page`} onClick={onShow}>
-                <VpIcon size="s" />
+                <Icon name={entry.viewport} size="s" />
                 <span>
                   {viewportLabel(entry.viewport)} <span className="num mute">{sizeLabel(entry)}</span>
                 </span>
@@ -255,7 +242,7 @@ export function Ticket({
                 }
                 trigger={
                   <Value aria-label={`Tags: ${entry.tags.length ? entry.tags.join(", ") : "none"}`}>
-                    <TagIcon size="s" />
+                    <Icon name="tag" size="s" />
                     <span>{entry.tags.length ? entry.tags.join(", ") : <span className="mute">Add tags</span>}</span>
                   </Value>
                 }
@@ -273,7 +260,7 @@ export function Ticket({
                     onSelect={(k) => onUpdate({ testPlan: k === NONE ? null : k })}
                     trigger={
                       <Value aria-label={`Test plan: ${entry.testPlan ?? "not linked"}`}>
-                        <PlanIcon size="s" />
+                        <Icon name="plan" size="s" />
                         <span>{entry.testPlan ?? <span className="mute">Not linked</span>}</span>
                       </Value>
                     }
@@ -285,17 +272,17 @@ export function Ticket({
             <dd>
               {entry.issue ? (
                 <span className="val ro">
-                  <GhIcon size="s" />
+                  <Icon name="gh" size="s" />
                   <span>{entry.issue}</span>
                 </span>
               ) : canOpenIssue ? (
                 <Value onClick={onOpenIssue}>
-                  <GhIcon size="s" />
+                  <Icon name="gh" size="s" />
                   <span className="mute">Open an issue</span>
                 </Value>
               ) : (
                 <span className="val ro">
-                  <GhIcon size="s" />
+                  <Icon name="gh" size="s" />
                   <span className="mute">Not opened · v2</span>
                 </span>
               )}
@@ -308,7 +295,7 @@ export function Ticket({
           <div className="crumbs">
             {crumbParts.map((part, i) => (
               <span key={i} style={{ display: "contents" }}>
-                {i > 0 ? <ChevIcon size="xs" /> : null}
+                {i > 0 ? <Icon name="chev" size="xs" /> : null}
                 <span>{part}</span>
               </span>
             ))}
@@ -324,12 +311,12 @@ export function Ticket({
                     aria-label={`Copy source ${t.sourceInherited ? "(inherited) " : ""}${shortSource(t.source)}`}
                     onClick={() => copy(t.source ?? "", `Copied ${shortSource(t.source ?? "")}`)}
                   >
-                    <CodeIcon size="s" />
+                    <Icon name="code" size="s" />
                     <span>
                       {t.sourceInherited ? "↳ " : ""}
                       {shortSource(t.source)}
                     </span>
-                    <CopyIcon size="xs" />
+                    <Icon name="copy" size="xs" />
                   </Value>
                 </dd>
               </>
@@ -345,7 +332,7 @@ export function Ticket({
                     onClick={() => copy(selectors.join("\n"), "Copied the element selector")}
                   >
                     <span>{elementLabel}</span>
-                    <CopyIcon size="xs" />
+                    <Icon name="copy" size="xs" />
                   </Value>
                 </dd>
               </>
@@ -456,13 +443,13 @@ export function Ticket({
 
       <div className="sh-ft">
         <Button onClick={onShow}>
-          <EyeIcon size="s" />
+          <Icon name="eye" size="s" />
           Show on page
         </Button>
         <Button
           onClick={() => copy(serialize(entry), `Copied ${entry.id} as a prompt for an agent`)}
         >
-          <SparkleIcon size="s" />
+          <Icon name="sparkle" size="s" />
           Copy for agent
         </Button>
         <span className="sp" />
