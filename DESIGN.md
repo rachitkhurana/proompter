@@ -283,7 +283,7 @@ A **surface** is what the kit reviews: `{ doc, win, toScreen(rect), scale }`.
   - **File:** a markdown preview
   - **Footer:** Show on page, Copy for agent, Resolve
   - The Viewport row is read-only, as in the prototype. Clicking it shows the entry on that viewport (D4.1).
-- **Command menu (`⌘K`):** tools, viewports, open entries, all entries, publish. Searchable, fully
+- **Command menu (`⌘⇧K`):** tools, viewports, open entries, all entries, publish. Searchable, fully
   keyboard-driven.
 - **Shortcuts:**
   - `P` `M` `B` `T` `N` pick tools
@@ -291,7 +291,7 @@ A **surface** is what the kit reviews: `{ doc, win, toScreen(rect), scale }`.
   - `R` rotate
   - `1`–`4` viewports
   - `E` entries
-  - `⌘K` command menu
+  - `⌘⇧K` command menu
   - `⌘⇧.` show or hide the kit
   - `Esc` closes things in order: menu, composer, command menu, current mode, ticket, sheet
 - **Tokens:** take every colour, radius, shadow, type size and easing from the prototype's `:root`
