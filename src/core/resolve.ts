@@ -153,11 +153,12 @@ function crumbPartsOf(el: Element): string[] {
 const srcSelector = (src: string) =>
   `[data-src="${src.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\a ")}"]`;
 
-function count(doc: Document, selector: string): number {
+/** Every element matching `selector`; none when the selector is invalid. */
+function matches(doc: Document, selector: string): Element[] {
   try {
-    return doc.querySelectorAll(selector).length;
+    return [...doc.querySelectorAll(selector)];
   } catch {
-    return 0;
+    return [];
   }
 }
 
@@ -193,7 +194,7 @@ export function selectorFor(target: Element): string {
   const own = attr(el, "data-src");
   if (own) {
     const s = srcSelector(own);
-    if (count(doc, s) === 1) return s;
+    if (matches(doc, s).length === 1) return s;
   }
   const parts: string[] = [];
   for (let n: Element | null = el; n && n !== doc.body && n !== doc.documentElement; n = n.parentElement) {
@@ -201,9 +202,10 @@ export function selectorFor(target: Element): string {
       const src = attr(n, "data-src");
       if (src) {
         const s = srcSelector(src);
-        if (count(doc, s) === 1) {
+        if (matches(doc, s).length === 1) {
           const candidate = `${s} > ${parts.join(" > ")}`;
-          if (isExactly(doc, candidate, el)) return candidate;
+          const found = matches(doc, candidate);
+          if (found.length === 1 && found[0] === el) return candidate;
           break;
         }
       }
@@ -211,15 +213,6 @@ export function selectorFor(target: Element): string {
     parts.unshift(step(n));
   }
   return fullChain(el, doc);
-}
-
-function isExactly(doc: Document, selector: string, el: Element): boolean {
-  try {
-    const found = doc.querySelectorAll(selector);
-    return found.length === 1 && found[0] === el;
-  } catch {
-    return false;
-  }
 }
 
 /** Re-resolve a stored selector. Null when it matches nothing, or is invalid. */
