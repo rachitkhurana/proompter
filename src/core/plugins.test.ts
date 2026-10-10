@@ -88,6 +88,17 @@ describe("applyRedact (fails closed)", () => {
     expect(e.description).toContain("hunter2"); // the input is untouched
   });
 
+  it("built-in redaction covers resolution and replies (T16)", () => {
+    const e = makeEntry({ resolution: "fixed, password=hunter2", replies: "- a (d): mail jo@example.com" });
+    const r = applyRedact(undefined, e);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const dump = JSON.stringify([r.entry.resolution, r.entry.replies]);
+    expect(dump).not.toContain("hunter2");
+    expect(dump).not.toContain("jo@example.com");
+    expect(r.entry.replies).toContain("- a (d):");
+  });
+
   it("built-in redaction also covers route, extra (recursively), tags, task, plan, issue, build and target text", () => {
     const target = makeTarget({ source: "src/a.tsx:1:1", component: "A › x@y.com", label: "x@y.com" });
     const e = makeEntry({
