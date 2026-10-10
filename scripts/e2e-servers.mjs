@@ -3,7 +3,8 @@
 //   2. production build with the flag UNSET into .next-prod, served on :3101 (DESIGN 11.1)
 //   3. the Vite example (D14): `vite build` with VITE_PROOMPTER unset, served by `vite preview` on :3103, and
 //      `vite dev` with the flag on at :3102
-//   4. `next dev` with NEXT_PUBLIC_PROOMPTER=true on :3100 (everything else)
+//   4. production build with the flag ON into .next-preview, served on BASE+4 (D15 preview mode)
+//   5. `next dev` with NEXT_PUBLIC_PROOMPTER=true on :3100 (everything else)
 // :3100 is the URL Playwright waits for, and it starts last, so once it answers both servers are up.
 import { spawn, spawnSync } from "node:child_process";
 
@@ -17,6 +18,7 @@ const playground = (...args) => [pnpm, ["--filter", "proompter-playground", "exe
 const viteExample = (...args) => [pnpm, ["--filter", "proompter-vite-example", "exec", ...args]];
 const VITE_DEV_PORT = BASE + 2;
 const VITE_PREVIEW_PORT = BASE + 3;
+const PREVIEW_PORT = BASE + 4;
 
 const children = [];
 const stop = () => {
@@ -74,6 +76,10 @@ runSync(pnpm, ["build"], {});
 runSync(...playground("next", "build"), prodEnv);
 start(...playground("next", "start", "-p", String(PROD_PORT)), prodEnv);
 await waitFor(`http://localhost:${PROD_PORT}/`);
+const previewEnv = { NEXT_PUBLIC_PROOMPTER: "true", PLAYGROUND_DIST_DIR: ".next-preview" };
+runSync(...playground("next", "build"), previewEnv);
+start(...playground("next", "start", "-p", String(PREVIEW_PORT)), previewEnv);
+await waitFor(`http://localhost:${PREVIEW_PORT}/`);
 runSync(...viteExample("vite", "build"), { VITE_PROOMPTER: undefined });
 start(...viteExample("vite", "preview", "--port", String(VITE_PREVIEW_PORT), "--strictPort"), { VITE_PROOMPTER: undefined });
 await waitFor(`http://localhost:${VITE_PREVIEW_PORT}/`);
