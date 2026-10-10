@@ -26,10 +26,10 @@ async function sheetIsOpen(page: Page, on = true) {
 }
 
 test.describe("keyboard only", () => {
-  test("⌘K finds an entry, opens its ticket, edits it from menus, and Esc unwinds one layer at a time", async ({ page }) => {
+  test("⌘⇧K finds an entry, opens its ticket, edits it from menus, and Esc unwinds one layer at a time", async ({ page }) => {
     await open(page);
 
-    await page.keyboard.press("ControlOrMeta+k");
+    await page.keyboard.press("ControlOrMeta+Shift+K");
     await expect(palette(page)).toBeVisible();
     await expect(search(page)).toBeFocused();
     await page.keyboard.type("squad");
@@ -143,7 +143,7 @@ test.describe("keyboard only", () => {
     await page.keyboard.press("p");
     await expect(tool(page, "Pick element")).toHaveAttribute("aria-pressed", "true");
 
-    await page.keyboard.press("ControlOrMeta+k");
+    await page.keyboard.press("ControlOrMeta+Shift+K");
     await expect(palette(page)).toBeVisible();
     await page.keyboard.press("Escape"); // the command menu first
     await expect(palette(page)).toBeHidden();
