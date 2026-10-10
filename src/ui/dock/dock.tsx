@@ -525,7 +525,7 @@ export function Dock({
               </IconButton>
             </Tooltip>
             <span className="sep" />
-            <Tooltip content={tip("Command menu", "⌘K")} side={tooltipSide}>
+            <Tooltip content={tip("Command menu", "⌘⇧K")} side={tooltipSide}>
               <IconButton label="Command menu" pressed={commandOpen} onClick={onCommand}>
                 <Icon name="search" />
               </IconButton>
