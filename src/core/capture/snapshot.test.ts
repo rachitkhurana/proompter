@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toPng } from "html-to-image";
 import { createCapture } from "./index.ts";
-import type { Surface } from "./types.ts";
+import type { Surface } from "../surface";
 import { makeWin } from "./helpers.test-util.ts";
 
 vi.mock("html-to-image", () => ({ toPng: vi.fn() }));
