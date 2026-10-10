@@ -12,7 +12,7 @@
   "sideEffects": false,
   "packageManager": "pnpm@9.15.0",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.18"
   },
   "files": [
     "dist"
@@ -85,12 +85,14 @@
   },
   "dependencies": {
     "@babel/parser": "8.0.7",
+    "@jridgewell/remapping": "2.3.5",
     "bippy": "0.7.3",
     "html-to-image": "1.11.13",
     "magic-string": "1.4.3"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@jridgewell/trace-mapping": "0.3.31",
     "@playwright/test": "1.64.0",
     "@storybook/react-vite": "10.6.1",
     "@tailwindcss/postcss": "4.3.3",

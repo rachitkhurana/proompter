@@ -1,8 +1,2 @@
-/** Stub. `withProompter` / `createProompterRoute` land in T03 / T09. */
-export interface WithProompterOptions {
-  enabled?: boolean;
-}
-
-export function withProompter<T extends object>(config: T, _options: WithProompterOptions = {}): T {
-  return config;
-}
+// `createProompterRoute()` lands with T09; `./next/route` stays a reserved entry until then.
+export { withProompter, type WithProompterOptions } from "./with-proompter";
