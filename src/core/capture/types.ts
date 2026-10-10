@@ -1,24 +1,12 @@
 /**
  * Capture types.
  *
- * NOTE for T04: `Surface` and `Rect` are defined here only because no shared definition existed when
- * T06 was written (DESIGN §6: `{ doc, win, toScreen(rect), scale }`). T04 may adopt this shape or
- * move it to the surface module and re-export it from here; capture only reads `doc` and `win`.
+ * `Surface` and `Rect` live in `../surface` (the one definition: `{ doc, win, toScreen(rect), scale }`, DESIGN §6).
+ * They are re-exported here for code that imports them from capture. Capture only reads `doc` and `win`.
  */
+import type { Rect, Surface } from "../surface";
 
-export interface Rect {
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-}
-
-export interface Surface {
-  doc: Document;
-  win: Window & typeof globalThis;
-  toScreen(rect: Rect): Rect;
-  scale: number;
-}
+export type { Rect, Surface };
 
 export interface CaptureConsoleEntry {
   /** Epoch ms. */

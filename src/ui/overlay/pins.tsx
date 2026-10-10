@@ -32,7 +32,7 @@ export function PinMarker({ pin, x, y, fresh, pulse, onOpen }: PinMarkerProps) {
       className={cx("pm-pin", pin.status === "resolved" ? "done" : pin.priority, fresh && "fresh")}
       style={{ left: x, top: y }}
       data-id={pin.id}
-      aria-label={`${ref}: ${pin.title}`}
+      aria-label={`Pin ${ref}: ${pin.title}`}
       onClick={() => onOpen?.(pin.id)}
     >
       {pin.id}

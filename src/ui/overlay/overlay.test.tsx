@@ -161,7 +161,7 @@ describe("<Pins>", () => {
     expect(a!.classList.contains("important")).toBe(true);
     expect(b!.classList.contains("done")).toBe(true);
     expect(b!.classList.contains("blocking")).toBe(false);
-    expect(a!.getAttribute("aria-label")).toBe("PRO-1: Avatar is cropped");
+    expect(a!.getAttribute("aria-label")).toBe("Pin PRO-1: Avatar is cropped");
     expect(a!.querySelector(".pm-pin-card b")!.textContent).toBe("Avatar is cropped");
     expect(a!.querySelector(".pm-pin-card")!.textContent).toContain("Important");
     expect(a!.querySelector(".pm-pin-card")!.textContent).toContain("PRO-1");

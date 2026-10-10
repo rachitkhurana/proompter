@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useImperativeHandle, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type Ref } from "react";
-import type { Capture, CaptureContext, Surface as CaptureSurface } from "../../core/capture";
+import type { Capture, CaptureContext } from "../../core/capture";
 import type { Entry, EntryIntent, EntryPriority, EntrySnapshot, EntryTarget, ProompterPlugin } from "../../core/entry";
 import type { PickCommit } from "../../core/pick";
 import { pluginContext, pluginTask, pluginTestPlan } from "../../core/plugins";
@@ -295,8 +295,7 @@ export function Composer({
       const ctx = safeContext(capture);
       let snapshot: EntrySnapshot | undefined;
       try {
-        // Capture's own `Surface` wants `win: Window & typeof globalThis`; the pick surface's is `Window`.
-        const shot = await capture.snapshot(surface as unknown as CaptureSurface, resolved[0]?.el);
+        const shot = await capture.snapshot(surface, resolved[0]?.el);
         if (shot.element || shot.viewport) {
           snapshot = { fontsEmbedded: shot.fontsEmbedded, ...(shot.element ? { element: shot.element } : {}), ...(shot.viewport ? { viewport: shot.viewport } : {}) };
         }
