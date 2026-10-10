@@ -10,12 +10,7 @@ import {
   type ViewportId,
 } from "../../core/surface";
 import { Button } from "../primitives/button";
-import { viewportCss } from "./viewport-styles";
 
-/** Renders the stage CSS. Mount it once, inside the shadow root. */
-export function ViewportStyles() {
-  return <style data-proompter-viewports="">{viewportCss}</style>;
-}
 
 export interface ViewportStageProps {
   viewport: ViewportId;
@@ -78,12 +73,7 @@ export function ViewportStage(props: ViewportStageProps) {
     return () => notify(null);
   }, [device]);
 
-  return (
-    <>
-      <ViewportStyles />
-      {device ? <DeviceStage {...props} emit={emit} /> : null}
-    </>
-  );
+  return device ? <DeviceStage {...props} emit={emit} /> : null;
 }
 
 function DeviceStage({
