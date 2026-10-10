@@ -230,8 +230,28 @@ type ProompterPlugin = {
 };
 ```
 
-The Task and Test plan chips only show when a plugin supplies them. See [docs/gamorite.md](docs/gamorite.md)
-for a worked example (route → task).
+The Task and Test plan chips only show when a plugin supplies them. If your app keeps task files and a test
+plan in its repo, you don't need to write a plugin. Use `repoPlugin`:
+
+```tsx
+import { repoPlugin } from "@rachitkay/proompter/plugins";
+
+<Proompter
+  plugins={[
+    repoPlugin({
+      tasks: { "/clips": "tasks/T-clips.md", "/": "tasks/T-home.md" }, // route glob -> repo path
+      testPlan: ["Smoke", "Auth", "Billing"],                               // Test plan menu sections
+      context: () => ({ build: process.env.NEXT_PUBLIC_BUILD }),            // extra frontmatter (optional)
+    }),
+  ]}
+/>;
+```
+
+- `tasks`: the first glob (in the order you wrote them) that matches the route's pathname gives the entry's
+  `task:`. A plain path matches that route and everything under it (`/clips` covers `/clips/42`), `/` matches only
+  the home page, and globs support `*`, `**`, `?` and `{a,b}`. No match means no task.
+- `testPlan` is passed through. `context` is passed through too, and a throw yields no extra fields.
+- `name` defaults to `"repo"`. The entry point is client-safe: it imports nothing from node.
 
 ## FAQ
 
