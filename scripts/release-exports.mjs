@@ -1,5 +1,5 @@
 // Release gate for DESIGN 11.7: the published package exposes exactly `.`, `./next`, `./next/route`,
-// `./github` and `./package.json`. The private `./internal/fixtures` export stays in the working tree (the
+// `./github`, `./plugins` and `./package.json`. The private `./internal/fixtures` export stays in the working tree (the
 // playground's /fixtures/* e2e routes need it) and is removed only for the tarball.
 //
 //   node scripts/release-exports.mjs strip     remove it from package.json (a backup is kept)
@@ -73,7 +73,7 @@ function checkPack() {
   const internal = files.filter((f) => f.startsWith("dist/internal"));
   const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
   const keys = Object.keys(pkg.exports).sort();
-  const want = [".", "./next", "./next/route", "./vite", "./github", "./package.json"].sort();
+  const want = [".", "./next", "./next/route", "./vite", "./github", "./plugins", "./package.json"].sort();
   const problems = [];
   if (internal.length) problems.push(`tarball contains ${internal.join(", ")}`);
   if (!files.includes("licenses/Geist-OFL.txt")) problems.push("tarball lacks licenses/Geist-OFL.txt");
