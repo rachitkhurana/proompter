@@ -415,10 +415,6 @@
     background-color 0.15s var(--ease),
     color 0.15s var(--ease);
 }
-.pp .seg .seg-t[aria-disabled="true"] {
-  opacity: 0.4;
-  pointer-events: none;
-}
 .pp .seg .seg-t.on {
   background: var(--fill-3);
   color: var(--fg);
@@ -568,10 +564,6 @@
 }
 .pp .menu .mi[data-highlighted] {
   background: var(--fill-2);
-}
-.pp .menu .mi[data-disabled] {
-  opacity: 0.4;
-  pointer-events: none;
 }
 .pp .menu .mi .ck {
   margin-left: auto;
