@@ -224,6 +224,11 @@ export function Composer({
     (result: ComposerResult) => {
       if (closingRef.current) return;
       closingRef.current = true;
+      // The exit animation outlives the keypress: let go of focus now, so a field inside the (already inert)
+      // composer doesn't swallow the next shortcut.
+      const root = rootRef.current;
+      const active = (root?.getRootNode() as Document | ShadowRoot | undefined)?.activeElement;
+      if (root && active && root.contains(active)) (active as HTMLElement).blur();
       setLeaving(true);
       clearTimeout(closeTimer.current);
       closeTimer.current = setTimeout(() => onCloseRef.current(result), reducedMotion() ? 0 : exitMs);
