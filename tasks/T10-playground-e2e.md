@@ -18,4 +18,4 @@
 - A Gamorite integration note in `docs/gamorite.md`: the plugin sketch for route → task. **Don't edit
   the Gamorite repo.**
 
-**Done when:** DESIGN §11, items 1–6, all pass in CI.
+**Done when:** DESIGN §11, items 1–7, all pass in CI (item 7: remove or gate out `./internal/fixtures`).
