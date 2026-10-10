@@ -10,8 +10,9 @@ import { composerOf, openKit, PNG_MAGIC, readEntry, sessionDir, VITE_REVIEWS, wa
  * - :3102 is `vite` dev with VITE_PROOMPTER=true: stamping, the kit and the dev route write files.
  * - :3103 is `vite preview` of a `vite build` with the flag unset: nothing of the kit ships.
  */
-const DEV = "http://localhost:3102";
-const PREVIEW = "http://localhost:3103";
+const BASE = Number(process.env.E2E_PORT_BASE ?? 3100); // see playwright.config.ts
+const DEV = `http://localhost:${BASE + 2}`;
+const PREVIEW = `http://localhost:${BASE + 3}`;
 const DIST = fileURLToPath(new URL("../examples/vite/dist", import.meta.url));
 
 test.describe.configure({ mode: "serial" });
