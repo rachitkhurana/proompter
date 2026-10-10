@@ -149,6 +149,70 @@ examples/vite/          → plain React app on Vite 8 with @vitejs/plugin-react 
     `e2e/vite.spec.ts` picks an element in dev and finds the file on disk with its source. It also checks that a
     flag-unset build ships no kit, no stamps and no route.
   - Other bundlers (webpack without Next, Parcel) aren't supported yet.
+- **v2/v3 decisions (2026-10-10, Rachit approved the plan; tasks in `tasks/v2/`).** Rachit's rulings:
+  - The task/test-plan plugin is generic and lives in the package.
+  - GitHub sync is tested against a fake GitHub API plus one live smoke test.
+  - Zip export/import is dropped.
+  - The release is prepped as 0.1.0 locally.
+- **D15. Preview mode (T11).** In a non-development build with the flag on (a deployed preview), the kit ships
+  **dormant**.
+  - Dormant means: no capture, no UI chunk, only `window.__proompter` and the chord listener.
+  - `window.__proompter.enable()`, or the `⌘⇧.` chord, activates it: capture starts and the kit opens.
+  - The choice persists in `localStorage["proompter:enabled"]` for that origin. `disable()` clears it and stops
+    capture.
+  - Dev is unchanged: it is always active, and capture runs from mount (D4).
+  - Entries are kept in IndexedDB. The files sink stays off outside dev, as today.
+  - The D13 prod-off guarantee is unchanged: with the flag unset, nothing ships.
+- **D16. GitHub sync (T12).** `@rachitkay/proompter/github` exports
+  `createGithubRoute({ repo, token, branch = "reviews", reviewKey })`, which returns Web `{ GET, POST }`.
+  - **Mounting:** Next mounts it at `app/api/proompter/github/route.ts`. Any other server mounts the same handlers.
+  - **Token:** it never leaves the server. A PAT with contents and issues write is enough.
+  - **Files:** each entry is written to the branch through the Contents API, in the files sink's layout
+    (`reviews/<session>/…`, the same serializer), so local and remote reviews are interchangeable.
+  - **Issues:** one issue per entry, upserted. Labels are `proompter`, `kind:<k>` and `priority:<p>`. The body is
+    the entry markdown, with its snapshot linked from the branch. The entry's `issue` field stores the number.
+  - **Status, both ways:** sync reports issue state back. Resolving locally closes the issue. An issue closed on
+    GitHub marks the entry resolved, with one activity line, on the next sync.
+  - **Client:** `createGithubSink` (`src/core/sinks/github.ts`) is enabled by the kit's `github={{ endpoint }}`
+    prop.
+    - It is manual: the Publish tab's "Sync to GitHub" sends one entry per request.
+    - It works in dev and preview, next to the files sink.
+  - **Guard:**
+    - Every request needs `x-proompter: 1`, same-origin, and `Authorization: Bearer <reviewKey>`.
+    - `reviewKey` defaults to `process.env.PROOMPTER_REVIEW_KEY`, and the route answers 404 when it is unset.
+    - The kit asks the reviewer for the key once and keeps it in `localStorage`.
+    - The body cap and the field validation are shared with the dev route (`src/server/`).
+- **D17. Snapshot redaction (T13).** After `toPng`, each PNG is masked on a canvas: solid boxes are drawn over the
+  rectangles of these elements (html-to-image has no clone hook, and filtering nodes out would shift the layout):
+  - `[data-proompter-redact]` elements;
+  - by default, `input`, `textarea` and `[contenteditable]`;
+  - the selectors in a plugin's `redactSnapshot`.
+  - The live page is never touched.
+  - It fails closed: if masking throws, that PNG is dropped. The entry is saved without it, and a toast says so.
+- **D18. Generic repo plugin (T14).** `@rachitkay/proompter/plugins` exports `repoPlugin({ tasks, testPlan,
+  context })`.
+  - `tasks`: route globs mapped to repo files. They feed `taskFor`, and so the Task chip.
+  - `testPlan`: section names, which feed the Test plan menu.
+  - `context`: extra frontmatter.
+  - `globToRegExp` moves to `src/core/glob.ts`, a pure module the loader re-exports.
+- **D19. CLI (T15).** The `proompter` bin works on `./reviews/` with the v1 parser and writer. It adds no new
+  format.
+  - `list [--status --priority --route --session]`.
+  - `show <ref>`.
+  - `task <ref>` prints an agent-ready task.
+  - `resolve <ref> [--note "…"] [--require-test]`.
+  - `ref` is `<session>/PRO-n`, or `PRO-n` when that is unambiguous.
+  - Test-plan linking: `test_plan` may name a test file. `--require-test` refuses unless that file exists.
+- **D20. MCP server (T16).** `proompter mcp` is hand-written JSON-RPC 2.0 over stdio, with no dependency.
+  - Methods: `initialize`, `tools/list`, `tools/call`.
+  - Tools: `list_entries`, `show_entry`, `entry_task`, `reply_entry` and `resolve_entry`.
+  - `reply_entry` adds a `## Replies` line and an activity line.
+  - It is a thin wrapper over the CLI core.
+- **v1 gaps (T17):**
+  - `isProompterFrame()` export, for apps that double-mount providers in device frames.
+  - Esc during the composer's exit animation goes to the Esc ladder.
+  - The D11 focusout guard is narrowed, so app inputs still get blur.
+  - An `Alt+K` fallback for the command menu (Firefox owns `Ctrl+Shift+K`).
 - **Peer dependencies:** `react >=19`, `react-dom >=19`, `next >=15.3` (optional, only for `./next`), `vite >=5`
   (optional, only for `./vite`, D14).
 - **Dependencies:**
