@@ -1,0 +1,7 @@
+/* Placeholder. T02 (ui-kit) owns the real content: tokens, primitives, Tailwind theme. */
+@import "tailwindcss";
+
+.pm-root {
+  display: block;
+  color-scheme: light dark;
+}
