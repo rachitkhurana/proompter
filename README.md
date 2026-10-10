@@ -137,6 +137,62 @@ Dev is unchanged: always on. Entries stay in the reviewer's browser (IndexedDB) 
 sink is a dev-only feature, and the dev route still answers 404 in a production build. With the flag unset,
 nothing ships at all.
 
+## GitHub sync
+
+On a dev server or a preview, a reviewer can press **Sync to GitHub** in the Publish tab. Each entry lands on a
+`reviews` branch, as the same files you get locally, and as a GitHub issue. Status goes both ways.
+
+**1. Mount the route** (Next: `app/api/proompter/github/route.ts`; any other server can mount the same Web
+`GET` and `POST`):
+
+```ts
+import { createGithubRoute } from "@rachitkay/proompter/github";
+
+const route = createGithubRoute({ repo: "owner/name" }); // also: branch = "reviews", allowedHosts, api
+export const GET = route.GET;
+export const POST = route.POST;
+```
+
+**2. Set two env vars on the server** (the route answers 404 until both exist):
+
+- `PROOMPTER_GITHUB_TOKEN`: a fine-grained personal access token with **Contents** and **Issues** read and
+  write on that one repo. It stays on the server and never reaches the browser.
+- `PROOMPTER_REVIEW_KEY`: a secret you share with your reviewers, **at least 16 characters** (a shorter one is
+  treated as unset and the route stays 404). Make one with `openssl rand -hex 24`. The browser sends it as
+  `Authorization: Bearer`; a wrong or missing key is a 401. The Publish tab asks for it once and keeps it in
+  `localStorage["proompter:review-key"]`.
+
+**3. Turn it on in the app:** `<Proompter github={{ endpoint: "/api/proompter/github" }} />` (the endpoint is
+optional when you use that path). Without the prop nothing changes.
+
+**What lands where**
+
+- Files, through the Contents API, on the `reviews` branch (created from the default branch if missing):
+  `reviews/<session>/session.md`, `entries/NNN-slug.md` and `assets/*.png`, the same layout and serializer as the
+  local files. A file that has not changed is not rewritten, and a renamed title deletes the old file.
+- One issue per entry, titled `PRO-n: <title>`, labelled `proompter`, `kind:<kind>` and `priority:<priority>`
+  (created when missing). The body is the entry markdown with its snapshot linked from the branch. The issue
+  number is stored in the entry's `issue` field and shown as a link in the Publish tab.
+
+**Status, both ways.** Resolving an entry closes its issue and reopening it reopens the issue. An issue closed on
+GitHub marks the entry resolved, with one activity line, on the next sync. If the entry also changed locally,
+the local change wins, but only within one page load: what was already synced is remembered in memory, so after a
+reload GitHub wins.
+
+Notes: syncing sends one request per changed entry. Each entry costs a handful of GitHub API calls, so a very
+large review on a token with a low rate limit can be throttled; it picks up where it stopped on the next sync.
+Large screenshots go through the Contents API (100 MB per file at most).
+
+Things to know before you turn it on:
+
+- **One server instance.** Concurrent syncs are serialised inside one server process. On serverless or several
+  instances two syncs of the same entry at once can create two issues and clash on `session.md` (a clash is
+  retried once).
+- **Issue bodies carry the entry's Context lines**, the console and network summary, as the files do. On a
+  public repo, read [What gets redacted?](#what-gets-redacted) first and add a `redact` hook if needed. Issue
+  titles and bodies have `@` broken with a zero-width space, so a synced entry cannot ping people or teams;
+  the files on the branch are unchanged.
+
 ## Shortcuts
 
 | Key | Does |
