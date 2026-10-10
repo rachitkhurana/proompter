@@ -1,4 +1,6 @@
+import { existsSync } from "node:fs";
 import { parseArgs } from "node:util";
+import { serveMcp } from "./mcp";
 import { CliError, findEntry, listEntries, listLine, resolveEntry, targetFor, taskText } from "./core";
 
 const USAGE = `proompter: work the reviews/ folder from the terminal
@@ -9,13 +11,14 @@ Usage:
   proompter show <ref> [--json]
   proompter task <ref>
   proompter resolve <ref> [--note "<text>"] [--require-test]
+  proompter mcp          serve the same actions to an MCP client over stdio
 
 Options:
   --dir <path>   the reviews folder (default ./reviews)
   -h, --help
 
 <ref> is <session>/PRO-n, or PRO-n when only one session has it.
-Exit codes: 0 ok, 1 not found, 2 usage or ambiguous.
+Exit codes: 0 ok, 1 not found, 2 usage or ambiguous, 3 unexpected error.
 `;
 
 async function run(argv: string[]): Promise<string> {
@@ -38,6 +41,7 @@ async function run(argv: string[]): Promise<string> {
   if (values.help || cmd === undefined) return USAGE;
   if (extra.length) throw new CliError(`unexpected argument '${extra[0]}'`);
   const t = targetFor(process.cwd(), values.dir);
+  if (values.dir !== undefined && !existsSync(t.dir)) throw new CliError(`--dir ${t.dir} does not exist`, 2);
   const needRef = (): string => {
     if (ref === undefined) throw new CliError(`'${cmd}' needs an entry reference`);
     return ref;
@@ -59,6 +63,10 @@ async function run(argv: string[]): Promise<string> {
       const r = await resolveEntry(t, needRef(), { note: values.note, requireTest: values["require-test"] });
       return `resolved ${r.ref}\n`;
     }
+    case "mcp":
+      if (ref !== undefined) throw new CliError(`unexpected argument '${ref}'`);
+      await serveMcp(t);
+      return "";
     default:
       throw new CliError(`unknown command '${cmd}'\n\n${USAGE}`);
   }
@@ -74,7 +82,7 @@ try {
     process.stderr.write(`proompter: ${e.message}\n`);
     process.exitCode = 2;
   } else {
-    process.stderr.write(`proompter: ${e instanceof Error ? e.message : String(e)}\n`);
-    process.exitCode = 1;
+    process.stderr.write(`proompter: unexpected error: ${e instanceof Error ? e.message : String(e)}\n`);
+    process.exitCode = 3;
   }
 }
