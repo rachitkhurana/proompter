@@ -150,3 +150,77 @@ describe("Tooltip", () => {
     expect(tip()).toBeNull();
   });
 });
+
+// Regression: the UI is a portal into a shadow root inside the host app's React tree, so the pointer
+// usually arrives from another element React manages. React's onPointerEnter is skipped in that case, which
+// left tooltips dead after the first visit.
+describe("Tooltip re-entry from outside the group", () => {
+  async function setupWithOutsiders() {
+    m = await mountInShadow(
+      <>
+        <button id="managed">host-managed neighbour</button>
+        <TooltipProvider>
+          <Tooltip content="First">
+            <button id="a">a</button>
+          </Tooltip>
+          <Tooltip content="Second">
+            <button id="b">b</button>
+          </Tooltip>
+        </TooltipProvider>
+      </>,
+      { css: "" },
+    );
+    const plain = document.createElement("div");
+    document.body.appendChild(plain);
+    return {
+      a: m.shadow().querySelector<HTMLElement>("#a")!,
+      b: m.shadow().querySelector<HTMLElement>("#b")!,
+      managed: m.shadow().querySelector<HTMLElement>("#managed")!,
+      plain,
+    };
+  }
+
+  it("shows after the pointer comes back from a React-managed element", async () => {
+    const { a, managed } = await setupWithOutsiders();
+    await act(async () => move(managed, a));
+    await advance(350);
+    expect(tip()?.textContent).toBe("First");
+    await act(async () => move(a, managed));
+    await advance(600);
+    expect(tip()).toBeNull();
+    await act(async () => move(managed, a));
+    await advance(350);
+    expect(tip()?.textContent).toBe("First");
+  });
+
+  it("shows after the pointer comes back from a plain DOM node outside the portal tree", async () => {
+    const { a, plain } = await setupWithOutsiders();
+    await act(async () => move(plain, a));
+    await advance(350);
+    expect(tip()).not.toBeNull();
+    await act(async () => move(a, plain));
+    await advance(600);
+    expect(tip()).toBeNull();
+    await act(async () => move(plain, a));
+    await advance(350);
+    expect(tip()?.textContent).toBe("First");
+    plain.remove();
+  });
+
+  it("goes cold after leaving to a managed element for more than 250ms, and stays warm for less", async () => {
+    const { a, b, managed } = await setupWithOutsiders();
+    await act(async () => move(managed, a));
+    await advance(350 + 100); // shown
+    await advance(100); // warm (420ms after the pointer went over)
+    await act(async () => move(a, managed));
+    await advance(100);
+    await act(async () => move(managed, b));
+    expect(tip()?.textContent).toBe("Second"); // instant: still warm
+    await act(async () => move(b, managed));
+    await advance(300);
+    await act(async () => move(managed, a));
+    expect(tip()).toBeNull(); // cold again: waits the full delay
+    await advance(350);
+    expect(tip()?.textContent).toBe("First");
+  });
+});
