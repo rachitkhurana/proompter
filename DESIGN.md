@@ -113,6 +113,21 @@ examples/playground/    → Next 16 app with a Gamorite-like mock page (the prot
   `backdrop-filter`, the `--blur-*` tokens and the `prefers-reduced-transparency` override are removed. Shadows,
   the top-edge highlight and borders stay, so depth still reads. rgba fills on top of surfaces are unchanged.
   The prototype uses the same tokens.
+- **D11. Host modals stay open (2026-10-10, Rachit, Gamorite trial):** events from the shadow root reach the
+  document retargeted to `<proompter-root>`, so a host modal (Radix Dialog) took any click in the kit as an
+  outside click and closed. `shadow-root.tsx` shields the host page:
+  - pointer, mouse, click, touch, wheel and focusin/focusout events stop at the host element, so outside-click,
+    focus-outside and scroll-lock listeners never see them. The kit's own document listeners are capture-phase
+    or keydown, so they still run.
+  - A window capture-phase `focusout` guard stops focus moving from an app dialog into the kit, so a focus trap
+    doesn't pull it back.
+  - `Esc` inside the kit is default-prevented before the app's capture listeners, which skip handled events.
+    The Esc ladder ignores that mark (`isShielded`).
+  - While picking, the pick engine hands `Esc` straight to the ladder, so it leaves the mode and doesn't close
+    the app's dialog.
+  - A modal's `aria-hidden` is taken off the host, so the kit stays reachable to assistive tech.
+  Picking inside the dialog works as before. A click on the app itself still closes it. `e2e/app-dialog.spec.ts`
+  covers this against a real Radix Dialog (`radix-ui`, a playground dev dependency only).
 - **Peer dependencies:** `react >=19`, `react-dom >=19`, `next >=15.3` (optional, only for `./next`).
 - **Dependencies:**
   - `html-to-image` (snapshots)
