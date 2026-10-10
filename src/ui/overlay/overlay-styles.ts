@@ -9,6 +9,7 @@
  */
 export const overlayCss = /* css */ `
 .pp .pm-ovl{position:fixed;inset:0;pointer-events:none;z-index:40}
+.pp .pm-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .pp .pm-hov{position:fixed;border-radius:6px;box-shadow:0 0 0 1.5px var(--acc),0 0 0 4px var(--acc-soft);background:rgba(255,99,99,.06);opacity:0;transition:opacity .12s var(--ease),left .09s var(--ease),top .09s var(--ease),width .09s var(--ease),height .09s var(--ease)}
 .pp .pm-hov.on{opacity:1}
 .pp .pm-hlab{position:fixed;display:flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:6px;background:var(--acc-solid);color:var(--acc-fg);font:500 11.5px/16px var(--sans);white-space:nowrap;opacity:0;translate:0 2px;transition:opacity .12s var(--ease),translate .15s var(--ease)}

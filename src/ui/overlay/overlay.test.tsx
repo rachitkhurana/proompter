@@ -274,6 +274,20 @@ describe("<Overlay>", () => {
     expect(sh().querySelector(".pm-hlab")!.textContent).toContain("↓1");
   });
 
+  it("announces each keyboard move as '<label>, <source>' in a polite live region", async () => {
+    await mountOverlay();
+    const live = () => sh().querySelector(".pm-sr")!;
+    expect(live().getAttribute("aria-live")).toBe("polite");
+    expect(live().textContent).toBe("");
+    await act(async () => engine!.setMode("pick"));
+    await hover($("#avatar"));
+    expect(live().textContent).toBe("img · avatar, avatar.tsx:6:7");
+    await act(async () => void $("#avatar").dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true, cancelable: true })));
+    expect(live().textContent).toBe("Avatar, avatar.tsx:5:5");
+    await act(async () => engine!.setMode("idle"));
+    expect(live().textContent).toBe("");
+  });
+
   it("fades the box out where it was when the mode ends", async () => {
     await mountOverlay();
     await act(async () => engine!.setMode("pick"));
