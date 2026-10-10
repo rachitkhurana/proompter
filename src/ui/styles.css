@@ -48,7 +48,8 @@
   --fg-3: #8f8f98; /* secondary text: 4.5:1 or better on the kit's surfaces (axe color-contrast) */
   --fg-4: #52525b;
   --acc: #ff6363;
-  --acc-fg: var(--canvas); /* text on --acc (D7): white on #ff6363 is 2.9:1. One-line swap if --acc darkens. */
+  --acc-solid: #d63c3c; /* fill behind text (D7): white on it is 4.7:1. --acc stays for strokes, pins, rings, highlights */
+  --acc-fg: #fff;
   --acc-press: #f25555;
   --acc-soft: rgba(255, 99, 99, 0.13);
   --acc-line: rgba(255, 99, 99, 0.4);
@@ -176,7 +177,7 @@
   height: 15px;
   padding: 0 4px;
   border-radius: 8px;
-  background: var(--acc);
+  background: var(--acc-solid);
   color: var(--acc-fg);
   font: 600 9.5px/15px var(--sans);
   text-align: center;
@@ -211,7 +212,7 @@
   scale: 0.97;
 }
 .pp .btn.pri {
-  background: var(--acc);
+  background: var(--acc-solid);
   color: var(--acc-fg);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.18),
@@ -219,11 +220,11 @@
 }
 @media (hover: hover) {
   .pp .btn.pri:hover {
-    background: #ff7272;
+    background: #cc3b3b;
   }
 }
 .pp .btn.pri:active {
-  background: var(--acc-press);
+  background: #c23636;
 }
 .pp .btn.ghost {
   background: transparent;
