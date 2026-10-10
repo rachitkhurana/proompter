@@ -263,7 +263,8 @@ export function Composer({
       const ctx = safeContext(capture);
       let snapshot: EntrySnapshot | undefined;
       try {
-        const shot = await capture.snapshot(surface, resolved[0]?.el);
+        const shot = await capture.snapshot(surface, resolved[0]?.el, plugins?.flatMap((p) => p.redactSnapshot ?? []));
+        if (shot.redactFailed) toast("Snapshot hidden: it couldn't be redacted.");
         if (shot.element || shot.viewport) {
           snapshot = { fontsEmbedded: shot.fontsEmbedded, ...(shot.element ? { element: shot.element } : {}), ...(shot.viewport ? { viewport: shot.viewport } : {}) };
         }
