@@ -111,6 +111,6 @@ export function createCapture(opts: CaptureOptions): Capture {
         internalErrors: errorRing.toArray(),
       };
     },
-    snapshot: (surface, el) => takeSnapshot(surface, el, fail),
+    snapshot: (surface, el, redact) => takeSnapshot(surface, el, fail, redact),
   };
 }
