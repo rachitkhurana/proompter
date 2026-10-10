@@ -81,7 +81,11 @@
     "lint": "eslint .",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "release:strip": "node scripts/release-exports.mjs strip",
+    "release:restore": "node scripts/release-exports.mjs restore",
+    "prepack": "node scripts/release-exports.mjs prepack",
+    "postpack": "node scripts/release-exports.mjs postpack"
   },
   "peerDependencies": {
     "next": ">=15.3",
@@ -101,6 +105,7 @@
     "magic-string": "1.4.3"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@eslint/js": "10.0.1",
     "@fontsource-variable/geist": "5.3.0",
     "@fontsource-variable/geist-mono": "5.3.0",
