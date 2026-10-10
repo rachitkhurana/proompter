@@ -1,4 +1,4 @@
-import type { EntryIntent, EntryKind, EntryPriority, EntryStatus } from "../../core/entry";
+import type { EntryIntent, EntryKind, EntryPriority } from "../../core/entry";
 import type { IconName } from "../icons";
 
 /** Prototype `INTENT`. */
@@ -12,14 +12,6 @@ export const INTENT_LABEL: Record<EntryIntent, string> = {
 
 /** Prototype `PRIO` (urgent / high / med), under the one vocabulary of DESIGN D2.5. */
 export const PRIORITY_ORDER: readonly EntryPriority[] = ["blocking", "important", "minor"];
-
-/** Prototype `STATUS`. */
-export const STATUS_ORDER: readonly EntryStatus[] = ["open", "progress", "resolved"];
-export const STATUS_NAME: Record<EntryStatus, string> = {
-  open: "Open",
-  progress: "In progress",
-  resolved: "Resolved",
-};
 
 /** Prototype `TAGS`. */
 export const DEFAULT_TAGS: readonly string[] = ["ui", "data", "copy", "a11y", "perf", "regression", "mobile"];
