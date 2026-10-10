@@ -198,19 +198,34 @@ examples/vite/          → plain React app on Vite 8 with @vitejs/plugin-react 
   - `testPlan`: section names, which feed the Test plan menu.
   - `context`: extra frontmatter.
   - `globToRegExp` moves to `src/core/glob.ts`, a pure module the loader re-exports.
-- **D19. CLI (T15).** The `proompter` bin works on `./reviews/` with the v1 parser and writer. It adds no new
-  format.
-  - `list [--status --priority --route --session]`.
-  - `show <ref>`.
-  - `task <ref>` prints an agent-ready task.
-  - `resolve <ref> [--note "…"] [--require-test]`.
-  - `ref` is `<session>/PRO-n`, or `PRO-n` when that is unambiguous.
-  - Test-plan linking: `test_plan` may name a test file. `--require-test` refuses unless that file exists.
-- **D20. MCP server (T16).** `proompter mcp` is hand-written JSON-RPC 2.0 over stdio, with no dependency.
-  - Methods: `initialize`, `tools/list`, `tools/call`.
-  - Tools: `list_entries`, `show_entry`, `entry_task`, `reply_entry` and `resolve_entry`.
-  - `reply_entry` adds a `## Replies` line and an activity line.
+- **D19. CLI (T15).** The `proompter` bin works on `./reviews/`, using the v1 parser and writer.
+  - **Commands:**
+    - `list [--status --priority --route --session]`
+    - `show <ref>`
+    - `task <ref>` prints an agent-ready task, including any existing Resolution and Replies.
+    - `resolve <ref> [--note "…"] [--require-test]`
+    - A `ref` is `<session>/PRO-n`, or just `PRO-n` when that is unambiguous.
+  - **Exit codes:** 0 ok, 1 not found, 2 usage or ambiguous, 3 unexpected.
+  - **Format additions:** two optional sections, `## Resolution` and `## Replies`. They follow the description, or
+    `## Targets` when present, and come before `## Context`.
+    - A description line that would read as a section heading is written with an escaping backslash.
+    - Both sections are file-carried fields: the files sink merges them from disk, and `checkEntry` and the
+      redaction keep them.
+  - **Activity:** the file format has no activity log, so the CLI and MCP write none. The kit logs "resolution
+    edited" or "replies edited" when it merges the change.
+  - **Test-plan linking:** `test_plan` may name a test file. `--require-test` refuses unless it is an existing file
+    inside the repo that looks like a test.
+  - **Pages left open:** before auto-writing an entry, the files sink does a 3-way merge of external changes, with
+    the last-known disk text as the base, so an open page doesn't overwrite an agent's write. Where both sides
+    changed the same field, local wins.
+- **D20. MCP server (T16).** `proompter mcp` runs JSON-RPC 2.0 over stdio, newline-delimited, written by hand with
+  no dependency.
+  - **Methods:** `initialize`, `ping`, `tools/list` and `tools/call`. Notifications get no response, and there is no
+    batching.
+  - **Tools:** `list_entries`, `show_entry`, `entry_task`, `reply_entry` and `resolve_entry`. Tool failures and bad
+    arguments come back as results with `isError: true`.
   - It is a thin wrapper over the CLI core.
+  - **Run it with:** `npx -y @rachitkay/proompter mcp`. The unscoped `proompter` on npm is someone else's package.
 - **v1 gaps (T17):**
   - `isProompterFrame()` export, for apps that double-mount providers in device frames.
   - Esc during the composer's exit animation goes to the Esc ladder.
