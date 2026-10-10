@@ -657,3 +657,20 @@ describe("kind is escaped like every other frontmatter value (T09)", () => {
     expect(serialize(makeEntry())).toMatch(/^kind: element$/m);
   });
 });
+
+describe("serialize: resolution (T15)", () => {
+  it("round-trips a ## Resolution section before ## Context", () => {
+    const { md, back } = roundTrip(makeEntry({ status: "resolved", resolution: "Cropped the avatar.\n\nSee commit abc." }));
+    expect(back.resolution).toBe("Cropped the avatar.\n\nSee commit abc.");
+    expect(md.indexOf("## Resolution")).toBeLessThan(md.indexOf("## Context"));
+  });
+
+  it("is omitted when blank, and works for multi entries and an image link", () => {
+    expect(serialize(makeEntry({ resolution: "  \n" }))).not.toContain("## Resolution");
+    const multi = makeEntry({ kind: "multi", targets: [makeTarget(), makeTarget({ label: "Second" })], resolution: "done" });
+    const { back } = roundTrip(multi);
+    expect(back.resolution).toBe("done");
+    expect(back.targets).toHaveLength(2);
+    expect(back.description).not.toContain("Resolution");
+  });
+});
