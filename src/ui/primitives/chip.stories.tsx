@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { CodeIcon, ResponsiveIcon, TagIcon } from "../icons";
+import { Icon } from "../icons";
 import { Chip } from "./chip";
 import { Kbd } from "./kbd";
 import { PriorityIcon } from "./priority-icon";
@@ -14,18 +14,18 @@ export const Chips: Story = {
   render: () => (
     <Stack>
       <Row>
-        <Chip icon={<TagIcon size="s" />}>Static</Chip>
-        <Chip as="button" icon={<TagIcon size="s" />}>
+        <Chip icon={<Icon name="tag" size="s" />}>Static</Chip>
+        <Chip as="button" icon={<Icon name="tag" size="s" />}>
           Button
         </Chip>
         <Chip mono>post-card.tsx:48</Chip>
         <Chip mono as="button">
           ↳ avatar.tsx:12
         </Chip>
-        <Chip accent icon={<CodeIcon size="s" />}>
+        <Chip accent icon={<Icon name="code" size="s" />}>
           T-feed-home
         </Chip>
-        <Chip ghost icon={<ResponsiveIcon size="s" />}>
+        <Chip ghost icon={<Icon name="responsive" size="s" />}>
           1280×800
         </Chip>
       </Row>
@@ -52,14 +52,14 @@ export const PriorityAndStatus: Story = {
   render: () => (
     <Stack>
       <Row>
-        <PriorityIcon priority="blocking" label="Blocking" />
-        <PriorityIcon priority="important" label="Important" />
-        <PriorityIcon priority="minor" label="Minor" />
+        <PriorityIcon priority="blocking" />
+        <PriorityIcon priority="important" />
+        <PriorityIcon priority="minor" />
       </Row>
       <Row>
-        <StatusIcon status="open" label="Open" />
-        <StatusIcon status="progress" label="In progress" />
-        <StatusIcon status="resolved" label="Resolved" />
+        <StatusIcon status="open" />
+        <StatusIcon status="progress" />
+        <StatusIcon status="resolved" />
       </Row>
     </Stack>
   ),
