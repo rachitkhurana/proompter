@@ -45,7 +45,7 @@
   --edge: inset 0 1px 0 rgba(255, 255, 255, 0.07);
   --fg: #f4f4f5;
   --fg-2: #a1a1aa;
-  --fg-3: #8f8f98; /* secondary text: 4.5:1 or better on the kit's surfaces (axe color-contrast) */
+  --fg-3: #9a9aa3; /* secondary text: 4.5:1 or better on the kit's surfaces (axe color-contrast) */
   --fg-4: #52525b;
   --acc: #ff6363;
   --acc-solid: #d63c3c; /* fill behind text (D7): white on it is 4.7:1. --acc stays for strokes, pins, rings, highlights */
