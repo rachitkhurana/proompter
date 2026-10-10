@@ -63,7 +63,7 @@ export function handleKeydown(ev: KeyboardEvent, state: KeyState, actions: KeyAc
   const key = typeof ev.key === "string" ? ev.key : "";
   const mod = ev.metaKey || ev.ctrlKey;
 
-  if (mod && !ev.shiftKey && !ev.altKey && key.toLowerCase() === "k") {
+  if (mod && ev.shiftKey && !ev.altKey && key.toLowerCase() === "k") {
     ev.preventDefault();
     actions.toggleCommand();
     return true;
@@ -91,7 +91,7 @@ export function handleKeydown(ev: KeyboardEvent, state: KeyState, actions: KeyAc
   }
 
   if (mod || ev.altKey || ev.repeat || eventElement(ev)?.closest(TYPING)) return false;
-  // The command menu, an open menu and the composer own the keyboard while they are open: only Esc and ⌘K
+  // The command menu, an open menu and the composer own the keyboard while they are open: only Esc and ⌘⇧K
   // (above) and the toggle chord (handled elsewhere) act. Otherwise `e` in a menu would toggle the sheet,
   // and `p` on a composer chip would discard the draft.
   if (state.commandOpen || state.menuOpen || state.composerOpen) return false;
