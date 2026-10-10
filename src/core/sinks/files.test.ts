@@ -176,6 +176,66 @@ describe("files sink", () => {
     expect(parse(await fs.readFile(path.join(a.dir, "entries", names[0]!), "utf8")).resolution).toBe("Cropped it.");
   });
 
+  it("an external resolve + note made while the page is open survives a later UI title edit (M2)", async () => {
+    const a = await setup();
+    const e = await a.store.create(draft());
+    await a.sink.idle();
+    const file = path.join(a.dir, "entries", "001-avatar-is-cropped-on-mobile.md");
+    const md = await fs.readFile(file, "utf8");
+    await fs.writeFile(
+      file,
+      md.replace("## Context", "## Resolution\n\nCropped it.\n\n## Context").replace("status: open", "status: resolved"),
+    );
+    await a.store.update(e.id, { title: "Renamed in the UI" });
+    await a.sink.idle();
+    const names = await fs.readdir(path.join(a.dir, "entries"));
+    const disk = parse(await fs.readFile(path.join(a.dir, "entries", names[0]!), "utf8"));
+    expect(disk.title).toBe("Renamed in the UI");
+    expect(disk.status).toBe("resolved");
+    expect(disk.resolution).toBe("Cropped it.");
+    expect(a.store.get(e.id)?.status).toBe("resolved");
+  });
+
+  it("a field changed both on disk and in the UI keeps the UI value (M2)", async () => {
+    const a = await setup();
+    const e = await a.store.create(draft());
+    await a.sink.idle();
+    const file = path.join(a.dir, "entries", "001-avatar-is-cropped-on-mobile.md");
+    const md = await fs.readFile(file, "utf8");
+    await fs.writeFile(file, md.replace("priority: important", "priority: blocking").replace("status: open", "status: resolved"));
+    await a.store.update(e.id, { priority: "minor" });
+    await a.sink.idle();
+    const names = await fs.readdir(path.join(a.dir, "entries"));
+    const disk = parse(await fs.readFile(path.join(a.dir, "entries", names[0]!), "utf8"));
+    expect(disk.priority).toBe("minor");
+    expect(disk.status).toBe("resolved");
+  });
+
+  it("replies written to the file survive a later UI edit (T16)", async () => {
+    const a = await setup();
+    await a.store.create(draft());
+    await a.sink.idle();
+    const file = path.join(a.dir, "entries", "001-avatar-is-cropped-on-mobile.md");
+    const md = await fs.readFile(file, "utf8");
+    await fs.writeFile(file, md.replace("## Context", "## Replies\n\n- claude (2026-10-10T12:00:00Z): On it.\n\n## Context"));
+
+    const store = newStore();
+    await store.ready;
+    const sink = sinkFor(store);
+    await store.create(draft());
+    await sink.rehydrate();
+    await sink.idle();
+    const id = store.getState().entries[0]!.id;
+    expect(store.get(id)?.replies).toBe("- claude (2026-10-10T12:00:00Z): On it.");
+
+    const sink2 = sinkFor(store);
+    await sink2.rehydrate();
+    await store.update(id, { title: "Renamed after reply" });
+    await sink2.idle();
+    const names = await fs.readdir(path.join(a.dir, "entries"));
+    expect(parse(await fs.readFile(path.join(a.dir, "entries", names[0]!), "utf8")).replies).toBe("- claude (2026-10-10T12:00:00Z): On it.");
+  });
+
   it("on 404 (preview/prod) entries stay pending and auto-posting stops until write()", async () => {
     vi.stubEnv("NODE_ENV", "production");
     const { store, sink, dir } = await setup();
@@ -409,6 +469,7 @@ describe("diskPatch", () => {
     const disk = parse(serialize(e));
     expect(diskPatch(e, disk)).toEqual({});
     expect(diskPatch(e, { ...disk, resolution: "done" })).toEqual({ resolution: "done" });
+    expect(diskPatch(e, { ...disk, replies: "- a (d): b" })).toEqual({ replies: "- a (d): b" });
     expect(diskPatch(e, { ...disk, status: "resolved", testPlan: undefined, title: "New" })).toEqual({
       status: "resolved",
       testPlan: null,
