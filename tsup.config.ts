@@ -65,4 +65,13 @@ export default defineConfig([
     },
     clean: false,
   },
+  // The `proompter` bin (D19). ESM only, no types, and the shebang goes on this entry alone.
+  {
+    ...shared,
+    format: ["esm"],
+    dts: false,
+    entry: { "cli/index": "src/cli/index.ts" },
+    banner: { js: "#!/usr/bin/env node" },
+    clean: false,
+  },
 ]);
