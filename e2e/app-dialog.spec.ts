@@ -74,6 +74,20 @@ test("D11: pick, compose, scroll and Esc inside the kit keep an app dialog open"
   await expect(page.locator(".pm-comp")).toHaveCount(0); // its exit animation ends; the engine is free again
   await expect(dialog).toBeVisible();
 
+  // Esc on the page right after the composer's own Esc, while its exit animation still runs: the kit's ladder
+  // takes it, never the dialog. (Reopen the composer first; the previous one is gone.)
+  if ((await pick.getAttribute("aria-pressed")) !== "true") await pick.click();
+  await field.hover();
+  await field.click();
+  await expect(composer).toBeVisible();
+  await expect(composer.getByLabel("Title")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape"); // no wait for `.pm-comp` to go
+  await expect(composer).toBeHidden();
+  await expect(page.locator(".pm-comp")).toHaveCount(0);
+  await expect(dialog).toBeVisible();
+  if ((await pick.getAttribute("aria-pressed")) !== "true") await pick.click();
+
   // Esc on the page while picking leaves the pick mode, not the app's dialog. Then a click on the page
   // outside the dialog (the app itself) still dismisses it.
   await page.keyboard.press("Escape");
@@ -81,4 +95,15 @@ test("D11: pick, compose, scroll and Esc inside the kit keep an app dialog open"
   await expect(dialog).toBeVisible();
   await page.mouse.click(400, 800);
   await expect(dialog).toBeHidden();
+});
+
+test("D11: focus moving into the kit still blurs an app input outside any modal", async ({ page }) => {
+  await page.goto("/dialog");
+  await openKit(page);
+  const outside = page.getByLabel("Outside field");
+  await outside.focus();
+  await expect(outside).toBeFocused();
+  await page.getByRole("button", { name: /^Entries/ }).click();
+  await expect(outside).not.toBeFocused();
+  expect(await page.evaluate(() => (window as unknown as { __outsideBlurs?: number }).__outsideBlurs)).toBeGreaterThan(0);
 });
