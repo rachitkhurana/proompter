@@ -7,6 +7,9 @@ import { parse } from "../src/core/serialize";
 /** Where the dev route writes (`<playground cwd>/reviews`). Gitignored. */
 export const REVIEWS = fileURLToPath(new URL("../examples/playground/reviews", import.meta.url));
 
+/** Where the Vite example's dev route writes (D14). Gitignored. */
+export const VITE_REVIEWS = fileURLToPath(new URL("../examples/vite/reviews", import.meta.url));
+
 export const cleanReviews = () => rmSync(REVIEWS, { recursive: true, force: true });
 
 export const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -41,13 +44,13 @@ export async function waitForFile(dir: () => string, prefix: string, ext: string
 }
 
 /** The one session folder under reviews/ (waits for it). */
-export async function sessionDir(): Promise<string> {
+export async function sessionDir(root = REVIEWS): Promise<string> {
   let dir = "";
   await expect
     .poll(
       () => {
-        const names = existsSync(REVIEWS) ? readdirSync(REVIEWS).filter((n) => /^\d{4}-\d{2}-\d{2}_/.test(n)) : [];
-        dir = names[0] ? path.join(REVIEWS, names[0]) : "";
+        const names = existsSync(root) ? readdirSync(root).filter((n) => /^\d{4}-\d{2}-\d{2}_/.test(n)) : [];
+        dir = names[0] ? path.join(root, names[0]) : "";
         return dir;
       },
       { timeout: 30_000, message: "a session folder under reviews/" },
