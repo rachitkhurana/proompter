@@ -101,24 +101,14 @@ function readSingle(raw: string, start: number): Quoted {
 }
 
 function readDouble(raw: string, start: number): Quoted {
-  for (let i = start + 1; i < raw.length; i++) {
-    const c = raw[i];
-    if (c === "\\") {
-      i++;
-      continue;
-    }
-    if (c === '"') {
-      const literal = raw.slice(start, i + 1);
-      try {
-        const value: unknown = JSON.parse(literal);
-        if (typeof value !== "string") throw new Error("not a string");
-        return { value, rest: raw.slice(i + 1) };
-      } catch {
-        throw new YamlError(`bad double-quoted string: ${literal}`);
-      }
-    }
+  const literal = /^"(?:[^"\\]|\\[\s\S])*"/.exec(raw.slice(start))?.[0];
+  if (literal === undefined) throw new YamlError(`unterminated double-quoted string: ${raw}`);
+  try {
+    // `literal` is a JSON string literal, so JSON.parse yields a string or throws on a bad escape.
+    return { value: JSON.parse(literal) as string, rest: raw.slice(start + literal.length) };
+  } catch {
+    throw new YamlError(`bad double-quoted string: ${literal}`);
   }
-  throw new YamlError(`unterminated double-quoted string: ${raw}`);
 }
 
 function assertTail(rest: string, whole: string): void {
@@ -162,40 +152,27 @@ function parseFlowList(raw: string): Scalar[] {
   const t = raw.trim();
   const items: Scalar[] = [];
   let i = 1;
-  let closed = false;
-  while (i < t.length) {
+  const skipSpaces = () => {
     while (t[i] === " ") i++;
-    if (t[i] === "]") {
-      closed = true;
-      i++;
-      break;
-    }
-    let item: Scalar;
+  };
+  for (;;) {
+    skipSpaces();
+    if (t[i] === "]") break; // also after a trailing comma
+    if (i >= t.length) throw new YamlError(`unterminated flow list: ${raw}`);
     if (t[i] === "'" || t[i] === '"') {
       const q = t[i] === "'" ? readSingle(t, i) : readDouble(t, i);
-      item = q.value;
+      items.push(q.value);
       i = t.length - q.rest.length;
     } else {
-      let j = i;
-      while (j < t.length && t[j] !== "," && t[j] !== "]") j++;
-      item = plain(t.slice(i, j), false);
-      i = j;
+      const len = t.slice(i).search(/[,\]]|$/);
+      items.push(plain(t.slice(i, i + len), false));
+      i += len;
     }
-    items.push(item);
-    while (t[i] === " ") i++;
-    if (t[i] === ",") {
-      i++;
-      continue;
-    }
-    if (t[i] === "]") {
-      closed = true;
-      i++;
-      break;
-    }
-    throw new YamlError(`bad flow list: ${raw}`);
+    skipSpaces();
+    if (t[i] === ",") i++;
+    else if (t[i] !== "]") throw new YamlError(`bad flow list: ${raw}`);
   }
-  if (!closed) throw new YamlError(`unterminated flow list: ${raw}`);
-  assertTail(t.slice(i), raw);
+  assertTail(t.slice(i + 1), raw);
   return items;
 }
 

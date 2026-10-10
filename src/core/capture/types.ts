@@ -1,12 +1,10 @@
 /**
  * Capture types.
  *
- * `Surface` and `Rect` live in `../surface` (the one definition: `{ doc, win, toScreen(rect), scale }`, DESIGN §6).
- * They are re-exported here for code that imports them from capture. Capture only reads `doc` and `win`.
+ * `Surface` lives in `../surface` (the one definition: `{ doc, win, toScreen(rect), scale }`, DESIGN §6).
+ * Capture only reads `doc` and `win`.
  */
-import type { Rect, Surface } from "../surface";
-
-export type { Rect, Surface };
+import type { Surface } from "../surface";
 
 export interface CaptureConsoleEntry {
   /** Epoch ms. */

@@ -1,5 +1,6 @@
 import { toPng } from "html-to-image";
-import type { SnapshotResult, Surface } from "./types.ts";
+import type { Surface } from "../surface";
+import type { SnapshotResult } from "./types.ts";
 
 const PADDING = 12;
 

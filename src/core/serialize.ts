@@ -38,7 +38,19 @@
  * - `extra` (plugin `context()`) fields come after `created`. Keys that collide with a field above are dropped.
  * - session.md also has a `session:` line (the folder name) after `proompter: 1`.
  */
-import type { ContextSummary, Entry, EntryIntent, EntryKind, EntryPriority, EntryStatus, EntryTarget, Session } from "./entry";
+import {
+  ENTRY_INTENTS,
+  ENTRY_KINDS,
+  ENTRY_PRIORITIES,
+  ENTRY_STATUSES,
+  type ContextSummary,
+  type Entry,
+  type EntryKind,
+  type EntryPriority,
+  type EntryStatus,
+  type EntryTarget,
+  type Session,
+} from "./entry";
 import { VIEWPORT_ORDER, viewportSize, type ViewportId } from "./surface";
 import { emitString, emitValue, parseFrontmatter, parseValue, YamlError, type Scalar, type YamlValue } from "./yaml-lite";
 
@@ -345,10 +357,6 @@ export function serialize(entry: Entry, session?: Session): string {
 // ---------------------------------------------------------------------------------------------------------
 // Parse
 
-const STATUSES: readonly EntryStatus[] = ["open", "progress", "resolved"];
-const INTENTS: readonly EntryIntent[] = ["fix", "change", "question", "approve"];
-const PRIORITIES: readonly EntryPriority[] = ["blocking", "important", "minor"];
-
 function oneOf<T extends string>(value: string, list: readonly T[], what: string): T {
   if ((list as readonly string[]).includes(value)) return value as T;
   throw new ParseError(`unknown ${what} '${value}' (expected ${list.join(" | ")})`);
@@ -428,8 +436,13 @@ function parseTargets(lines: string[]): EntryTarget[] {
 
 /** Parse an entry file. Throws `ParseError` on anything that is not a Proompter entry. */
 export function parse(markdown: string): Entry {
+  return asParseError(() => parseEntry(markdown));
+}
+
+/** Run a parser; a `YamlError` from the frontmatter reader comes out as a `ParseError`. */
+function asParseError<T>(run: () => T): T {
   try {
-    return parseEntry(markdown);
+    return run();
   } catch (e) {
     if (e instanceof YamlError) throw new ParseError(e.message);
     throw e;
@@ -444,9 +457,9 @@ function parseEntry(markdown: string): Entry {
   const n = idNumber(id);
   if (n === null) throw new ParseError(`'id' must look like PRO-12, got '${id}'`);
   const session = str(fields, "session", true) as string;
-  const status = oneOf(str(fields, "status", true) as string, STATUSES, "status");
-  const intent = oneOf(str(fields, "intent", true) as string, INTENTS, "intent");
-  const priority = oneOf(str(fields, "priority", true) as string, PRIORITIES, "priority");
+  const status = oneOf(str(fields, "status", true) as string, ENTRY_STATUSES, "status");
+  const intent = oneOf(str(fields, "intent", true) as string, ENTRY_INTENTS, "intent");
+  const priority = oneOf(str(fields, "priority", true) as string, ENTRY_PRIORITIES, "priority");
 
   const vp = /^(\S+) (\d+)x(\d+)$/.exec(str(fields, "viewport", true) as string);
   if (!vp) throw new ParseError("'viewport' must look like 'mobile 390x844'");
@@ -468,7 +481,7 @@ function parseEntry(markdown: string): Entry {
 
   const kindField = str(fields, "kind", false);
   const kind: EntryKind = kindField
-    ? oneOf(kindField, ["element", "multi", "box", "text", "note"] as const, "kind")
+    ? oneOf(kindField, ENTRY_KINDS, "kind")
     : frontTarget
       ? "element"
       : "note";
@@ -673,7 +686,7 @@ export function serializeSession(session: Session, entries: ReadonlyArray<Pick<E
 const INDEX_LINE = /^- (PRO-\d+) · (open|progress|resolved) · (blocking|important|minor) · \[(.*)\]\((entries\/[^)\s]+\.md)\)$/;
 
 export function parseSession(markdown: string): ParsedSession {
-  try {
+  return asParseError(() => {
     const fm = parseFrontmatter(markdown);
     const fields: Fields = new Map(fm.fields);
     const version = parseValue(fields.get("proompter") ?? "", { typed: true });
@@ -707,8 +720,5 @@ export function parseSession(markdown: string): ParsedSession {
       });
     }
     return { session, entries };
-  } catch (e) {
-    if (e instanceof YamlError) throw new ParseError(e.message);
-    throw e;
-  }
+  });
 }

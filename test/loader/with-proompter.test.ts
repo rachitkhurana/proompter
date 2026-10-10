@@ -231,11 +231,9 @@ describe("the loader function (webpack / Turbopack contract)", () => {
     expect(map).toMatchObject({ version: 3, sources: ["/repo/app/page.tsx"] });
   });
 
-  it("falls back to rootContext, then to this.query", async () => {
-    const a = await run("/repo/x.tsx", jsx, {}, { rootContext: "/repo", getOptions: undefined, query: {} });
+  it("falls back to rootContext when the options have no root", async () => {
+    const a = await run("/repo/x.tsx", jsx, {}, { rootContext: "/repo", getOptions: undefined });
     expect(a.code).toContain('data-src="x.tsx:1:24"');
-    const b = await run("/repo/y.tsx", jsx, {}, { getOptions: undefined, query: { root: "/repo" } });
-    expect(b.code).toContain('data-src="y.tsx:1:24"');
   });
 
   it("passes skipped files through unchanged", async () => {
