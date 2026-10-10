@@ -136,7 +136,13 @@ export interface ProompterApi {
   open(): void;
   close(): void;
   toggle(): void;
-  /** The session's entries. Empty until the kit has been opened once (the store loads with the UI chunk). */
+  /** Preview builds (D15): turn the kit on (persisted in localStorage), start capture and open it. */
+  enable(): void;
+  /** Turn it off again: close, stop capture, back to dormant. */
+  disable(): void;
+  /** Whether the kit is active. Always true in development. */
+  enabled(): boolean;
+  /** The session's entries. Empty while dormant, and until the kit has been opened once (the store loads with the UI chunk). */
   entries(): readonly Entry[];
 }
 
