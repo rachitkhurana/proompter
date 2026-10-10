@@ -339,7 +339,7 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const notFound = () => new Response("Not found", { status: 404 });
 
-function enabled(): boolean {
+function nextDevEnabled(): boolean {
   return process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_PROOMPTER === "true";
 }
 
@@ -409,10 +409,16 @@ export interface RouteOptions {
   cwd?: () => string;
   /** Extra host names (no port) that may reach the route, e.g. a tunnel or LAN name. Loopback is always allowed. */
   allowedHosts?: readonly string[];
+  /**
+   * Whether the route answers at all (else 404). Default: `NODE_ENV === "development"` and
+   * `NEXT_PUBLIC_PROOMPTER === "true"`. The Vite plugin mounts it only on the dev server, so it passes `() => true`.
+   */
+  enabled?: () => boolean;
 }
 
 export function createProompterRoute(opts: RouteOptions = {}) {
   const cwdOf = opts.cwd ?? (() => process.cwd());
+  const enabled = opts.enabled ?? nextDevEnabled;
   /** `allowedHosts` plus `PROOMPTER_ALLOWED_HOSTS` (comma-separated), read per request. */
   const allowedNow = (): ReadonlySet<string> =>
     new Set(
