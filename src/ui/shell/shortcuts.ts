@@ -9,7 +9,7 @@ import { VIEWPORT_ORDER } from "../../core/surface";
 import { isTypingTarget } from "./chord";
 
 export interface KeyState {
-  /** A dropdown menu is open (Radix closes it itself when it saw the key; see `closeMenu`). */
+  /** A dropdown menu is open (it closes itself when it saw the key; see `closeMenu`). */
   menuOpen: boolean;
   composerOpen: boolean;
   commandOpen: boolean;
@@ -57,8 +57,8 @@ const TOOL_KEYS: Record<string, Exclude<PickMode, "idle">> = {
 
 /**
  * Handle one keydown. Returns true when the key was used (and its default prevented).
- * Skips events something else already handled (`defaultPrevented`: the dock grip's arrows, a Radix menu or
- * dialog that closed itself on Esc), and letter shortcuts typed into a text field.
+ * Skips events something else already handled (`defaultPrevented`: the dock grip's arrows, a menu that
+ * closed itself on Esc), and letter shortcuts typed into a text field.
  */
 export function handleKeydown(ev: KeyboardEvent, state: KeyState, actions: KeyActions): boolean {
   if (ev.defaultPrevented) return false;
