@@ -24,13 +24,20 @@ process.on("SIGINT", () => {
   process.exit(0);
 });
 
+/** `process.env` plus `env`; an `undefined` value removes the variable. */
+function withEnv(env) {
+  const merged = { ...process.env, ...env };
+  for (const k of Object.keys(merged)) if (merged[k] === undefined) delete merged[k];
+  return merged;
+}
+
 function runSync(cmd, args, env) {
-  const r = spawnSync(cmd, args, { stdio: "inherit", env: { ...process.env, ...env } });
+  const r = spawnSync(cmd, args, { stdio: "inherit", env: withEnv(env) });
   if (r.status !== 0) process.exit(r.status ?? 1);
 }
 
 function start(cmd, args, env) {
-  const c = spawn(cmd, args, { stdio: "inherit", env: { ...process.env, ...env } });
+  const c = spawn(cmd, args, { stdio: "inherit", env: withEnv(env) });
   children.push(c);
   c.on("exit", (code) => {
     if (code) {
@@ -53,7 +60,8 @@ async function waitFor(url, ms = 120_000) {
   throw new Error(`${url} did not come up`);
 }
 
-const prodEnv = { NEXT_PUBLIC_PROOMPTER: "", PLAYGROUND_DIST_DIR: DIST };
+// Truly unset, not "": Next only inlines NEXT_PUBLIC_* variables that exist, so "" would hide a leak (D13).
+const prodEnv = { NEXT_PUBLIC_PROOMPTER: undefined, PLAYGROUND_DIST_DIR: DIST };
 
 runSync(pnpm, ["build"], {});
 runSync(...playground("next", "build"), prodEnv);
