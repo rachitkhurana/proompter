@@ -72,17 +72,36 @@ function enabledItems(menu: HTMLElement): HTMLElement[] {
  */
 function place(menu: HTMLElement, anchor: HTMLElement, side: Side, align: Align) {
   const r = anchor.getBoundingClientRect();
+  // The viewport without scrollbars (`innerWidth` includes them).
+  const vw = document.documentElement.clientWidth;
+  const vh = document.documentElement.clientHeight;
+  if (!vw || !vh) return; // no layout (tests, detached): nothing to measure against
+  menu.style.maxHeight = "";
+  menu.style.overflowY = "";
   const w = menu.offsetWidth;
-  const h = menu.offsetHeight;
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  const fits: Record<Side, boolean> = {
-    bottom: r.bottom + GAP + h <= vh - PAD,
-    top: r.top - GAP - h >= PAD,
-    right: r.right + GAP + w <= vw - PAD,
-    left: r.left - GAP - w >= PAD,
+  let h = menu.offsetHeight;
+  const room: Record<Side, number> = {
+    bottom: vh - r.bottom - GAP - PAD,
+    top: r.top - GAP - PAD,
+    right: vw - r.right - GAP - PAD,
+    left: r.left - GAP - PAD,
   };
-  const s = !fits[side] && fits[OPPOSITE[side]] ? OPPOSITE[side] : side;
+  const fits: Record<Side, boolean> = {
+    bottom: h <= room.bottom,
+    top: h <= room.top,
+    right: w <= room.right,
+    left: w <= room.left,
+  };
+  // Flip when the wanted side overflows and the opposite fits; when neither fits, take the roomier one.
+  const opp = OPPOSITE[side];
+  const s = fits[side] ? side : fits[opp] ? opp : room[opp] > room[side] ? opp : side;
+  // Taller than the space available: cap the height and scroll.
+  const cap = s === "top" || s === "bottom" ? room[s] : vh - 2 * PAD;
+  if (h > cap) {
+    menu.style.maxHeight = `${Math.max(cap, 0)}px`;
+    menu.style.overflowY = "auto";
+    h = menu.offsetHeight;
+  }
   let left: number;
   let top: number;
   let ox: number | string;
@@ -163,9 +182,20 @@ export function Menu({
     [open, isOpen, onOpenChange],
   );
 
+  const setOpenRef = useRef(setOpen);
+  setOpenRef.current = setOpen;
+
   const close = (returnFocus: boolean) => {
     setOpen(false);
-    if (returnFocus) triggerRef.current?.focus({ preventScroll: true });
+    if (!returnFocus) return;
+    const t = triggerRef.current;
+    if (t?.isConnected) {
+      t.focus({ preventScroll: true });
+    } else if (container) {
+      // The trigger is gone: park focus on the kit's container (so on the shadow host), not the page body.
+      if (!container.hasAttribute("tabindex")) container.tabIndex = -1;
+      container.focus({ preventScroll: true });
+    }
   };
 
   // Place and focus the first item once the content is in the DOM (same commit as `isOpen`).
@@ -192,17 +222,29 @@ export function Menu({
       const path = ev.composedPath();
       if ((menuRef.current && path.includes(menuRef.current)) || (triggerRef.current && path.includes(triggerRef.current)))
         return;
-      setOpen(false);
+      setOpenRef.current(false);
     };
+    // Scroll events do not cross the shadow boundary, so listen on the shadow root as well as the window.
+    const menuEl = menuRef.current;
+    const root = menuEl?.getRootNode();
+    const onRootScroll = (ev: Event) => {
+      if (menuEl && ev.target instanceof Node && menuEl.contains(ev.target)) return; // the menu's own scroll
+      reposition();
+    };
+    const ro = menuEl && typeof ResizeObserver !== "undefined" ? new ResizeObserver(reposition) : null;
+    if (menuEl) ro?.observe(menuEl);
     document.addEventListener("pointerdown", outside, true);
     window.addEventListener("resize", reposition);
     window.addEventListener("scroll", reposition, true);
+    if (root && root !== document) root.addEventListener("scroll", onRootScroll, true);
     return () => {
       document.removeEventListener("pointerdown", outside, true);
       window.removeEventListener("resize", reposition);
       window.removeEventListener("scroll", reposition, true);
+      if (root && root !== document) root.removeEventListener("scroll", onRootScroll, true);
+      ro?.disconnect();
     };
-  }, [isOpen, side, align, setOpen]);
+  }, [isOpen, side, align]);
 
   // Unmount after the exit animation (or at once when there is none, e.g. reduced motion or no CSS).
   useEffect(() => {
@@ -243,7 +285,9 @@ export function Menu({
       return;
     }
     if (key === "Tab") {
-      e.preventDefault();
+      // APG: close and focus the trigger, but let the default Tab run. The menu is portalled, so the browser
+      // then moves focus to the element after (Shift+Tab: before) the trigger instead of trapping the user.
+      e.stopPropagation();
       close(true);
       return;
     }
@@ -273,6 +317,7 @@ export function Menu({
     if (key === "Enter" || (key === " " && !typed.current.text)) {
       e.preventDefault();
       e.stopPropagation();
+      if (e.repeat) return; // holding the key must not select again
       // The item the key was sent to wins over focus (a key event is addressed to its target).
       const targetItem = (e.target as Element | null)?.closest?.<HTMLElement>('[role^="menuitem"]:not([data-disabled])');
       const k = targetItem?.dataset.key ?? (i >= 0 ? list[i]?.dataset.key : undefined);
@@ -282,6 +327,11 @@ export function Menu({
     }
     if (key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
       // Type-ahead: a growing prefix, or the same letter repeated to cycle.
+      if (key === " ") {
+        // A space inside a type-ahead run (or one that finds nothing) must not scroll the host page.
+        e.preventDefault();
+        e.stopPropagation();
+      }
       const t = typed.current;
       window.clearTimeout(t.timer);
       t.text += key.toLowerCase();
@@ -374,6 +424,7 @@ export function Menu({
       if (e.defaultPrevented || triggerProps.disabled) return;
       if (e.key === "Enter" || e.key === " " || e.key === "ArrowDown") {
         e.preventDefault();
+        if (e.repeat) return; // a held key must not reopen what the menu just closed
         openFromTrigger();
       }
     },
@@ -398,7 +449,7 @@ export function Menu({
               data-state={isOpen ? "open" : "closed"}
               onKeyDown={onMenuKeyDown}
             >
-              {header ? <div className="mh">{header}</div> : null}
+              {header ? <div className="mh" role="presentation">{header}</div> : null}
               {items.map(renderItem)}
             </div>,
             portalTarget,
