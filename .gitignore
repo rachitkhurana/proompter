@@ -14,3 +14,4 @@ examples/vite/reviews/
 
 # Production check build (e2e, DESIGN 11.1)
 examples/playground/.next-prod/
+examples/playground/.next-preview/
