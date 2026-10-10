@@ -112,6 +112,8 @@ export class PickEngine {
   private walk: Element[] = [];
   private hoverEl: Element | null = null;
   private lastRaw: Element | null = null;
+  /** The current pick mode was entered by a shortcut (see `seed`). */
+  private keyed = false;
   private off: (() => void) | null = null;
   /** Whether the current mouse gesture started on the page (not on the kit). */
   private gestureInSurface = false;
@@ -188,6 +190,7 @@ export class PickEngine {
       this.setCrosshair(doc, false);
     };
     this.syncCrosshair();
+    this.seed(); // the frame can attach after the shortcut was pressed
   }
 
   dispose(): void {
@@ -213,7 +216,13 @@ export class PickEngine {
     this.set({ mode: next, multi: next === "multi" ? this.snap.multi : [] });
     this.syncCrosshair();
     this.opts.onModeChange?.(next);
-    const start = byKey && this.picking ? this.startTarget() : null;
+    this.keyed = byKey;
+    this.seed();
+  }
+
+  /** Keyboard entry with no target yet: land on the start target. Re-run when the surface (re)attaches. */
+  private seed() {
+    const start = this.keyed && this.picking && !this.hoverEl ? this.startTarget() : null;
     if (start) this.showHover(start);
   }
 
