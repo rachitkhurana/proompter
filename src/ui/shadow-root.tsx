@@ -8,6 +8,49 @@ export { mountFonts, unmountFonts };
 /** Tag name of the element that hosts the shadow root. */
 export const HOST_TAG = "proompter-root";
 
+/** Interaction events that must not reach the host page's listeners once they leave our shadow root. */
+const SEALED = ["pointerdown", "pointerup", "mousedown", "mouseup", "click", "touchstart", "touchend", "touchmove", "wheel", "focusin", "focusout"];
+
+const shielded = new WeakSet<Event>();
+
+/** True when `ev` was default-prevented only by the shield (an Esc inside the kit), not by a handler of ours. */
+export function isShielded(ev: Event): boolean {
+  return shielded.has(ev);
+}
+
+/**
+ * Keep the host app's modal machinery (Radix, Headless UI...) from treating the kit as "outside" (D11).
+ * - Our interaction events stop at the host element, so document-level outside-click, focus-outside and
+ *   scroll-lock listeners never see them. Our own document listeners are capture-phase or keydown, so they still run.
+ * - Focus leaving an app dialog for the kit: its focusout is stopped, so a focus trap doesn't pull focus back.
+ * - Esc inside the kit is default-prevented before the app's capture listeners, which skip handled events.
+ * - A modal's `aria-hidden` on its siblings is taken off the host, so the kit stays visible to assistive tech.
+ */
+function shield(host: HTMLElement): () => void {
+  const stop = (e: Event) => e.stopPropagation();
+  const focusOut = (e: Event) => {
+    const { target, relatedTarget } = e as FocusEvent;
+    if (relatedTarget === host && target !== host) e.stopPropagation();
+  };
+  const key = (e: Event) => {
+    const ev = e as KeyboardEvent;
+    if (ev.key !== "Escape" || ev.defaultPrevented || !ev.composedPath().includes(host)) return;
+    shielded.add(ev);
+    ev.preventDefault();
+  };
+  for (const t of SEALED) host.addEventListener(t, stop, { passive: true });
+  window.addEventListener("focusout", focusOut, true);
+  window.addEventListener("keydown", key, true);
+  const unhide = new MutationObserver(() => host.removeAttribute("aria-hidden"));
+  unhide.observe(host, { attributes: true, attributeFilter: ["aria-hidden"] });
+  return () => {
+    unhide.disconnect();
+    for (const t of SEALED) host.removeEventListener(t, stop);
+    window.removeEventListener("focusout", focusOut, true);
+    window.removeEventListener("keydown", key, true);
+  };
+}
+
 const ShadowContainerContext = createContext<HTMLElement | null>(null);
 
 /**
@@ -50,8 +93,10 @@ export function ShadowRoot({ children, css = compiledStyles, parent }: ShadowRoo
     shadow.append(style, root);
     target.appendChild(host);
     mountFonts(); // the kit's one change to the host document: <style data-proompter-fonts>
+    const unshield = shield(host);
     setContainer(root);
     return () => {
+      unshield();
       unmountFonts();
       host.remove();
       setContainer(null);
