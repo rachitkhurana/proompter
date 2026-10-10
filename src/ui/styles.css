@@ -33,10 +33,8 @@
   color-scheme: dark;
 
   --canvas: #09090b;
-  --mat-1: rgba(30, 30, 34, 0.72); /* small floating chrome: dock, menus, tooltips */
-  --mat-2: rgba(22, 22, 25, 0.86); /* big surfaces: composer, sheet, command menu */
-  --blur-1: blur(20px) saturate(1.8);
-  --blur-2: blur(32px) saturate(1.9);
+  --mat-1: #1e1e22; /* small floating chrome: dock, menus, tooltips (solid, D10) */
+  --mat-2: #161619; /* big surfaces: composer, sheet, command menu (solid, D10) */
   --fill-1: rgba(255, 255, 255, 0.04);
   --fill-2: rgba(255, 255, 255, 0.07);
   --fill-3: rgba(255, 255, 255, 0.11);
@@ -72,15 +70,6 @@
   color: var(--fg);
   -webkit-font-smoothing: antialiased;
   font-feature-settings: "ss01", "cv11";
-}
-
-@media (prefers-reduced-transparency: reduce) {
-  .pp {
-    --mat-1: #1e1e22;
-    --mat-2: #161619;
-    --blur-1: none;
-    --blur-2: none;
-  }
 }
 
 @media (prefers-contrast: more) {
@@ -439,8 +428,6 @@
   padding: 0 8px;
   border-radius: 6px;
   background: var(--mat-1);
-  backdrop-filter: var(--blur-1);
-  -webkit-backdrop-filter: var(--blur-1);
   box-shadow: var(--sh-1), var(--edge);
   color: var(--fg);
   font: 500 11.5px/1 var(--sans);
@@ -496,8 +483,6 @@
   padding: 4px;
   border-radius: 12px;
   background: var(--mat-1);
-  backdrop-filter: var(--blur-1);
-  -webkit-backdrop-filter: var(--blur-1);
   box-shadow: var(--sh-2), var(--edge);
   /* menu.tsx sets --menu-origin from the trigger: the menu grows out of where it was opened. */
   transform-origin: var(--menu-origin, 0 0);
@@ -605,8 +590,6 @@
   padding: 8px 14px 8px 12px;
   border-radius: 12px;
   background: var(--mat-1);
-  backdrop-filter: var(--blur-1);
-  -webkit-backdrop-filter: var(--blur-1);
   box-shadow: var(--sh-2), var(--edge);
   font: 400 12.5px/18px var(--sans);
   max-width: 100%;
@@ -670,7 +653,7 @@
 .pp .pm-catch{position:fixed;z-index:45;cursor:crosshair;pointer-events:auto;touch-action:none}
 .pp .pm-drag{position:fixed;z-index:46;border-radius:4px;box-shadow:0 0 0 1.5px var(--acc);background:var(--acc-soft);pointer-events:none}
 
-.pp .pm-subbar{position:fixed;z-index:61;display:flex;align-items:center;gap:8px;height:42px;padding:0 6px 0 14px;border-radius:14px;background:var(--mat-1);backdrop-filter:var(--blur-1);-webkit-backdrop-filter:var(--blur-1);box-shadow:var(--sh-2),var(--edge);font:500 12.5px/1 var(--sans);transition:opacity .16s var(--ease),scale .16s var(--ease)}
+.pp .pm-subbar{position:fixed;z-index:61;display:flex;align-items:center;gap:8px;height:42px;padding:0 6px 0 14px;border-radius:14px;background:var(--mat-1);box-shadow:var(--sh-2),var(--edge);font:500 12.5px/1 var(--sans);transition:opacity .16s var(--ease),scale .16s var(--ease)}
 .pp .pm-subbar:not(.on){opacity:0;scale:.96;pointer-events:none}
 
 .pp .pm-pin{position:fixed;pointer-events:auto;width:24px;height:24px;margin:-12px 0 0 -12px;padding:0;border:0;border-radius:12px 12px 12px 3px;display:grid;place-items:center;color:#fff;font:600 10.5px/1 var(--sans);cursor:pointer;box-shadow:0 0 0 2px rgba(9,9,11,.9),0 6px 14px -2px rgba(0,0,0,.55);transition:scale .16s var(--ease)}
@@ -681,7 +664,7 @@
 .pp .pm-pin.minor{background:#52525b}
 .pp .pm-pin.done{background:#27272a;color:var(--fg-3)}
 .pp .pm-pin-ring{position:absolute;inset:-2px;border-radius:inherit;box-shadow:0 0 0 0 var(--acc-line);animation:pm-ring .9s var(--ease) 2;pointer-events:none}
-.pp .pm-pin-card{position:absolute;left:18px;top:-6px;width:248px;padding:10px 12px;border-radius:12px;background:var(--mat-1);backdrop-filter:var(--blur-1);-webkit-backdrop-filter:var(--blur-1);box-shadow:var(--sh-2),var(--edge);text-align:left;color:var(--fg);opacity:0;scale:.96;transform-origin:0 12px;transition:opacity .14s var(--ease),scale .18s var(--ease);pointer-events:none}
+.pp .pm-pin-card{position:absolute;left:18px;top:-6px;width:248px;padding:10px 12px;border-radius:12px;background:var(--mat-1);box-shadow:var(--sh-2),var(--edge);text-align:left;color:var(--fg);opacity:0;scale:.96;transform-origin:0 12px;transition:opacity .14s var(--ease),scale .18s var(--ease);pointer-events:none}
 .pp .pm-pin-card b{display:block;font:500 13px/18px var(--sans)}
 .pp .pm-pin-card > span{display:flex;gap:6px;align-items:center;margin-top:4px;font:400 11.5px/16px var(--sans);color:var(--fg-3)}
 .pp .pm-pin-card i.dot{display:block;width:3px;height:3px;border-radius:50%;background:var(--fg-4)}
@@ -693,7 +676,7 @@
 /* ---------- dock (under `.pp .dock`: higher specificity than the primitives' `.pp .ib`, `.pp .seg`) ----------
    Differences from the prototype: tooltips are the <Tooltip> primitive, and the settle after a drag is the
    in-house spring, so `.tip` and `.settling` are gone. */
-.pp .dock{position:fixed;left:50%;bottom:20px;translate:-50% 0;z-index:60;display:flex;align-items:center;gap:2px;padding:5px;border-radius:16px;background:var(--mat-1);backdrop-filter:var(--blur-1);-webkit-backdrop-filter:var(--blur-1);box-shadow:var(--sh-2),var(--edge);touch-action:none;user-select:none;-webkit-user-select:none}
+.pp .dock{position:fixed;left:50%;bottom:20px;translate:-50% 0;z-index:60;display:flex;align-items:center;gap:2px;padding:5px;border-radius:16px;background:var(--mat-1);box-shadow:var(--sh-2),var(--edge);touch-action:none;user-select:none;-webkit-user-select:none}
 .pp .dock.free{translate:none;bottom:auto}
 .pp .dock.dragging{box-shadow:var(--sh-3),var(--edge);cursor:grabbing}
 .pp .dock.intro{animation:pp-dock-in .45s var(--ease) both}
@@ -740,7 +723,7 @@
    `@starting-style` instead of a class added a frame later; `.pm-ctx` can scroll if a very long log would
    push the panel past `max-height`. */
 /* The large-surface material, shared by the composer, the sheet and the command menu. */
-.pp .pm-comp,.pp .pm-surface{background:var(--mat-2);backdrop-filter:var(--blur-2);-webkit-backdrop-filter:var(--blur-2);box-shadow:var(--sh-3),var(--edge);border-radius:16px}
+.pp .pm-comp,.pp .pm-surface{background:var(--mat-2);box-shadow:var(--sh-3),var(--edge);border-radius:16px}
 .pp .pm-comp{position:fixed;z-index:90;width:min(500px,calc(100vw - 24px));display:flex;flex-direction:column;max-height:calc(100vh - 24px);opacity:0;scale:.96;transition:opacity .16s var(--ease),scale .2s var(--ease);pointer-events:none}
 .pp .pm-comp.on{opacity:1;scale:1;pointer-events:auto}
 @starting-style{.pp .pm-comp.on{opacity:0;scale:.96}}
@@ -805,7 +788,7 @@
 .pp .pm-sheet .sh-ft .sp{flex:1}
 
 /* list */
-.pp .pm-sheet .grp{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:8px;height:34px;padding:0 16px;font:500 12px/1 var(--sans);color:var(--fg-2);background:rgba(28,28,31,.92);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:inset 0 -1px 0 var(--line)}
+.pp .pm-sheet .grp{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:8px;height:34px;padding:0 16px;font:500 12px/1 var(--sans);color:var(--fg-2);background:rgba(28,28,31,.92);box-shadow:inset 0 -1px 0 var(--line)}
 .pp .pm-sheet .grp .n{color:var(--fg-3);font-weight:400}
 .pp .pm-sheet .row{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:grid;grid-template-columns:14px 52px 14px minmax(0,1fr) auto;align-items:center;gap:10px;height:40px;padding:0 16px;box-shadow:inset 0 -1px 0 var(--line);transition:background-color .1s var(--ease)}
 @media (hover:hover){.pp .pm-sheet .row:hover{background:var(--fill-1)}}
@@ -859,12 +842,12 @@
 .pp .pm-sheet .snap{aspect-ratio:auto;min-height:150px;display:grid;place-items:center;transition:height .25s var(--ease)}
 .pp .pm-sheet .snap img{display:block;width:100%;height:auto;max-height:300px;object-fit:contain;opacity:0;transition:opacity .22s var(--ease)}
 .pp .pm-sheet .snap img.ld{opacity:1}
-.pp .pm-sheet .snap .mode{position:absolute;right:8px;top:8px;z-index:1;display:flex;gap:2px;padding:2px;border-radius:8px;background:rgba(9,9,11,.78);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:inset 0 0 0 1px var(--line-2)}
+.pp .pm-sheet .snap .mode{position:absolute;right:8px;top:8px;z-index:1;display:flex;gap:2px;padding:2px;border-radius:8px;background:rgba(9,9,11,.78);box-shadow:inset 0 0 0 1px var(--line-2)}
 .pp .pm-sheet .snap .mode button{all:unset;cursor:pointer;height:22px;padding:0 8px;border-radius:6px;font:500 11.5px/22px var(--sans);color:var(--fg-3)}
 .pp .pm-sheet .snap .mode button.on{background:var(--fill-3);color:var(--fg)}
 .pp .pm-sheet .snap-empty{position:absolute;inset:0;display:grid;place-items:center;align-content:center;gap:8px;color:var(--fg-3);font:400 12.5px/18px var(--sans);text-align:center;padding:16px}
 .pp .pm-sheet .shot .cap{position:absolute;left:8px;bottom:8px;display:flex;gap:6px}
-.pp .pm-sheet .shot .cap .chip{background:rgba(9,9,11,.8);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.pp .pm-sheet .shot .cap .chip{background:rgba(9,9,11,.8)}
 .pp .pm-sheet .ctabs{display:flex;gap:2px}
 .pp .pm-sheet .ctabs button{all:unset;cursor:pointer;height:24px;padding:0 8px;border-radius:6px;font:500 12px/1 var(--sans);color:var(--fg-3);display:flex;align-items:center;gap:6px}
 .pp .pm-sheet .ctabs button.on{background:var(--fill-2);color:var(--fg)}
