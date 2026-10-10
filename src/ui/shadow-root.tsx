@@ -12,7 +12,7 @@ const ShadowContainerContext = createContext<HTMLElement | null>(null);
 
 /**
  * The element inside the shadow root that all UI renders into (`.pp`, which carries the tokens).
- * Pass it as `container` to every Radix portal, so menus and dialogs stay inside the shadow tree.
+ * Portal into it (`createPortal`), so menus and tooltips stay inside the shadow tree.
  * Returns `null` outside a `<ShadowRoot>`.
  */
 export function useShadowContainer(): HTMLElement | null {

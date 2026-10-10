@@ -12,8 +12,6 @@ export interface SpringOptions {
   to: number;
   /** Starting velocity in units per second (the drag's release velocity). */
   velocity?: number;
-  /** Seconds. Default 0.35. */
-  response?: number;
   onUpdate: (value: number) => void;
   /** Called once, after the final `onUpdate(to)`. Not called when cancelled. */
   onDone?: () => void;
@@ -25,6 +23,8 @@ export interface SpringHandle {
   cancel(): void;
 }
 
+/** Time scale in seconds. */
+const RESPONSE = 0.35;
 const REST_DISTANCE = 0.1;
 const REST_SPEED = 1;
 
@@ -38,7 +38,7 @@ export function prefersReducedMotion(): boolean {
 
 /** Animate `from` to `to` on requestAnimationFrame. With reduced motion it jumps straight to `to`. */
 export function spring(o: SpringOptions): SpringHandle {
-  const w = (2 * Math.PI) / (o.response ?? 0.35);
+  const w = (2 * Math.PI) / RESPONSE;
   if (o.reducedMotion ?? prefersReducedMotion()) {
     o.onUpdate(o.to);
     o.onDone?.();
