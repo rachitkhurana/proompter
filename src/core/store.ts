@@ -7,7 +7,7 @@
  * - `on(listener)` delivers `entry:created` / `entry:updated` (`EntryEvent`) to sinks, after the state has
  *   changed and after redaction. A sink never sees an entry the built-in and plugin redaction have not cleared.
  * - Persistence is raw `indexedDB` (no dependency), best effort: every call is wrapped. A failure to open falls
- *   back to memory; a failed write sets `persistence: "memory"` and `lastWriteError` so the UI can warn.
+ *   back to memory; a failed write calls `onWriteError` (once per burst of failures) so the UI can warn.
  * - Numbering is per session (`PRO-1`, `PRO-2`, ...). With IndexedDB the number is allocated INSIDE the same
  *   readwrite transaction that adds the entry (max `n` of the session + 1, and `add`, never `put`), so two tabs on
  *   the same session cannot both take PRO-4 or overwrite each other. Without it, numbering continues from the
@@ -62,9 +62,12 @@ export interface StoreOptions {
    * caller's to time out.
    */
   beforeCreate?: () => Promise<unknown> | undefined;
+  /**
+   * Called when a write to IndexedDB fails (quota, aborted transaction): the entry is kept in memory only.
+   * Fires once per burst of failures; a later successful write re-arms it.
+   */
+  onWriteError?: () => void;
 }
-
-export type Persistence = "pending" | "indexeddb" | "memory";
 
 export interface StoreState {
   session: Session;
@@ -72,9 +75,6 @@ export interface StoreState {
   entries: readonly Entry[];
   /** The saved entries of this session have been loaded (or loading failed and the store runs in memory). */
   ready: boolean;
-  persistence: Persistence;
-  /** Set when a write to IndexedDB failed (quota, aborted transaction): the entries live in memory only. */
-  lastWriteError: string | null;
 }
 
 /** What a caller supplies to `create`; the store adds id, n, session, status, timestamps and the activity log. */
@@ -132,18 +132,6 @@ export interface EntryStore {
 // IndexedDB (raw)
 
 type AddResult = { entry: Entry } | { error: unknown } | null;
-
-interface Backend {
-  loadSession(sessionId: string): Promise<{ session?: Session; entries: Entry[] }>;
-  /**
-   * Allocate the next number and add the entry in ONE readwrite transaction. `build(n)` makes the entry (and may
-   * throw, which aborts the transaction and comes back as `{ error }`). `null`: IndexedDB itself failed.
-   */
-  addEntry(sessionId: string, minN: number, build: (n: number) => Entry): Promise<AddResult>;
-  putEntry(entry: Entry): Promise<boolean>;
-  putSession(session: Session): Promise<boolean>;
-  close(): void;
-}
 
 const ENTRIES = "entries";
 const SESSIONS = "sessions";
@@ -209,9 +197,9 @@ function run<T>(
   });
 }
 
-function createBackend(db: IDBDatabase): Backend {
+function createBackend(db: IDBDatabase) {
   return {
-    async loadSession(sessionId) {
+    async loadSession(sessionId: string): Promise<{ session?: Session; entries: Entry[] }> {
       const [rows, sess] = await Promise.all([
         run<EntryRecord[]>(db, ENTRIES, "readonly", (s) => s.getAll() as IDBRequest<EntryRecord[]>),
         run<Session[]>(db, SESSIONS, "readonly", (s) => s.getAll() as IDBRequest<Session[]>),
@@ -223,7 +211,11 @@ function createBackend(db: IDBDatabase): Backend {
       const session = (sess.result ?? []).find((s) => s && s.id === sessionId);
       return { session, entries };
     },
-    addEntry(sessionId, minN, build) {
+    /**
+     * Allocate the next number and add the entry in ONE readwrite transaction. `build(n)` makes the entry (and may
+     * throw, which aborts the transaction and comes back as `{ error }`). `null`: IndexedDB itself failed.
+     */
+    addEntry(sessionId: string, minN: number, build: (n: number) => Entry) {
       return new Promise<AddResult>((resolve) => {
         let added: Entry | undefined;
         let failure: { error: unknown } | undefined;
@@ -258,11 +250,11 @@ function createBackend(db: IDBDatabase): Backend {
         }
       });
     },
-    async putEntry(entry) {
+    async putEntry(entry: Entry) {
       const record: EntryRecord = { key: `${entry.session}/${entry.n}`, session: entry.session, entry };
       return (await run(db, ENTRIES, "readwrite", (s) => s.put(record))).ok;
     },
-    async putSession(session) {
+    async putSession(session: Session) {
       return (await run(db, SESSIONS, "readwrite", (s) => s.put(session))).ok;
     },
     close() {
@@ -301,48 +293,33 @@ function sanitizePatch(patch: EntryPatch): EntryPatch {
 }
 
 function describeChanges(prev: Entry, patch: EntryPatch): { next: Entry; log: string[] } {
-  const next: Entry = { ...prev };
+  const next: Record<string, unknown> = { ...prev };
+  const old: Record<string, unknown> = { ...prev };
+  const changes: Record<string, unknown> = { ...patch };
   const log: string[] = [];
-  if (patch.status !== undefined && patch.status !== prev.status) {
-    log.push(`status: ${prev.status} → ${patch.status}`);
-    next.status = patch.status;
+  for (const [key, label, edited] of CHANGE_FIELDS) {
+    const to = changes[key];
+    if (to === undefined || same(to ?? undefined, old[key] ?? undefined)) continue;
+    log.push(edited ? `${label} edited` : `${label}: ${show(old[key])} → ${show(to)}`);
+    if (to === null && key !== "issue") delete next[key];
+    else next[key] = Array.isArray(to) ? [...to] : to;
   }
-  if (patch.priority !== undefined && patch.priority !== prev.priority) {
-    log.push(`priority: ${prev.priority} → ${patch.priority}`);
-    next.priority = patch.priority;
-  }
-  if (patch.intent !== undefined && patch.intent !== prev.intent) {
-    log.push(`intent: ${prev.intent} → ${patch.intent}`);
-    next.intent = patch.intent;
-  }
-  if (patch.title !== undefined && patch.title !== prev.title) {
-    log.push("title edited");
-    next.title = patch.title;
-  }
-  if (patch.description !== undefined && patch.description !== prev.description) {
-    log.push("description edited");
-    next.description = patch.description;
-  }
-  if (patch.tags !== undefined && !same(patch.tags, prev.tags)) {
-    log.push(`tags: ${prev.tags.join(", ") || "none"} → ${patch.tags.join(", ") || "none"}`);
-    next.tags = [...patch.tags];
-  }
-  if (patch.testPlan !== undefined && (patch.testPlan ?? undefined) !== prev.testPlan) {
-    log.push(`test plan: ${orNone(prev.testPlan)} → ${orNone(patch.testPlan)}`);
-    if (patch.testPlan === null) delete next.testPlan;
-    else next.testPlan = patch.testPlan;
-  }
-  if (patch.task !== undefined && (patch.task ?? undefined) !== prev.task) {
-    log.push(`task: ${orNone(prev.task)} → ${orNone(patch.task)}`);
-    if (patch.task === null) delete next.task;
-    else next.task = patch.task;
-  }
-  if (patch.issue !== undefined && patch.issue !== prev.issue) {
-    log.push(`issue: ${orNone(prev.issue)} → ${orNone(patch.issue)}`);
-    next.issue = patch.issue;
-  }
-  return { next, log };
+  return { next: next as unknown as Entry, log };
 }
+
+/** Patch fields in activity-log order: [key, log label, log "edited" instead of old → new]. */
+const CHANGE_FIELDS: ReadonlyArray<readonly [keyof EntryPatch, string, boolean]> = [
+  ["status", "status", false],
+  ["priority", "priority", false],
+  ["intent", "intent", false],
+  ["title", "title", true],
+  ["description", "description", true],
+  ["tags", "tags", false],
+  ["testPlan", "test plan", false],
+  ["task", "task", false],
+  ["issue", "issue", false],
+];
+const show = (v: unknown) => (Array.isArray(v) ? v.join(", ") || "none" : orNone(v as string | null | undefined));
 
 export function createStore(opts: StoreOptions): EntryStore {
   const now = opts.now ?? (() => new Date());
@@ -365,12 +342,11 @@ export function createStore(opts: StoreOptions): EntryStore {
     session: initialSession,
     entries: [],
     ready: false,
-    persistence: "pending",
-    lastWriteError: null,
   };
   const stateListeners = new Set<() => void>();
   const eventListeners = new Set<EntryListener>();
-  let backend: Backend | null = null;
+  let backend: ReturnType<typeof createBackend> | null = null;
+  let failing = false;
   let sessionSaved = false;
   let writes: Promise<unknown> = Promise.resolve();
 
@@ -393,8 +369,17 @@ export function createStore(opts: StoreOptions): EntryStore {
       }
     }
   };
-  const writeFailed = (what: string) => {
-    setState({ persistence: "memory", lastWriteError: `Could not save ${what} to IndexedDB. It is kept in memory only.` });
+  /** Report a write result; `onWriteError` fires on the first failure of a burst, a success re-arms it. */
+  const wrote = (ok: boolean) => {
+    if (ok) failing = false;
+    else if (!failing) {
+      failing = true;
+      try {
+        opts.onWriteError?.();
+      } catch {
+        // a broken callback must not break the store
+      }
+    }
   };
   const queue = (job: () => Promise<unknown>) => {
     writes = writes.then(job, job).catch(() => {});
@@ -404,17 +389,13 @@ export function createStore(opts: StoreOptions): EntryStore {
     sessionSaved = true;
     const b = backend;
     const s = state.session;
-    queue(async () => {
-      if (!(await b.putSession(s))) writeFailed("the session");
-    });
+    queue(async () => wrote(await b.putSession(s)));
   };
   const persist = (entry: Entry) => {
     if (!backend) return;
     const b = backend;
     saveSessionOnce();
-    queue(async () => {
-      if (!(await b.putEntry(entry))) writeFailed(entry.id);
-    });
+    queue(async () => wrote(await b.putEntry(entry)));
   };
 
   const factory = opts.idb === undefined ? (globalThis as { indexedDB?: IDBFactory }).indexedDB : opts.idb;
@@ -422,7 +403,7 @@ export function createStore(opts: StoreOptions): EntryStore {
     try {
       const db = await openDatabase(factory, opts.dbName ?? "proompter");
       if (!db) {
-        setState({ ready: true, persistence: "memory" });
+        setState({ ready: true });
         return;
       }
       backend = createBackend(db);
@@ -436,11 +417,10 @@ export function createStore(opts: StoreOptions): EntryStore {
         // The stored session wins for `started` (a reload keeps the original start), the live options win otherwise.
         session: saved.session ? { ...state.session, started: saved.session.started } : state.session,
         ready: true,
-        persistence: "indexeddb",
       });
     } catch {
       backend = null;
-      setState({ ready: true, persistence: "memory" });
+      setState({ ready: true });
     }
   })();
 
@@ -496,6 +476,15 @@ export function createStore(opts: StoreOptions): EntryStore {
       const sessionId = state.session.id;
       const reviewer = state.session.reviewer;
 
+      const hasImage = !!(snapshot?.element || snapshot?.viewport);
+      const pickAssets = (n: number) => {
+        const names = assetNames(n, draft.viewport);
+        return {
+          ...(snapshot?.element ? { element: names.element } : {}),
+          ...(snapshot?.viewport ? { viewport: names.viewport } : {}),
+        };
+      };
+
       /** Build, number and redact the entry for number `n`. Throws `RedactError`; nothing is kept then. */
       const make = (n: number): Entry => {
         const raw: Entry = {
@@ -511,19 +500,7 @@ export function createStore(opts: StoreOptions): EntryStore {
           created,
           updated: created,
           activity: [{ at: created, who: reviewer, text: "created" } satisfies EntryActivity],
-          ...(snapshot && (snapshot.element || snapshot.viewport)
-            ? {
-                snapshot: {
-                  ...snapshot,
-                  assets: {
-                    ...(snapshot.element ? { element: assetNames(n, draft.viewport).element } : {}),
-                    ...(snapshot.viewport ? { viewport: assetNames(n, draft.viewport).viewport } : {}),
-                  },
-                },
-              }
-            : snapshot
-              ? { snapshot }
-              : {}),
+          ...(snapshot ? { snapshot: hasImage ? { ...snapshot, assets: pickAssets(n) } : snapshot } : {}),
         };
         if (!targets[0]) delete raw.target;
         const result = applyRedact(plugins, raw);
@@ -535,9 +512,11 @@ export function createStore(opts: StoreOptions): EntryStore {
       if (backend) {
         // The database decides the number (another tab may have filed entries we haven't seen).
         const r = await backend.addEntry(sessionId, nextN(), make);
-        if (r && "entry" in r) entry = r.entry;
-        else if (r && r.error instanceof RedactError) throw r.error;
-        else writeFailed("a new entry"); // IndexedDB failed; fall through and keep it in memory
+        if (r && "entry" in r) {
+          entry = r.entry;
+          wrote(true);
+        } else if (r && r.error instanceof RedactError) throw r.error;
+        else wrote(false); // IndexedDB failed; fall through and keep it in memory
       }
       entry ??= make(nextN());
 
