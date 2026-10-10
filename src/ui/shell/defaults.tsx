@@ -6,7 +6,7 @@
 import { createFilesSink, DEFAULT_ENDPOINT, type FilesSink } from "../../core/sinks/files";
 import { serialize, entryPath as entryFile } from "../../core/serialize";
 import { createStore, type EntryStore as CoreStore, type StoreState as CoreState } from "../../core/store";
-import { Composer } from "../composer";
+import { Composer } from "../composer/composer";
 import type { EntryStore, PendingFile, ProompterDeps, ProompterProps, StoreState } from "../proompter-deps";
 
 const NO_PENDING: readonly PendingFile[] = [];
