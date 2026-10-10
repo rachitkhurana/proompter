@@ -75,6 +75,11 @@ export interface FilesSink {
   rehydrate(): Promise<RehydrateResult>;
   /** True after a 404: auto-posting is off until `write()`. */
   paused(): boolean;
+  /**
+   * Resolves once `rehydrate()` has finished. Pass it to the store (`beforeCreate`) so a new entry is never
+   * numbered before the numbers already on disk are known. Never rejects.
+   */
+  readonly hydrated: Promise<void>;
   /** Resolves when no request is in flight or queued. */
   idle(): Promise<void>;
   dispose(): void;
@@ -132,6 +137,11 @@ export function createFilesSink(opts: FilesSinkOptions): FilesSink {
   let isPaused = false;
   /** Auto-posting waits for `rehydrate()` so stale store copies cannot overwrite the disk. */
   let hydrated = false;
+  let markHydrated!: () => void;
+  /** Resolves when `rehydrate()` has finished (the store waits for it before numbering a new entry). */
+  const hydratedPromise = new Promise<void>((resolve) => {
+    markHydrated = resolve;
+  });
   let pendingList: readonly PendingFile[] = [];
   const listeners = new Set<() => void>();
   let queue: Promise<unknown> = Promise.resolve();
@@ -217,14 +227,19 @@ export function createFilesSink(opts: FilesSinkOptions): FilesSink {
         return { kind: "ok" };
       }
       const error = typeof body?.error === "string" ? body.error : `The route answered ${res.status}`;
-      if (res.status >= 400 && res.status < 500 && body?.ok === false) return { kind: "rejected", status: res.status, error };
+      // Only a refusal scoped to this entry (400, 413) is skipped. A refusal of the whole request (403, 415, an
+      // unknown 4xx) would repeat for every entry and every event, so stop and pause until `write()`.
+      if (body?.ok === false && body.scope === "entry") return { kind: "rejected", status: res.status, error };
+      if (res.status >= 400 && res.status < 500) isPaused = true;
       return { kind: "stop", status: res.status, error };
     } catch (err) {
       return { kind: "stop", error: err instanceof Error ? err.message : "network error" };
     }
   }
 
-  async function post(): Promise<WriteResult> {
+  async function post(auto = false): Promise<WriteResult> {
+    // Queued automatic posts re-check the pause: an earlier one in the queue may have just paused the sink.
+    if (auto && isPaused) return { ok: false, files: pendingList.length, error: "paused" };
     const files = pendingList.length;
     const todo = [...dirty.values()].sort((a, b) => a.n - b.n);
     if (todo.length === 0) return { ok: true, status: 200, files: 0 };
@@ -245,14 +260,14 @@ export function createFilesSink(opts: FilesSinkOptions): FilesSink {
     return rejected ? { ok: false, files, status: rejected.status, error: rejected.error } : { ok: true, status: 200, files };
   }
 
-  const enqueue = (): Promise<WriteResult> => {
-    const run = queue.then(post, post);
+  const enqueue = (auto = false): Promise<WriteResult> => {
+    const run = queue.then(() => post(auto), () => post(auto));
     queue = run.catch(() => {});
     return run;
   };
 
   const autoPost = () => {
-    if (hydrated && !isPaused && pendingList.length) void enqueue();
+    if (hydrated && !isPaused && pendingList.length) void enqueue(true);
   };
 
   const off = store.on((event) => {
@@ -282,6 +297,7 @@ export function createFilesSink(opts: FilesSinkOptions): FilesSink {
       }
     },
     paused: () => isPaused,
+    hydrated: hydratedPromise,
     async idle() {
       let q: Promise<unknown>;
       do {
@@ -339,6 +355,7 @@ export function createFilesSink(opts: FilesSinkOptions): FilesSink {
       for (const e of store.getState().entries) dirty.set(e.n, e);
       recompute();
       hydrated = true;
+      markHydrated();
       autoPost();
       return result;
     },
