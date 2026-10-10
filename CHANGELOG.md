@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.1.0 (2026-10-10)
+
+Shared reviews (v2) and agent tools (v3).
+
+- **Preview builds:** a production build with the flag on ships the kit dormant: no capture, no UI. A reviewer turns
+  it on with `window.__proompter.enable()` or `⌘⇧.`, and the choice is remembered per browser. `disable()` turns
+  it off.
+- **GitHub sync:** new `@rachitkay/proompter/github` route, plus the `github` prop and a "Sync to GitHub" action in
+  the Publish tab.
+  - Entries land on a `reviews` branch in the same layout as the local files, and as one issue each, labelled by
+    kind and priority.
+  - Status syncs both ways.
+  - The token stays on the server, and every request needs a review key.
+- **Snapshot redaction:** PNG snapshots black out inputs, text areas, selects, editable areas and
+  `[data-proompter-redact]` elements, plus your plugins' `redactSnapshot` selectors. Masking happens inside the
+  rendered copy, never on the page, and a snapshot that can't be masked is dropped.
+- **Repo plugin:** new `@rachitkay/proompter/plugins` with `repoPlugin({ tasks, testPlan, context })`. It maps
+  routes to task files and fills the Test plan menu, with no plugin code.
+- **CLI:** `npx -y @rachitkay/proompter list | show | task | resolve` works on your `reviews/` folder. `task`
+  prints an agent-ready brief. `resolve --note` records a resolution, and `--require-test` insists on a linked test
+  file.
+- **MCP server:** `npx -y @rachitkay/proompter mcp` lets agents list, read, reply to and resolve entries.
+- **File format:** two optional sections, `## Resolution` and `## Replies`. An open page now merges changes made on
+  disk before it saves, so it doesn't overwrite an agent's edit.
+- **Fixes:**
+  - `isProompterFrame()` for apps that mount twice in device viewports.
+  - Esc during the composer's closing animation no longer reaches the app.
+  - App inputs keep their blur events.
+  - `Alt+K` opens the command menu where the browser owns `⌘⇧K`/`Ctrl+Shift+K` (Firefox).
+
 ## 0.0.3 (2026-10-10)
 
 - **Vite and plain React:** new `@rachitkay/proompter/vite` export with a `proompter()` plugin. It stamps source
