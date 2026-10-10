@@ -24,6 +24,6 @@ export default defineConfig({
   plugins: [inlineCss],
   test: {
     environment: "happy-dom",
-    include: ["src/**/*.test.{ts,tsx}"],
+    include: ["src/**/*.test.{ts,tsx}", "test/**/*.test.{ts,tsx}"],
   },
 });
