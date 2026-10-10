@@ -4,7 +4,7 @@ A review layer you turn on over your own app. Pick any element on any viewport, 
 and get a markdown file in your repo with the source location, console, network and a snapshot. A human
 can read the file and an AI agent can act on it.
 
-> Status: early (0.0.x). Works with Next.js and with plain React on Vite. The design is in [DESIGN.md](DESIGN.md), changes in [CHANGELOG.md](CHANGELOG.md).
+> Status: 0.1 (v2 shared reviews + v3 agent tools). Works with Next.js and with plain React on Vite. The design is in [DESIGN.md](DESIGN.md), changes in [CHANGELOG.md](CHANGELOG.md).
 
 ## Install
 
