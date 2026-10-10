@@ -35,11 +35,33 @@ export interface PendingFile {
   change: "add" | "modify";
 }
 
+/** GitHub sync (D16) as the Publish tab shows it. Present only when `<Proompter github>` is set. */
+export interface GithubStatus {
+  /** Entries not yet sent in their current state. */
+  pending: number;
+  /** Message of the last failed sync, else null. */
+  error: string | null;
+  /** The route answered 401: show the review key field. */
+  needsKey: boolean;
+  /** Issue URL per entry id (entries synced in this page load). */
+  urls: Readonly<Record<string, string>>;
+}
+
+/** What a sync did, for the status line. */
+export interface GithubSyncOutcome {
+  ok: boolean;
+  synced: number;
+  resolved: number;
+  error?: string;
+  needsKey?: boolean;
+}
+
 export interface StoreState {
   session: Session;
   entries: readonly Entry[];
   /** Files not yet written to disk (the Publish tab's tree). Empty when everything is written. */
   pending: readonly PendingFile[];
+  github?: GithubStatus;
 }
 
 /** What the sheet, ticket and command menu need from the entry store. */
@@ -51,6 +73,11 @@ export interface EntryStore {
   resolve(id: string, who: string): void;
   /** Publish tab: write the pending files. Absent when the sink is unavailable (button disabled). */
   write?(): Promise<void>;
+  /**
+   * Publish tab: sync with GitHub. `key` is the review key the reviewer just typed (kept in localStorage).
+   * Absent without `<Proompter github>`.
+   */
+  syncGithub?(key?: string): Promise<GithubSyncOutcome>;
   /** v2: open a GitHub issue. Absent in v1 (the ticket shows a read-only "v2" row). */
   openIssue?(id: string, who: string): void;
 }
@@ -121,6 +148,11 @@ export interface ProompterProps {
   redact?: CaptureOptions["redact"];
   /** URL of the dev file-writer route (`app/api/proompter/route.ts` in the host). Default `/api/proompter`. */
   endpoint?: string;
+  /**
+   * Turn on GitHub sync (D16): the Publish tab gets a "Sync to GitHub" button. `endpoint` is where the host
+   * mounted `createGithubRoute` (default `/api/proompter/github`).
+   */
+  github?: { endpoint?: string };
   /** Inject the store, serializer and composer (stories, tests, fixtures). Defaults to the real ones. */
   deps?: ProompterDeps;
   /** Start with the kit shown. By default it stays hidden until `⌘⇧.` or `window.__proompter.open()`. */
