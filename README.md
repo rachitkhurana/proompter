@@ -198,19 +198,38 @@ Things to know before you turn it on:
 `proompter` works the `reviews/` folder from the terminal, with no UI. Run it in your repo (or pass `--dir <path>`).
 
 ```sh
-npx proompter list --status open        # <ref>  <status>  <priority>  <title>  <source>
-npx proompter show PRO-5                # the entry markdown, as on disk (--json for the parsed entry)
-npx proompter task PRO-5                # an agent-ready task: source, selector, description, context, snapshots
-npx proompter resolve PRO-5 --note "Cropped the avatar" [--require-test]
+npx -y @rachitkay/proompter list --status open        # <ref>  <status>  <priority>  <title>  <source>
+npx -y @rachitkay/proompter show PRO-5                # the entry markdown, as on disk (--json for the parsed entry)
+npx -y @rachitkay/proompter task PRO-5                # an agent-ready task: source, selector, description, context, snapshots
+npx -y @rachitkay/proompter resolve PRO-5 --note "Cropped the avatar" [--require-test]
 ```
 
 - `list` takes `--status open|progress|resolved`, `--priority`, `--route <glob>`, `--session <id>` and `--json`.
 - `<ref>` is `<session>/PRO-n`, or `PRO-n` when only one session has it.
 - `resolve` sets `status: resolved`, writes the note under `## Resolution`, and rebuilds `session.md`.
-  `--require-test` refuses unless `test_plan` names a file (for example `e2e/feed.spec.ts`) that exists in the repo.
-- Exit codes: 0 ok, 1 not found, 2 usage or ambiguous ref.
+  `--require-test` refuses unless `test_plan` names a regular file inside the repo that looks like a test (for example `e2e/feed.spec.ts`; a README or a folder is refused).
+- Exit codes: 0 ok, 1 not found, 2 usage or ambiguous ref (or a missing `--dir`, or an unknown `--status` / `--priority`), 3 unexpected error.
 
 The agent loop: `list` -> `task` -> fix -> `resolve`.
+
+## MCP
+
+`proompter mcp` serves the same actions to an MCP client over stdio (newline-delimited JSON-RPC, no extra dependency).
+For Claude Code:
+
+```sh
+claude mcp add proompter -- npx -y @rachitkay/proompter mcp
+```
+
+Add `--dir <path>` after `mcp` when the reviews folder is not `./reviews`. Tools:
+
+- `list_entries { status?, priority?, route?, session? }`
+- `show_entry { ref }`
+- `entry_task { ref }`
+- `reply_entry { ref, text, who? }` appends `- <who> (<ISO date>): <text>` under the entry's `## Replies`.
+- `resolve_entry { ref, note?, requireTest? }`
+
+A failed tool call comes back as a result with `isError: true`, not a protocol error.
 
 ## Shortcuts
 
