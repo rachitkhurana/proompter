@@ -1,0 +1,65 @@
+// Playwright's webServer command. One process owns both playground servers so they never race on `dist/`:
+//   1. build the package once
+//   2. production build with the flag UNSET into .next-prod, served on :3101 (DESIGN 11.1)
+//   3. `next dev` with NEXT_PUBLIC_PROOMPTER=true on :3100 (everything else)
+// :3100 is the URL Playwright waits for, and it starts last, so once it answers both servers are up.
+import { spawn, spawnSync } from "node:child_process";
+
+const DEV_PORT = 3100;
+const PROD_PORT = 3101;
+const DIST = ".next-prod";
+const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+const playground = (...args) => [pnpm, ["--filter", "proompter-playground", "exec", ...args]];
+
+const children = [];
+const stop = () => {
+  for (const c of children) c.kill("SIGTERM");
+};
+process.on("SIGTERM", () => {
+  stop();
+  process.exit(0);
+});
+process.on("SIGINT", () => {
+  stop();
+  process.exit(0);
+});
+
+function runSync(cmd, args, env) {
+  const r = spawnSync(cmd, args, { stdio: "inherit", env: { ...process.env, ...env } });
+  if (r.status !== 0) process.exit(r.status ?? 1);
+}
+
+function start(cmd, args, env) {
+  const c = spawn(cmd, args, { stdio: "inherit", env: { ...process.env, ...env } });
+  children.push(c);
+  c.on("exit", (code) => {
+    if (code) {
+      stop();
+      process.exit(code);
+    }
+  });
+}
+
+async function waitFor(url, ms = 120_000) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    try {
+      if ((await fetch(url)).ok) return;
+    } catch {
+      /* not up yet */
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error(`${url} did not come up`);
+}
+
+const prodEnv = { NEXT_PUBLIC_PROOMPTER: "", PLAYGROUND_DIST_DIR: DIST };
+
+runSync(pnpm, ["build"], {});
+runSync(...playground("next", "build"), prodEnv);
+start(...playground("next", "start", "-p", String(PROD_PORT)), prodEnv);
+await waitFor(`http://localhost:${PROD_PORT}/`);
+start(...playground("next", "dev", "-p", String(DEV_PORT)), {
+  NEXT_PUBLIC_PROOMPTER: "true",
+  PLAYGROUND_DIST_DIR: ".next",
+});
