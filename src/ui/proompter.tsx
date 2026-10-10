@@ -63,7 +63,8 @@ function setActiveFlag(v: boolean) {
 const KitUI = lazy(() => import("./shell/ui"));
 
 const noSubscribe = () => () => {};
-const inFrame = () => {
+/** True inside a Proompter device viewport frame (`?__proompter_frame`); false on the host page and on the server. */
+export const inFrame = () => {
   try {
     return new URLSearchParams(window.location.search).has(FRAME_PARAM);
   } catch {
