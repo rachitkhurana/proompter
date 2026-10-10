@@ -62,7 +62,7 @@ function Kit({ options, box, onToggleKit }: ShellProps) {
   const container = useShadowContainer();
   const deps: ProompterDeps = useState(() => (box.deps ??= options.deps ?? createDefaultDeps(options)))[0];
   const { store, serialize, entryPath, composer } = deps;
-  const { session, entries, pending } = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+  const { session, entries, pending, github } = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   const reviewer = options.session?.reviewer ?? session.reviewer;
   const plugins = options.plugins ?? NO_PLUGINS;
 
@@ -361,6 +361,7 @@ function Kit({ options, box, onToggleKit }: ShellProps) {
   });
 
   const write = store.write;
+  const syncGithub = store.syncGithub;
   const issue = store.openIssue;
   const ticket: SheetTicketProps = {
     serialize: (e) => serialize(e, session),
@@ -448,6 +449,7 @@ function Kit({ options, box, onToggleKit }: ShellProps) {
         onSelect={(id) => setSheet((s) => ({ ...s, selected: id }))}
         onClose={closeSheet}
         onWrite={write ? () => write.call(store) : undefined}
+        github={github && syncGithub ? { status: github, onSync: (key) => syncGithub.call(store, key) } : undefined}
         ticket={ticket}
       />
       <Command
