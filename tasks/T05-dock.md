@@ -19,5 +19,10 @@
   response 0.35, velocity handoff from the drag, rAF-driven, cancellable, honours reduced motion.
   Unit-tested. Use it for release and edge snap; everything else uses CSS transitions or WAAPI.
 
+- **Tooltip group check (from T02):** T02's `TooltipProvider` groups tooltips with a `display: contents`
+  wrapper using pointerenter/pointerleave. That's only unit-tested in happy-dom, so the Playwright test
+  must prove it in a real browser: after the first tooltip warms, moving across the dock shows the next
+  one instantly, and leaving the dock for more than 250ms cools it.
+
 **Done when:** there are stories for horizontal, vertical-left, vertical-right, collapsed and
 collapsed-vertical (with a badge), and a Playwright test covers drag, edge snap and collapse.
