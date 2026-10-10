@@ -1,3 +1,5 @@
+import type { CaptureConsoleEntry, CaptureNetworkEntry } from "./types";
+
 export const REDACTED = "[redacted]";
 export const MAX_EXCERPT = 2048;
 /** Hard cap on text handed to the redactor (everything is linear-time, this is belt and braces). */
@@ -128,6 +130,28 @@ export function boundText(s: string, limit: number, partial = false): string {
   let end = s.length;
   while (end > 0 && !TOKEN_BREAK.has(s[end - 1] as string)) end--;
   return s.slice(0, end);
+}
+
+/** Built-in redaction of one captured console line (used when capturing and again when an entry is filed). */
+export function redactConsoleEntry(c: CaptureConsoleEntry): CaptureConsoleEntry {
+  return {
+    ...c,
+    message: excerpt(redactText(c.message)),
+    ...(c.frame !== undefined ? { frame: redactUrl(c.frame) } : {}),
+  };
+}
+
+/** Built-in redaction of one captured network request (used when capturing and again when an entry is filed). */
+export function redactNetworkEntry(n: CaptureNetworkEntry): CaptureNetworkEntry {
+  return {
+    ...n,
+    url: redactUrl(n.url),
+    ...(n.error !== undefined ? { error: redactString(n.error) } : {}),
+    ...(n.requestHeaders ? { requestHeaders: redactHeaders(n.requestHeaders) } : {}),
+    ...(n.responseHeaders ? { responseHeaders: redactHeaders(n.responseHeaders) } : {}),
+    ...(n.requestExcerpt !== undefined ? { requestExcerpt: excerpt(redactText(n.requestExcerpt)) } : {}),
+    ...(n.responseExcerpt !== undefined ? { responseExcerpt: excerpt(redactText(n.responseExcerpt)) } : {}),
+  };
 }
 
 /** Truncates to at most `max` chars (including the trailing ellipsis). Run AFTER redaction. */
