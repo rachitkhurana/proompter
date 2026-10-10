@@ -22,8 +22,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm lint
-      - run: pnpm test
       - run: pnpm build
+      - run: pnpm test
       # DESIGN 11.7: a release package exposes exactly ".", "./next", "./next/route", "./github", "./package.json".
       - name: Release exports (unit test on the stripped package.json)
         run: |
