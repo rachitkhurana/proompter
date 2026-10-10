@@ -54,7 +54,7 @@ function FrameMode({ redact, queries }: Pick<ProompterProps, "redact" | "queries
     let off: (() => void) | undefined;
     void import("../core/capture").then(({ createCapture }) => {
       if (cancelled) return;
-      const capture = createCapture({ win: window as Window & typeof globalThis, redact, queries });
+      const capture = createCapture({ win: window, redact, queries });
       capture.enable();
       window.__proompter_capture = capture;
       off = () => {
@@ -134,7 +134,7 @@ function HostMode(props: ProompterProps) {
         if (cancelled) return;
         const capture =
           box.getCapture() ??
-          box.setCapture(createCapture({ win: window as Window & typeof globalThis, redact, queries }));
+          box.setCapture(createCapture({ win: window, redact, queries }));
         capture.enable();
       });
     });
