@@ -32,7 +32,31 @@ export interface EntrySnapshot {
   element?: string;
   /** Visible viewport, PNG data URL. */
   viewport?: string;
-  fontsEmbedded: boolean;
+  /**
+   * T07: optional (was required). Not recorded in the markdown file, so an entry parsed from a file does not
+   * know it. `undefined` means "unknown".
+   */
+  fontsEmbedded?: boolean;
+  /**
+   * T07: file names inside `assets/` the sink should write (or, on a parsed entry, the one the file links to):
+   * `005-mobile.png` and `005-mobile-full.png`. Set by `store.create` from the entry number.
+   */
+  assets?: { element?: string; viewport?: string };
+}
+
+/**
+ * T07: what the markdown file says about the captured context (counts plus the one-line items). The full
+ * arrays are not in the file. `parse()` fills this in; `serialize()` uses it when the arrays are empty.
+ */
+export interface ContextSummary {
+  consoleLines: number;
+  consoleErrors: number;
+  /** `error GET /api/v1/feeds/trending 500`, `warn [voice] AudioContext suspended` (one per console line). */
+  consoleItems: string[];
+  networkTotal: number;
+  networkFailed: number;
+  /** `GET /api/v1/feeds/trending → 500 (911 ms)` (failed requests only). */
+  networkItems: string[];
 }
 
 export interface EntryContext {
@@ -41,6 +65,8 @@ export interface EntryContext {
   queries: CaptureQuery[];
   /** e.g. `migrate/main@611df0b`. */
   build?: string;
+  /** T07: set on entries parsed from a file (the arrays above are then empty). */
+  summary?: ContextSummary;
 }
 
 export interface EntryActivity {
@@ -53,6 +79,8 @@ export interface EntryActivity {
 export interface Entry {
   /** `PRO-<n>`. */
   id: string;
+  /** T07 (D3.2): fully qualified `<session>/PRO-n`, written to the file as `ref:`. Derived when absent. */
+  ref?: string;
   /** 1-based number within the session; the `NNN` in file names. */
   n: number;
   /** Session folder name, `<YYYY-MM-DD>_<slug>`. */
