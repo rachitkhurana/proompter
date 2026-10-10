@@ -86,19 +86,27 @@ test("B: opening the kit leaves the host's pixels, styles and document alone", a
   const snapshotDom = () =>
     page.evaluate(() => {
       const props = ["font-family", "font-size", "color", "background-color", "margin-top", "padding-left", "display", "width", "height", "letter-spacing"];
-      const styles = [...document.querySelectorAll(".h-root, .h-root *")].map((el) => {
+      const styles = [document.documentElement, document.body, ...document.querySelectorAll(".h-root, .h-root *")].map((el) => {
         const cs = getComputedStyle(el);
         return props.map((p) => cs.getPropertyValue(p)).join("|");
       });
       return {
         styles,
-        headTags: [...document.head.children].map((n) => n.outerHTML.slice(0, 400)),
+        headTags: [...document.head.children].map((n) => ({
+          key: n.outerHTML.slice(0, 400),
+          tag: n.tagName.toLowerCase(),
+          src: n.getAttribute("src") ?? "",
+          href: n.getAttribute("href") ?? "",
+          rel: n.getAttribute("rel") ?? "",
+          fonts: n.hasAttribute("data-proompter-fonts"),
+        })),
         bodyChildren: [...document.body.children].map((n) => n.tagName.toLowerCase()),
         bodyAttrs: document.body.getAttributeNames().sort(),
         bodyStyle: document.body.getAttribute("style"),
         htmlAttrs: document.documentElement.getAttributeNames().sort(),
         htmlStyle: document.documentElement.getAttribute("style"),
         sheets: document.styleSheets.length,
+        adopted: document.adoptedStyleSheets.length,
       };
     });
 
@@ -118,15 +126,23 @@ test("B: opening the kit leaves the host's pixels, styles and document alone", a
   expect(open.htmlAttrs).toEqual(closed.htmlAttrs);
   expect(open.htmlStyle).toEqual(closed.htmlStyle);
   // Allowed additions: the kit's root element and the one font style tag. Nothing else.
-  const added = (a: string[], b: string[]) => b.filter((x) => !a.includes(x));
-  expect(added(closed.bodyChildren, open.bodyChildren).every((t) => t === "proompter-root")).toBe(true);
-  // Next's own chunk loader appends a <script>/<link> for /_next/ assets to <head> when the kit's lazy UI chunk
-  // loads (and dev/HMR may add data-next / data-turbopack nodes). That is the framework, not the kit; filter
-  // exactly those and nothing else.
-  const framework = (h: string) => /\/_next\/|data-next|data-turbopack/.test(h);
-  const headAdded = added(closed.headTags, open.headTags).filter((h) => !framework(h));
-  expect(headAdded.filter((h) => !h.includes("data-proompter-fonts"))).toEqual([]); // anything else is a leak
-  expect(headAdded.length).toBeLessThanOrEqual(1);
+  const withoutKit = (tags: string[]) => tags.filter((t) => t !== "proompter-root");
+  expect(withoutKit(open.bodyChildren)).toEqual(withoutKit(closed.bodyChildren));
+  // Next's own chunk loader appends a <script>/<link> whose src/href is under /_next/ to <head> when the kit's
+  // lazy UI chunk loads. That is the framework, not the kit; filter exactly those (by attribute) and nothing else.
+  const closedKeys = closed.headTags.map((t) => t.key);
+  const headAdded = open.headTags.filter((t) => !closedKeys.includes(t.key));
+  const framework = (t: (typeof headAdded)[number]) => (t.tag === "script" || t.tag === "link") && `${t.src}${t.href}`.includes("/_next/");
+  const ours = headAdded.filter((t) => !framework(t));
+  expect(ours.filter((t) => !t.fonts).map((t) => t.key)).toEqual([]); // anything but the font tag is a leak
+  // The font tag is there while the kit is open: exactly one, a <style>.
+  expect(ours.filter((t) => t.fonts && t.tag === "style")).toHaveLength(1);
+  await expect(page.locator("style[data-proompter-fonts]")).toHaveCount(1);
+  // Style sheets: the document gained only what <head> gained (our font style, plus any framework stylesheet link);
+  // nothing was adopted onto the document.
+  const stylesheetNodes = headAdded.filter((t) => t.tag === "style" || (t.tag === "link" && t.rel === "stylesheet")).length;
+  expect(open.sheets - closed.sheets).toBe(stylesheetNodes);
+  expect(open.adopted).toBe(closed.adopted);
 
   // Closing removes the kit and the font tag again.
   await page.evaluate(() => window.__proompter?.close());
