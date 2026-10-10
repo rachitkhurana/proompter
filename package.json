@@ -1,6 +1,6 @@
 {
   "name": "@rachitkay/proompter",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "description": "A review layer you turn on over your own app: pick any element, write what's wrong, get a markdown file with the source location, console, network and a snapshot.",
   "license": "MIT",
   "author": "Rachit Khurana",
@@ -27,7 +27,7 @@
     "provenance": true
   },
   "bin": {
-    "proompter": "./dist/cli/index.js"
+    "proompter": "dist/cli/index.js"
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
