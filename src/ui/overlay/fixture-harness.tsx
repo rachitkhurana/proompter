@@ -9,8 +9,8 @@ import {
   type PickSurface,
   type ViewportId,
 } from "../../core/surface";
-import { Overlay } from "./index";
-import { ViewportStage } from "../viewports";
+import { Overlay } from "./overlay";
+import { ViewportStage } from "../viewports/viewport-stage";
 
 // The handful of kit tokens the overlay and stage use (the real kit gets these from `.pp` in styles.css).
 const TOKENS = `
