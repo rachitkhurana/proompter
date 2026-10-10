@@ -9,9 +9,8 @@
  * Imports here must stay type-only or tiny: the UI lives in `./shell/ui`.
  */
 import { lazy, Suspense, useEffect, useState, useSyncExternalStore } from "react";
-import type { ProompterApi, ProompterProps } from "./proompter-deps";
+import type { DepsBox, ProompterApi, ProompterProps } from "./proompter-deps";
 import { isToggleChord } from "./shell/chord";
-import { createDepsBox } from "./shell/deps-box";
 
 export type {
   ComposerSlot,
@@ -111,7 +110,7 @@ function register(api: ProompterApi): () => void {
 
 function HostMode(props: ProompterProps) {
   const [open, setOpen] = useState(!!props.defaultOpen);
-  const [box] = useState(createDepsBox);
+  const [box] = useState<DepsBox>(() => ({}));
 
   // Nothing global exists until this mounts: no listener, no `window.__proompter`.
   useEffect(() => {
@@ -119,7 +118,7 @@ function HostMode(props: ProompterProps) {
       open: () => setOpen(true),
       close: () => setOpen(false),
       toggle: () => setOpen((o) => !o),
-      entries: () => box.peek()?.store.getSnapshot().entries ?? [],
+      entries: () => box.deps?.store.getSnapshot().entries ?? [],
     };
     return register(api);
   }, [box]);
@@ -132,16 +131,13 @@ function HostMode(props: ProompterProps) {
     const cancelIdle = whenIdle(() => {
       void import("../core/capture").then(({ createCapture }) => {
         if (cancelled) return;
-        const capture =
-          box.getCapture() ??
-          box.setCapture(createCapture({ win: window, redact, queries }));
-        capture.enable();
+        (box.capture ??= createCapture({ win: window, redact, queries })).enable();
       });
     });
     return () => {
       cancelled = true;
       cancelIdle();
-      box.getCapture()?.disable();
+      box.capture?.disable();
     };
     // Hooks given on the first render are the ones the page keeps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
