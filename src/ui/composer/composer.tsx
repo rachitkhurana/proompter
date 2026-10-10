@@ -20,7 +20,6 @@ import { LogRows, PropMenu, propertyItems } from "../entry-parts";
 import { DEFAULT_TAGS, INTENT_LABEL, KIND_ICON, NO_PLAN_KEY, plural, targetName } from "../labels";
 import { useShadowContainer } from "../shadow-root";
 import { copyText } from "../shell/clipboard";
-import { composerCss } from "./composer-styles";
 import { placeComposer, unionBox, type Box } from "./place";
 
 export type ComposerResult = { type: "saved"; entry: Entry } | { type: "discarded" };
@@ -338,7 +337,6 @@ export function Composer({
 
   return (
     <>
-      <style data-proompter-composer="">{composerCss}</style>
       <div
         ref={rootRef}
         className={cx("pm-comp", !leaving && "on")}
