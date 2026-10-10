@@ -16,10 +16,13 @@ export interface Rect {
   height: number;
 }
 
-/** What the rest of the kit (capture, snapshots) needs from a surface. */
+/** A real window: the host's, or a frame's (capture patches `fetch`, `XMLHttpRequest` and `console` on it). */
+export type SurfaceWindow = Window & typeof globalThis;
+
+/** What the rest of the kit (capture, snapshots) needs from a surface. The one definition; capture re-exports it. */
 export interface Surface {
   doc: Document;
-  win: Window;
+  win: SurfaceWindow;
   /** Project a rect measured in `doc` (CSS px) to screen space (what `position: fixed` overlays use). */
   toScreen(rect: Rect): Rect;
   /** Screen px per document px. 1 on the live page. */
@@ -207,7 +210,7 @@ function createLayoutBus(win: Window, attach: (emit: () => void) => () => void) 
 }
 
 /** The live page as a surface (Responsive). */
-export function createPageSurface(win: Window = window): PickSurface {
+export function createPageSurface(win: SurfaceWindow = window): PickSurface {
   const bus = createLayoutBus(win, (emit) => {
     win.addEventListener("scroll", emit, { capture: true, passive: true });
     win.addEventListener("resize", emit);
@@ -247,10 +250,10 @@ export function createFrameSurface(
   viewport: ViewportId,
   opts: { scale?: () => number } = {},
 ): PickSurface | null {
-  const reached = ((): { doc: Document; win: Window } | null => {
+  const reached = ((): { doc: Document; win: SurfaceWindow } | null => {
     try {
       const d = frame.contentDocument;
-      const w = frame.contentWindow;
+      const w = frame.contentWindow as SurfaceWindow | null; // `WindowProxy` is typed as a bare Window
       if (d) void d.documentElement; // touching it throws for cross-origin documents
       return d && w ? { doc: d, win: w } : null;
     } catch {
