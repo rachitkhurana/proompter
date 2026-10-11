@@ -23,7 +23,7 @@ interface Box {
  * Decodes the PNG by drawing it on a canvas inside the page (no PNG library). `boxes` are border boxes in CSS px
  * relative to the PNG's top-left; the image's own width gives the scale. Per box it counts the pixels that are NOT
  * exactly #000 inside it (inset 1 device px from each edge, where rounding could bite), and the pixels that ARE
- * #000 in a strip 4 CSS px beyond its right edge (white page there): the mask is the element, not a bigger block. `leaks` counts #888 pixels anywhere (the field border colour).
+ * #000 in a strip 4 CSS px beyond its right edge (white page there): the mask is the element, not a bigger block. `leaks` counts #f0f pixels anywhere (the field border colour).
  */
 async function check(page: Page, file: string, cssWidth: number, boxes: Box[]) {
   const b64 = readFileSync(file).toString("base64");
@@ -46,12 +46,12 @@ async function check(page: Page, file: string, cssWidth: number, boxes: Box[]) {
         }
         return { total: d.length / 4, n };
       };
-      // The fields' 2px border is exactly #888 and nothing else on the page is: any such pixel is a field left visible.
+      // The fields' 2px border is exactly #f0f (magenta: no grey gradient or anti-aliased text can hit it, unlike #888, which Next's dev badge produced on Linux): any such pixel is a field left visible.
       const all = ctx.getImageData(0, 0, c.width, c.height).data;
       let leaks = 0;
       let black = 0;
       for (let i = 0; i < all.length; i += 4) {
-        if (all[i] === 136 && all[i + 1] === 136 && all[i + 2] === 136) leaks++;
+        if (all[i] === 255 && all[i + 1] === 0 && all[i + 2] === 255) leaks++;
         if (all[i] === 0 && all[i + 1] === 0 && all[i + 2] === 0 && all[i + 3] === 255) black++;
       }
       return {
