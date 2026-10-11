@@ -236,6 +236,16 @@ export function createGithubRoute(opts: GithubRouteOptions) {
     }
   }
 
+  /** The issue `number` if it exists, is a `proompter` issue (not a PR) and its body carries `ref`; else null. */
+  async function knownIssue(call: Call, number: string | null, ref: string): Promise<Issue | null> {
+    if (!number || !/^[1-9]\d{0,8}$/.test(number)) return null;
+    const res = await call("GET", `${repoPath}/issues/${number}`);
+    if (res.status === 404 || res.status === 410) return null;
+    const issue = (await (await expect(res, "reading the issue", 200)).json()) as Issue;
+    const ours = !issue.pull_request && issue.labels.some((l) => labelName(l) === "proompter") && refOf(issue) === ref;
+    return ours ? issue : null;
+  }
+
   async function upsertIssue(call: Call, session: Session, entry: Entry, markdown: string, image: string | null): Promise<Issue> {
     const ref = `${session.id}/${entry.id}`;
     const labels = ["proompter", `kind:${entry.kind}`, `priority:${entry.priority}`];
@@ -245,7 +255,12 @@ export function createGithubRoute(opts: GithubRouteOptions) {
     const title = defang(`${entry.id}: ${entry.title.replace(/\s+/g, " ").trim()}`).slice(0, 250);
     const state = entry.status === "resolved" ? "closed" : "open";
     await ensureLabels(call, labels);
-    const found = (await proompterIssues(call, (i) => refOf(i) === ref)).find((i) => refOf(i) === ref);
+    // GitHub's label listing lags a few seconds behind a new issue, so a re-sync right after the first one would not
+    // find it there and open a duplicate. The number the client already holds is read directly (consistent), and
+    // trusted only if that issue is ours and carries this entry's ref; otherwise fall back to the listing.
+    const found =
+      (await knownIssue(call, entry.issue, ref)) ??
+      (await proompterIssues(call, (i) => refOf(i) === ref)).find((i) => refOf(i) === ref);
     if (!found) {
       const res = await expect(await call("POST", `${repoPath}/issues`, { title, body: text, labels }), "creating the issue", 201);
       const made = (await res.json()) as Issue;
