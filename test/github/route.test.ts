@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it } from "vitest";
 import { makeEntry, makeSession, PNG } from "../../src/core/entry-fixtures.test-util";
-import { parse, parseSession } from "../../src/core/serialize";
+import { parse, parseSession, serializeSession } from "../../src/core/serialize";
 import { createGithubRoute } from "../../src/github";
 import { MAX_BODY_BYTES } from "../../src/server/validate";
 import { createFakeGithub } from "./fake";
@@ -184,6 +184,68 @@ describe("POST", () => {
     const again = await sync(makeEntry({ issue: first.body.issue, status: "resolved" }));
     expect(again.body).toMatchObject({ issue: first.body.issue, state: "closed" });
     expect(fake.state.issues).toHaveLength(1);
+  });
+
+  it("another review with the same session id is refused (409) before any issue or file is touched", async () => {
+    const first = await sync();
+    const writes = fake.state.writes;
+    const before = JSON.stringify(fake.state.issues);
+    // A second browser, same day and title: same id, its own start time, its own PRO-5.
+    const other = makeSession({ started: "2026-10-10T18:00:00Z" });
+    const res = await post({ session: other, entry: makeEntry({ title: "Someone else's note" }) });
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toMatch(/belongs to another review/);
+    expect(fake.state.writes).toBe(writes);
+    expect(JSON.stringify(fake.state.issues)).toBe(before);
+    expect(fake.state.log.filter((l) => l.startsWith("PATCH") || l.startsWith("POST /repos/acme/reviews/issues"))).toHaveLength(1);
+    // The same review (same `started`) still syncs.
+    expect((await sync(makeEntry({ issue: first.body.issue, status: "resolved" }))).res.status).toBe(200);
+  });
+
+  it("a new session claims its folder first: session.md is created before any issue", async () => {
+    await sync();
+    const order = fake.state.log.filter((l) => l.startsWith("PUT") || l.startsWith("POST /repos/acme/reviews/issues"));
+    expect(order[0]).toBe(`PUT /repos/acme/reviews/contents/${base}/session.md`);
+    expect(order[1]).toBe("POST /repos/acme/reviews/issues");
+  });
+
+  it("two reviews racing for one new id (another server instance): the loser is refused, nothing of it written", async () => {
+    let raced = false;
+    const racing = mk({
+      fetch: async (input, init) => {
+        const req = new Request(input as string, init);
+        // Between our read (no session.md) and our create, another instance creates it for another review.
+        if (!raced && req.method === "PUT" && req.url.endsWith(`${base}/session.md`)) {
+          raced = true;
+          const other = await fake.handle(new Request(req.url, { method: "PUT", headers: { authorization: `Bearer ${TOKEN}`, "content-type": "application/json" }, body: JSON.stringify({ branch: "reviews", content: Buffer.from(serializeSession(makeSession({ started: "2026-10-10T18:00:00Z", reviewer: "other" }), [])).toString("base64") }) }));
+          expect(other.status).toBe(201);
+        }
+        return fake.handle(req);
+      },
+    });
+    const res = await post({ session: makeSession(), entry: makeEntry() }, {}, racing);
+    expect(res.status).toBe(409);
+    expect(fake.state.issues).toEqual([]);
+    expect([...(fake.state.branches.get("reviews")?.keys() ?? [])].filter((f) => f.startsWith(base))).toEqual([`${base}/session.md`]);
+  });
+
+  it("a `started` that does not parse is a 400; a stored one that does not parse locks nothing", async () => {
+    expect((await post({ session: makeSession({ started: "yesterday" }), entry: makeEntry() })).status).toBe(400);
+    expect(fake.state.writes).toBe(0);
+    await sync();
+    const md = file(`${base}/session.md`)!.toString("utf8").replace(/^started: .*$/m, 'started: "sometime"');
+    fake.state.branches.get("reviews")!.set(`${base}/session.md`, Buffer.from(md));
+    expect((await sync(makeEntry({ title: "Edited" }))).res.status).toBe(200);
+  });
+
+  it("an issue number that is gone or is a pull request falls back to the listing", async () => {
+    const first = await sync();
+    fake.state.issues.push({ number: 2, title: "pr", body: `ref: ${SID}/PRO-5`, state: "open", labels: [{ name: "proompter" }], html_url: "x", pull_request: {} });
+    for (const issue of ["2", "404"]) {
+      const { body } = await sync(makeEntry({ issue, title: `Via ${issue}` }));
+      expect(body.issue).toBe(first.body.issue);
+    }
+    expect(fake.state.issues).toHaveLength(2);
   });
 
   it("a client-supplied number for another entry's proompter issue is ignored", async () => {
@@ -373,6 +435,19 @@ describe("GET", () => {
       { n: 5, issue: "1", state: "open", url: "https://github.com/acme/reviews/issues/1" },
       { n: 6, issue: "2", state: "closed", url: "https://github.com/acme/reviews/issues/2" },
     ]);
+  });
+  it("with `started`, answers only the review that owns the session: 409 for another one", async () => {
+    await sync();
+    const started = makeSession().started;
+    expect((await get(`?session=${SID}&started=${encodeURIComponent(started)}`)).status).toBe(200);
+    const res = await get(`?session=${SID}&started=${encodeURIComponent("2026-10-10T18:00:00Z")}`);
+    expect(res.status).toBe(409);
+    expect((await get(`?session=${SID}&started=nope`)).status).toBe(400);
+    // A session not on the branch yet is anyone's, and a 0.1.0 client (no `started`) is still answered.
+    expect((await get(`?session=2026-10-11_fresh&started=${encodeURIComponent(started)}`)).status).toBe(200);
+    expect((await get(`?session=${SID}`)).status).toBe(200);
+    // The same instant in another offset is the same review.
+    expect((await get(`?session=${SID}&started=${encodeURIComponent(started.replace(/Z$/, "+00:00"))}`)).status).toBe(200);
   });
   it("sees an issue closed on GitHub", async () => {
     await sync();
