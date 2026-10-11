@@ -106,6 +106,22 @@ describe("github sink", () => {
     expect(sink.pending()).toEqual([]);
   });
 
+  it("asks for issue states with this review's `started`, so another review's closed issues resolve nothing", async () => {
+    const urls: string[] = [];
+    const { store, sink } = await setup((input, init) => (urls.push(String(input)), routeFetch(input, init)));
+    await store.create(draft());
+    await sink.sync();
+    const started = store.getState().session.started;
+    expect(urls[0]).toBe(`/api/proompter/github?session=${SID}&started=${encodeURIComponent(started)}`);
+    // Another review already owns this id on the branch: the sync stops with the route's 409 message.
+    const md = fake.state.branches.get("reviews")!.get(`reviews/${SID}/session.md`)!.toString("utf8");
+    fake.state.branches.get("reviews")!.set(`reviews/${SID}/session.md`, Buffer.from(md.replace(/^started: .*$/m, "started: 2026-10-10T18:00:00Z")));
+    fake.state.issues[0]!.state = "closed";
+    const r = await sink.sync();
+    expect(r).toMatchObject({ ok: false, status: 409, error: expect.stringMatching(/belongs to another review/) });
+    expect(store.getState().entries[0]?.status).toBe("open");
+  });
+
   it("resolving locally closes the issue; reopening locally wins over a stale closed issue", async () => {
     const { store, sink } = await setup();
     const a = await store.create(draft());
