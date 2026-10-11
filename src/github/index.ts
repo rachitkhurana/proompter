@@ -23,10 +23,15 @@
  *   `reviews/<session>/` on the `reviews` branch (created from the default branch's head when missing).
  *   Unchanged files are skipped (git blob sha), a renamed title deletes the old file. Answers
  *   `{ ok, issue, url, state, files }`.
- * - `GET ?session=ID`: `{ ok, issues: [{ n, issue, state, url }] }`.
+ * - `GET ?session=ID&started=ISO`: `{ ok, issues: [{ n, issue, state, url }] }`.
+ * - Both answer 409 when `reviews/<session>/session.md` on the branch records another review's `started`: two
+ *   reviews sharing a session id would overwrite each other's issues and files. (`started` is optional on GET for
+ *   0.1.0 clients.)
  *
- * Issues are found by the `proompter` label plus the `ref:` line in the body, never by the client's `entry.issue`,
- * so a lost local number cannot create a duplicate and a client cannot edit someone else's issue.
+ * Issues are found by the `proompter` label plus the `ref:` line in the body. The client's `entry.issue` is only a
+ * hint, read directly (the label listing lags a new issue by seconds) and used only when that issue carries the
+ * label and this entry's `ref`, so a lost local number cannot create a duplicate and a client cannot edit someone
+ * else's issue.
  */
 import { createHash, timingSafeEqual } from "node:crypto";
 import { assetNames, pad, parseSession, serializeSession } from "../core/serialize";
@@ -285,10 +290,59 @@ export function createGithubRoute(opts: GithubRouteOptions) {
     return (await (await expect(await call("PATCH", `${repoPath}/issues/${found.number}`, patch), "updating the issue", 200)).json()) as Issue;
   }
 
+  /**
+   * Two reviews must never share a session folder: their PRO-n numbers would collide, and one would overwrite the
+   * other's issues and files. A session on the branch belongs to the review whose `started` its `session.md`
+   * records (the kit keeps `started` per browser across tabs and reloads); another one is refused with 409.
+   */
+  function assertOwner(text: string, id: string, started: string): void {
+    let theirs: Session;
+    try {
+      theirs = parseSession(text).session;
+    } catch {
+      return; // hand-edited into something unparsable: nothing to compare, sync rebuilds the index
+    }
+    const at = Date.parse(theirs.started);
+    if (Number.isNaN(at) || at === Date.parse(started)) return;
+    throw new Refusal(
+      `Session ${id} on GitHub belongs to another review (started ${theirs.started} by ${theirs.reviewer}). Start a new session to sync.`,
+      409,
+      "request",
+    );
+  }
+
+  /** GET: check only. */
+  async function checkOwner(call: Call, id: string, started: string): Promise<void> {
+    const old = await readText(call, `reviews/${id}/session.md`);
+    if (old) assertOwner(old.text, id, started);
+  }
+
+  /**
+   * POST: check, or claim a new session by creating its `session.md` before any issue or file. The create sends no
+   * sha, so GitHub refuses it (422) when the file appeared meanwhile: of two reviews racing for one id (across server
+   * instances, where `withLock` does not reach), exactly one gets it and the other is checked against it.
+   */
+  async function claimSession(call: Call, session: Session): Promise<void> {
+    const file = `reviews/${session.id}/session.md`;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const old = await readText(call, file);
+      if (old) return assertOwner(old.text, session.id, session.started);
+      const res = await call("PUT", `${repoPath}/contents/${file}`, {
+        message: `proompter: ${file}`,
+        content: Buffer.from(serializeSession(session, []), "utf8").toString("base64"),
+        branch,
+      });
+      if (res.ok) return;
+      if (res.status !== 409 && res.status !== 422) await fail(res, "writing a file");
+    }
+    throw new GithubError("GitHub kept refusing to create session.md");
+  }
+
   async function sync(call: Call, session: Session, input: Entry): Promise<Record<string, unknown>> {
     // Validate the images and the entry before GitHub sees anything.
     planEntry(session, input);
     await ensureBranch(call);
+    await claimSession(call, session);
     const names = assetNames(input.n, input.viewport);
     const snap = input.snapshot;
     const image = snap?.assets?.element || snap?.element ? names.element : snap?.assets?.viewport || snap?.viewport ? names.viewport : null;
@@ -357,6 +411,8 @@ export function createGithubRoute(opts: GithubRouteOptions) {
       }
       if (!isObj(body)) throw new Refusal("bad body", 400, "request");
       const session = checkSession(body.session);
+      // The ownership check compares `started`: one that does not parse could never match (or lock a session).
+      if (Number.isNaN(Date.parse(session.started))) throw new Refusal("bad started", 400, "request");
       if (body.entry === undefined) throw new Refusal("missing entry", 400, "request");
       const entry = checkEntry(body.entry, session);
       // One sync at a time per session in this process: two would race on session.md.
@@ -374,6 +430,12 @@ export function createGithubRoute(opts: GithubRouteOptions) {
       guard(req, s.key);
       const sid = new URL(req.url).searchParams.get("session");
       if (sid === null || !SESSION_ID.test(sid)) throw new Refusal("bad session id", 400, "request");
+      // `started` (sent since 0.1.1): another review's issue states must not resolve this review's entries.
+      const started = new URL(req.url).searchParams.get("started");
+      if (started !== null) {
+        if (Number.isNaN(Date.parse(started))) throw new Refusal("bad started", 400, "request");
+        await checkOwner(client(s.token), sid, started);
+      }
       const issues = (await proompterIssues(client(s.token)))
         .map((i) => ({ i, ref: refOf(i) }))
         .filter((x) => x.ref?.startsWith(`${sid}/PRO-`))
