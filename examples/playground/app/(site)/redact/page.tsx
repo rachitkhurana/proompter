@@ -1,7 +1,7 @@
 // Served at /redact. Cards with typed values and a marked block, for the snapshot redaction e2e (D17). The page is
 // taller than the window so it can scroll, and a fixed panel holds a field (its position is not the page's once scrolled).
 const box = { background: "#fff", color: "#111", display: "grid", gap: 16 } as const;
-const field = { padding: 8, border: "2px solid #888", font: "16px system-ui", background: "#fff", color: "#111" } as const;
+const field = { padding: 8, border: "2px solid #f0f", font: "16px system-ui", background: "#fff", color: "#111" } as const;
 
 export default function Page() {
   return (
