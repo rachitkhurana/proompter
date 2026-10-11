@@ -174,6 +174,13 @@ optional when you use that path). Without the prop nothing changes.
   (created when missing). The body is the entry markdown with its snapshot linked from the branch. The issue
   number is stored in the entry's `issue` field and shown as a link in the Publish tab.
 
+**One session per browser.** With the `github` prop, the session id gets a random tag kept in this browser
+(`2026-10-11_review-k3x9q2`, in `localStorage["proompter:browser"]`), so two reviewers on the same day never share
+a folder or an issue, and a reload stays in the same session. In dev this also names the local `reviews/` folder.
+The route refuses (409) any sync whose session id is already on the branch with another start time, before it
+touches an issue or a file. Upgrade every reviewer's app to 0.1.1 or later: a 0.1.0 kit still uses the shared
+`<date>_review` id.
+
 **Status, both ways.** Resolving an entry closes its issue and reopening it reopens the issue. An issue closed on
 GitHub marks the entry resolved, with one activity line, on the next sync. If the entry also changed locally,
 the local change wins, but only within one page load: what was already synced is remembered in memory, so after a
