@@ -128,6 +128,28 @@ test("an issue closed on GitHub marks the entry resolved on the next sync", asyn
   expect((await state(request)).issues[0]?.state).toBe("closed");
 });
 
+test("two reviewers on the same day: each browser's PRO-1 is its own issue and folder, nothing overwritten", async ({ browser, request }) => {
+  const sessions: string[] = [];
+  for (let i = 0; i < 2; i++) {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await context.newPage();
+    await page.addInitScript((k) => localStorage.setItem("proompter:review-key", k), KEY);
+    await fileEntry(page);
+    await page.keyboard.press("e");
+    await openPublish(page);
+    await page.getByRole("button", { name: "Sync to GitHub" }).click();
+    await expect(status(page)).toHaveText("Synced 1 entry"); // not "resolved from GitHub", not a 409
+    sessions.push(await page.evaluate(() => window.__proompter!.entries()[0]!.session));
+    await context.close();
+  }
+  expect(sessions[0]).not.toBe(sessions[1]);
+  for (const sid of sessions) expect(sid).toMatch(/^\d{4}-\d{2}-\d{2}_github-sync-[a-z0-9]{6}$/);
+  const s = await state(request);
+  expect(s.issues.map((i) => i.number)).toEqual([1, 2]);
+  const sessionFiles = Object.keys(s.files.reviews ?? {}).filter((f) => f.endsWith("/session.md"));
+  expect(sessionFiles.sort()).toEqual(sessions.map((sid) => `reviews/${sid}/session.md`).sort());
+});
+
 test("the GitHub token and route code never reach the client bundle", () => {
   const root = fileURLToPath(new URL("..", import.meta.url));
   const secrets = ["PROOMPTER_GITHUB_TOKEN", "PROOMPTER_REVIEW_KEY", TOKEN, "createGithubRoute", "api.github.com"];
