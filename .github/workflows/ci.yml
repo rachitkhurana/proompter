@@ -7,7 +7,7 @@ on:
 env:
   # Linux visual baselines are committed (e2e/__screenshots__/*/linux/), so a visual change fails CI.
   # To regenerate them: set this to `missing`, delete the old PNGs, and commit the `linux-visual-baselines` artifact.
-  VISUAL_SNAPSHOTS: missing
+  VISUAL_SNAPSHOTS: none
 
 jobs:
   verify:
