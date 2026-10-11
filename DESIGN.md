@@ -182,6 +182,18 @@ examples/vite/          → plain React app on Vite 8 with @vitejs/plugin-react 
     - `reviewKey` defaults to `process.env.PROOMPTER_REVIEW_KEY`, and the route answers 404 when it is unset.
     - The kit asks the reviewer for the key once and keeps it in `localStorage`.
     - The body cap and the field validation are shared with the dev route (`src/server/`).
+  - **One review per session (0.1.1):** every browser writes to the same branch, so a shared `<date>_<slug>` id
+    would let two reviewers' PRO-1 overwrite each other (found in the live smoke test).
+    - With the `github` prop, the kit's default session id ends in a per-browser tag from
+      `localStorage["proompter:browser"]` (memory in a private window), and its `started` is kept next to it
+      (`localStorage["proompter:session"]`), so every tab and reload of one browser is the same review.
+    - The route compares the session's `started` with the `session.md` on the branch. A different one is a 409 on
+      POST and on GET (which sends `started`; optional for 0.1.0 clients), before any issue or file.
+    - A new session is claimed first: POST creates `session.md` without a sha before anything else, so GitHub's
+      422 decides a race between two server instances. A `started` that does not parse is a 400.
+  - **Issue lookup:** a known issue number is read directly (`GET /issues/n`), and used only if it is a
+    `proompter` issue with this entry's `ref`. The label listing is the fallback, because it lags a few seconds
+    behind a new issue (a quick re-sync made a duplicate, live).
 - **D17. Snapshot redaction (T13).** The snapshot is masked inside html-to-image's cloned DOM: it renders
   `toSvg`, parses the SVG, blacks out the matching elements in the clone, then draws the PNG itself. The mask is
   part of what gets rendered, so it covers the field wherever the clone lays it out. Measuring on the live page
