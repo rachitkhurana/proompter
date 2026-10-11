@@ -5,7 +5,7 @@
  */
 import { createFilesSink, DEFAULT_ENDPOINT, type FilesSink } from "../../core/sinks/files";
 import { createGithubSink, REVIEW_KEY_STORAGE, type GithubSink } from "../../core/sinks/github";
-import { serialize, entryPath as entryFile } from "../../core/serialize";
+import { isoSeconds, serialize, entryPath as entryFile, sessionIdFor } from "../../core/serialize";
 import { createStore, type EntryStore as CoreStore, type StoreState as CoreState } from "../../core/store";
 import { Composer } from "../composer/composer";
 import { toast } from "../primitives/toast";
@@ -100,13 +100,71 @@ function loadKey(): string | null {
   }
 }
 
+/** Per-browser tag for session ids when GitHub sync is on. */
+export const BROWSER_TAG_STORAGE = "proompter:browser";
+let memoryTag: string | null = null;
+/**
+ * With GitHub sync, every reviewer's browser writes to the same branch: a shared `<date>_review` id would make two
+ * reviewers' PRO-1 the same issue and file. A random tag kept in this browser keeps reloads in one session and
+ * different browsers apart (`2026-10-11_review-k3x9q2`). The route also refuses a mismatch with 409.
+ */
+export function browserTag(): string {
+  const fresh = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => "abcdefghijklmnopqrstuvwxyz0123456789"[b % 36]).join("");
+  try {
+    const kept = localStorage.getItem(BROWSER_TAG_STORAGE);
+    if (kept && /^[a-z0-9]{6}$/.test(kept)) return kept;
+    const tag = fresh();
+    localStorage.setItem(BROWSER_TAG_STORAGE, tag);
+    return tag;
+  } catch {
+    return (memoryTag ??= fresh()); // private window: lasts until the page closes
+  }
+}
+
+/** With GitHub sync: this browser's session id, and its start when it can be kept. */
+function githubSession(title: string): { id: string; started?: string } {
+  const id = `${sessionIdFor(title, new Date())}-${browserTag()}`;
+  const started = sessionStart(id);
+  return started ? { id, started } : { id };
+}
+
+/** The GitHub session's id and start, per browser: `{ id, started }`. */
+export const SESSION_START_STORAGE = "proompter:session";
+/**
+ * The start time the route checks ownership by (409 for another review). IndexedDB keeps it too, but only once an
+ * entry is saved and only per tab until then: two tabs opened together, or a browser whose IndexedDB was cleared,
+ * would each claim a different start for the same id. localStorage is shared by the tabs and lives with the tag.
+ */
+export function sessionStart(id: string): string | undefined {
+  const read = (raw: string | null): { id?: unknown; started?: unknown } | null => {
+    try {
+      return JSON.parse(raw ?? "null") as { id?: unknown; started?: unknown } | null;
+    } catch {
+      return null; // junk: replaced below
+    }
+  };
+  try {
+    const kept = read(localStorage.getItem(SESSION_START_STORAGE));
+    if (kept?.id === id && typeof kept.started === "string" && !Number.isNaN(Date.parse(kept.started))) return kept.started;
+    const started = isoSeconds(new Date());
+    localStorage.setItem(SESSION_START_STORAGE, JSON.stringify({ id, started }));
+    return started;
+  } catch {
+    return undefined; // private window: the store's own start (one tab, one page load)
+  }
+}
+
 export function createDefaultDeps(options: ProompterProps): ProompterDeps {
   // A new entry is numbered only after the disk has been read (`sink.hydrated`), so it can never take a number
   // that already exists in `reviews/`. Capped at 2 s in case the route hangs.
   // eslint-disable-next-line prefer-const -- assigned after the store exists; the store's beforeCreate closure reads it
   let sink: FilesSink | undefined;
   const core = createStore({
-    session: { title: options.session?.title ?? "Review", reviewer: options.session?.reviewer ?? "reviewer" },
+    session: {
+      title: options.session?.title ?? "Review",
+      reviewer: options.session?.reviewer ?? "reviewer",
+      ...(options.github ? githubSession(options.session?.title ?? "Review") : {}),
+    },
     plugins: options.plugins,
     onWriteError: () => toast("Couldn't save locally. The entry is kept until you close this tab."),
     beforeCreate: () => (sink ? Promise.race([sink.hydrated, new Promise<void>((r) => setTimeout(r, HYDRATE_WAIT_MS))]) : undefined),
