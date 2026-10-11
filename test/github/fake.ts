@@ -42,6 +42,8 @@ export function createFakeGithub(opts: FakeOptions = {}) {
     log: [] as string[],
     /** Number of PUT/DELETE contents calls. */
     writes: 0,
+    /** Issue numbers the list endpoint leaves out, as GitHub's label listing does for a few seconds after a create. */
+    unlisted: new Set<number>(),
   };
   const reset = () => {
     s.branches = new Map([[defaultBranch, new Map([["README.md", Buffer.from("# reviews\n")]])]]);
@@ -49,6 +51,7 @@ export function createFakeGithub(opts: FakeOptions = {}) {
     s.labels = new Set();
     s.log = [];
     s.writes = 0;
+    s.unlisted = new Set();
   };
   reset();
 
@@ -139,7 +142,9 @@ export function createFakeGithub(opts: FakeOptions = {}) {
       const state = url.searchParams.get("state") ?? "open";
       const per = Number(url.searchParams.get("per_page") ?? 30);
       const page = Number(url.searchParams.get("page") ?? 1);
-      const all = s.issues.filter((i) => (state === "all" || i.state === state) && want.every((w) => i.labels.some((l) => l.name === w)));
+      const all = s.issues.filter(
+        (i) => !s.unlisted.has(i.number) && (state === "all" || i.state === state) && want.every((w) => i.labels.some((l) => l.name === w)),
+      );
       return j(all.slice((page - 1) * per, page * per));
     }
     if (rest === "/issues" && method === "POST") {
