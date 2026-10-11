@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1 (2026-10-11)
+
+- **GitHub sync:** syncing an entry again within a few seconds of its first sync (say, resolving it right away) could
+  open a second issue, because GitHub's label listing lags behind a new issue. The route now reads the issue number
+  the client already holds directly, and trusts it only when that issue is a `proompter` issue carrying the entry's
+  `ref`. Found in the live smoke test against github.com.
+
 ## 0.1.0 (2026-10-10)
 
 Shared reviews (v2) and agent tools (v3).
