@@ -5,9 +5,9 @@ on:
   pull_request:
 
 env:
-  # Linux visual baselines are committed (e2e/__screenshots__/visual.spec.ts/linux/), so a visual change fails CI.
+  # Linux visual baselines are committed (e2e/__screenshots__/*/linux/), so a visual change fails CI.
   # To regenerate them: set this to `missing`, delete the old PNGs, and commit the `linux-visual-baselines` artifact.
-  VISUAL_SNAPSHOTS: none
+  VISUAL_SNAPSHOTS: missing
 
 jobs:
   verify:
@@ -55,7 +55,7 @@ jobs:
         if: always() && env.VISUAL_SNAPSHOTS == 'missing'
         with:
           name: linux-visual-baselines
-          path: e2e/__screenshots__/visual.spec.ts/linux/
+          path: e2e/__screenshots__/*/linux/
           if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         if: failure()
