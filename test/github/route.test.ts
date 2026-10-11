@@ -178,6 +178,21 @@ describe("POST", () => {
     expect(fake.state.issues[0]).toMatchObject({ title: "someone else's", body: "mine", state: "open" });
   });
 
+  it("a re-sync while GitHub's listing still lags finds the issue by its number, not a second create", async () => {
+    const first = await sync();
+    fake.state.unlisted.add(Number(first.body.issue)); // live: the label listing missed a seconds-old issue
+    const again = await sync(makeEntry({ issue: first.body.issue, status: "resolved" }));
+    expect(again.body).toMatchObject({ issue: first.body.issue, state: "closed" });
+    expect(fake.state.issues).toHaveLength(1);
+  });
+
+  it("a client-supplied number for another entry's proompter issue is ignored", async () => {
+    fake.state.issues.push({ number: 1, title: "PRO-9", body: `ref: ${SID}/PRO-9`, state: "open", labels: [{ name: "proompter" }], html_url: "x" });
+    const { body } = await sync(makeEntry({ issue: "1", status: "resolved" }));
+    expect(body.issue).toBe("2");
+    expect(fake.state.issues[0]).toMatchObject({ title: "PRO-9", state: "open" });
+  });
+
   it("sends the images only when given, and keeps the existing ones", async () => {
     await sync();
     const slim = makeEntry({ snapshot: { assets: { element: "005-mobile.png", viewport: "005-mobile-full.png" } } as never });
