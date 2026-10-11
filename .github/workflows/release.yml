@@ -31,8 +31,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm lint
+      - run: pnpm build # before test: the CLI and MCP tests run dist/cli/index.js
       - run: pnpm test
-      - run: pnpm build
       - name: Release exports
         run: |
           node scripts/release-exports.mjs strip
