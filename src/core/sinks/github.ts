@@ -173,10 +173,10 @@ export function createGithubSink(opts: GithubSinkOptions): GithubSink {
     };
     try {
       await store.ready;
-      const sid = store.getState().session.id;
+      const { id: sid, started } = store.getState().session;
 
-      // 1. Issues closed on GitHub resolve their entries.
-      const res = await doFetch(`${endpoint}?session=${encodeURIComponent(sid)}`, { headers: headers(false) });
+      // 1. Issues closed on GitHub resolve their entries (only this review's: `started` tells it from another one).
+      const res = await doFetch(`${endpoint}?session=${encodeURIComponent(sid)}&started=${encodeURIComponent(started)}`, { headers: headers(false) });
       if (!res.ok) {
         const f = await failure(res);
         return stop(f.status, f.error);
