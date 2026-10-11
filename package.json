@@ -1,6 +1,6 @@
 {
   "name": "@rachitkay/proompter",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A review layer you turn on over your own app: pick any element, write what's wrong, get a markdown file with the source location, console, network and a snapshot.",
   "license": "MIT",
   "author": "Rachit Khurana",
