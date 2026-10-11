@@ -7,7 +7,7 @@ import { createStore } from "../../core/store";
 import { serialize } from "../../core/serialize";
 import { toast } from "../primitives/toast";
 import { seedEntries } from "./fake";
-import { adaptStore, createDefaultDeps } from "./defaults";
+import { adaptStore, browserTag, BROWSER_TAG_STORAGE, createDefaultDeps, SESSION_START_STORAGE, sessionStart } from "./defaults";
 
 // The real store, but its options are recorded (to reach `onWriteError`); the toast is a spy.
 vi.mock("../../core/store", async (orig) => {
@@ -96,6 +96,60 @@ describe("createDefaultDeps", () => {
     opts.onWriteError?.();
     expect(toast).toHaveBeenCalledTimes(1);
     expect(toast).toHaveBeenCalledWith("Couldn't save locally. The entry is kept until you close this tab.");
+  });
+
+  it("with GitHub sync the session id carries this browser's tag, kept across loads; without it, the plain id", () => {
+    localStorage.removeItem(BROWSER_TAG_STORAGE);
+    const idOf = () => vi.mocked(createStore).mock.calls.at(-1)![0].session.id;
+    createDefaultDeps({ session: { title: "Manual test pass" }, github: {} });
+    const first = idOf();
+    expect(first).toMatch(/^\d{4}-\d{2}-\d{2}_manual-test-pass-[a-z0-9]{6}$/);
+    expect(localStorage.getItem(BROWSER_TAG_STORAGE)).toBe(first!.slice(-6));
+    createDefaultDeps({ session: { title: "Manual test pass" }, github: {} });
+    expect(idOf()).toBe(first);
+    // Another browser (no tag kept yet) gets another id.
+    localStorage.removeItem(BROWSER_TAG_STORAGE);
+    expect(browserTag()).not.toBe(first!.slice(-6));
+    createDefaultDeps({ session: { title: "Manual test pass" } });
+    expect(idOf()).toBeUndefined();
+  });
+
+  it("keeps the GitHub session's start per browser, so two tabs and a reload claim the same review", () => {
+    localStorage.removeItem(BROWSER_TAG_STORAGE);
+    localStorage.removeItem(SESSION_START_STORAGE);
+    const last = () => vi.mocked(createStore).mock.calls.at(-1)![0].session;
+    createDefaultDeps({ session: { title: "Manual test pass" }, github: {} });
+    const tab1 = last();
+    expect(tab1.started).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+    createDefaultDeps({ session: { title: "Manual test pass" }, github: {} });
+    expect(last()).toMatchObject({ id: tab1.id, started: tab1.started });
+    // Junk in storage is replaced, not trusted.
+    localStorage.setItem(SESSION_START_STORAGE, "{not json");
+    expect(sessionStart(tab1.id!)).toMatch(/Z$/);
+    localStorage.setItem(BROWSER_TAG_STORAGE, "NOPE!!");
+    expect(browserTag()).toMatch(/^[a-z0-9]{6}$/);
+  });
+
+  it("an empty, non-Latin or very long title still makes a valid session id", () => {
+    for (const title of ["", "Überprüfung 検証", "x".repeat(300)]) {
+      createDefaultDeps({ session: { title }, github: {} });
+      expect(vi.mocked(createStore).mock.calls.at(-1)![0].session.id).toMatch(/^\d{4}-\d{2}-\d{2}_[a-z0-9-]+$/);
+    }
+  });
+
+  it("when localStorage throws, the tag lives in memory and the store keeps its own start", () => {
+    const denied = () => {
+      throw new Error("denied");
+    };
+    vi.stubGlobal("localStorage", { getItem: denied, setItem: denied, removeItem: denied });
+    try {
+      expect(browserTag()).toBe(browserTag());
+      expect(sessionStart("2026-10-11_review-abcdef")).toBeUndefined();
+      createDefaultDeps({ session: { title: "Review" }, github: {} });
+      expect(vi.mocked(createStore).mock.calls.at(-1)![0].session).not.toHaveProperty("started");
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 
