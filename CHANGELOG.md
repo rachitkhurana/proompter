@@ -2,6 +2,13 @@
 
 ## 0.1.1 (2026-10-11)
 
+- **GitHub sync, two reviewers on one day:** both browsers used the session id `<date>_review`, so the second
+  reviewer's PRO-1 overwrote the first one's issue and files on the branch, and could mark their own new entry
+  resolved from the other's closed issue. With the `github` prop the session id now ends in a per-browser tag
+  (`2026-10-11_review-k3x9q2`), and the route refuses (409) a sync whose session on the branch was started by
+  another review, before touching anything. A new session's `session.md` is created first, so a race between
+  server instances has one winner. Found in the live smoke test. Upgrade every reviewer's app: a 0.1.0 kit still
+  uses the shared id.
 - **GitHub sync:** syncing an entry again within a few seconds of its first sync (say, resolving it right away) could
   open a second issue, because GitHub's label listing lags behind a new issue. The route now reads the issue number
   the client already holds directly, and trusts it only when that issue is a `proompter` issue carrying the entry's
