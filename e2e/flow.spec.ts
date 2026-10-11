@@ -120,6 +120,7 @@ test("11.5: a page note filed from the keyboard alone reaches disk", async ({ pa
   await page.waitForFunction(() => !!window.__proompter);
   await page.keyboard.press("ControlOrMeta+Shift+."); // show the kit
   await expect(page.getByRole("toolbar", { name: "Proompter" })).toBeVisible();
+  await expect(page.locator(".dock")).not.toHaveClass(/\bintro\b/); // as openKit: a key during the entrance was lost on CI
   await page.keyboard.press("n");
   const composer = composerOf(page);
   await expect(composer.getByLabel("Title")).toBeFocused();
