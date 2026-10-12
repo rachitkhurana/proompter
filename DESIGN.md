@@ -203,6 +203,12 @@ examples/vite/          → plain React app on Vite 8 with @vitejs/plugin-react 
   - A masked element gets a black background and `filter: brightness(0)`, which makes the whole box and everything
     inside it pure black. Field values are cleared in the clone.
   - The live page is never touched.
+  - Unreadable media (0.2.2): html-to-image calls `toDataURL()` on every `<video>` and `<canvas>` while cloning, and
+    that throws a SecurityError for a cross-origin video without CORS or a canvas tainted by a cross-origin image,
+    which lost the whole picture. The render filter (it sees the original nodes) probes each one, read-only, and
+    leaves out the ones it can't read; a grey `video`/`canvas` placeholder is drawn at their live position on the PNG
+    (element crop and viewport). The element is removed from the clone, so where its container has no fixed size the
+    layout around it may collapse. Readable media and same-origin video are rendered as before.
   - It fails closed: if any step throws, that PNG is dropped, the entry is saved without it, and a toast says so.
 - **D18. Generic repo plugin (T14).** `@rachitkay/proompter/plugins` exports `repoPlugin({ tasks, testPlan,
   context })`.
