@@ -36,7 +36,8 @@
  * else's issue.
  */
 import { createHash, timingSafeEqual } from "node:crypto";
-import { assetNames, pad, parseSession, serializeSession } from "../core/serialize";
+import { defang, issueBody } from "./issue-body";
+import { pad, parseSession, serializeSession } from "../core/serialize";
 import type { Entry, Session } from "../core/entry";
 import { SESSION_ID } from "../core/store";
 import { checkEntry, checkRequest, checkSession, hostName, isObj, json, notFound, readBody, Refusal } from "../server/validate";
@@ -83,7 +84,10 @@ interface Issue {
 
 const MAX_ISSUE_BODY = 60_000; // GitHub's limit is 65536
 const MAX_ISSUE_PAGES = 10;
-const REF_LINE = /^ref:\s*"?([^"\s]+)"?\s*$/m;
+// 0.2.1+ bodies end with a hidden line (the last one wins: a note may quote another); 0.1.x and 0.2.0 bodies were the
+// entry file, whose frontmatter `ref:` line counts only inside the leading `---` block.
+const REF_COMMENT = /^<!-- proompter ref: (\S+) -->[ \t]*$/gm;
+const FRONT_REF = /^---\r?\n(?:(?!---\r?\n)[^\n]*\n)*?ref:[ \t]*"?([^"\s]+)"?[ \t]*\r?\n/;
 /** A shorter review key is guessable: the route stays 404 (`openssl rand -hex 24` makes a good one). */
 const MIN_KEY_LENGTH = 16;
 const LABEL_COLOR = "ededed";
@@ -91,9 +95,11 @@ const LABEL_COLOR = "ededed";
 const digest = (s: string) => createHash("sha256").update(s).digest();
 const blobSha = (bytes: Buffer) => createHash("sha1").update(`blob ${bytes.length}\0`).update(bytes).digest("hex");
 const labelName = (l: Issue["labels"][number]) => (typeof l === "string" ? l : l.name);
-/** Issue text is shown to people: break `@user` and `@org/team` so a synced entry cannot ping anyone. */
-const defang = (t: string) => t.replace(/@/g, "@\u200b");
-const refOf = (i: Issue) => REF_LINE.exec(i.body ?? "")?.[1];
+const refOf = (i: Issue) => {
+  const body = i.body ?? "";
+  const hidden = [...body.matchAll(REF_COMMENT)].pop();
+  return hidden?.[1] ?? FRONT_REF.exec(body)?.[1];
+};
 
 export function createGithubRoute(opts: GithubRouteOptions) {
   const branch = opts.branch ?? "reviews";
@@ -271,12 +277,10 @@ export function createGithubRoute(opts: GithubRouteOptions) {
     return ours ? issue : null;
   }
 
-  async function upsertIssue(call: Call, branch: string, github: boolean, session: Session, entry: Entry, markdown: string, image: string | null): Promise<Issue> {
+  async function upsertIssue(call: Call, branch: string, github: boolean, session: Session, entry: Entry, images: { element: boolean; viewport: boolean }): Promise<Issue> {
     const ref = `${session.id}/${entry.id}`;
     const labels = ["proompter", `kind:${entry.kind}`, `priority:${entry.priority}`];
-    const imageLine = image ? `\n\n![snapshot](https://github.com/${opts.repo}/blob/${branch}/reviews/${session.id}/assets/${image}?raw=true)\n` : "\n";
-    const body = markdown.length > MAX_ISSUE_BODY ? `${markdown.slice(0, MAX_ISSUE_BODY)}\n\n${github ? "(truncated)" : "(truncated, see the file on the branch)"}` : markdown;
-    const text = defang(`${body}${imageLine}`);
+    const text = issueBody(session, entry, { repo: opts.repo, branch, github, ...images, max: MAX_ISSUE_BODY });
     const title = defang(`${entry.id}: ${entry.title.replace(/\s+/g, " ").trim()}`).slice(0, 250);
     const state = entry.status === "resolved" ? "closed" : "open";
     await ensureLabels(call, labels);
@@ -364,11 +368,10 @@ export function createGithubRoute(opts: GithubRouteOptions) {
     planEntry(session, input);
     await ensureBranch(call, target, github);
     await claimSession(call, target, session);
-    const names = assetNames(input.n, input.viewport);
     const snap = input.snapshot;
-    const image = snap?.assets?.element || snap?.element ? names.element : snap?.assets?.viewport || snap?.viewport ? names.viewport : null;
-    // The issue body is the entry without its own issue number, so it is stable from the first sync on.
-    const issue = await upsertIssue(call, target, github, session, input, planEntry(session, { ...input, issue: null }).markdown, image);
+    const images = { element: !!(snap?.assets?.element || snap?.element), viewport: !!(snap?.assets?.viewport || snap?.viewport) };
+    // The issue body carries no issue number, so it is stable from the first sync on.
+    const issue = await upsertIssue(call, target, github, session, input, images);
     // The files carry the issue number, so the next sync finds them unchanged.
     const entry: Entry = { ...input, issue: String(issue.number) };
     const plan = planEntry(session, entry);
