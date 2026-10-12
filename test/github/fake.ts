@@ -44,6 +44,11 @@ export function createFakeGithub(opts: FakeOptions = {}) {
     writes: 0,
     /** Issue numbers the list endpoint leaves out, as GitHub's label listing does for a few seconds after a create. */
     unlisted: new Set<number>(),
+    /** Git Data API objects: tree sha -> files, commit sha -> { tree, parents }. */
+    trees: new Map<string, Map<string, Buffer>>(),
+    commits: new Map<string, { tree: string; parents: string[] }>(),
+    /** branch -> parent shas of the commit it was created from (empty: an orphan). Absent: copied from the default branch. */
+    parents: new Map<string, string[]>(),
   };
   const reset = () => {
     s.branches = new Map([[defaultBranch, new Map([["README.md", Buffer.from("# reviews\n")]])]]);
@@ -52,6 +57,9 @@ export function createFakeGithub(opts: FakeOptions = {}) {
     s.log = [];
     s.writes = 0;
     s.unlisted = new Set();
+    s.trees = new Map();
+    s.commits = new Map();
+    s.parents = new Map();
   };
   reset();
 
@@ -86,9 +94,24 @@ export function createFakeGithub(opts: FakeOptions = {}) {
       const ref = String(body.ref ?? "");
       const b = ref.replace(/^refs\/heads\//, "");
       if (s.branches.has(b)) return j({ message: "Reference already exists" }, 422);
-      // The sha must be the default branch's head, as the route got it from /git/ref.
-      s.branches.set(b, new Map(s.branches.get(defaultBranch)));
+      const commit = s.commits.get(String(body.sha ?? ""));
+      // A commit of ours (orphan): its tree. Else the sha is the default branch's head, as the route got it from /git/ref.
+      s.branches.set(b, new Map(commit ? s.trees.get(commit.tree) : s.branches.get(defaultBranch)));
+      if (commit) s.parents.set(b, commit.parents);
       return j({ ref }, 201);
+    }
+    if (rest === "/git/trees" && method === "POST") {
+      const files = new Map<string, Buffer>();
+      for (const t of Array.isArray(body.tree) ? (body.tree as Record<string, unknown>[]) : []) files.set(String(t.path), Buffer.from(String(t.content ?? ""), "utf8"));
+      const sha = createHash("sha1").update(`tree ${s.trees.size}`).digest("hex");
+      s.trees.set(sha, files);
+      return j({ sha }, 201);
+    }
+    if (rest === "/git/commits" && method === "POST") {
+      if (!s.trees.has(String(body.tree))) return j({ message: "Tree not found" }, 422);
+      const sha = createHash("sha1").update(`commit ${s.commits.size}`).digest("hex");
+      s.commits.set(sha, { tree: String(body.tree), parents: Array.isArray(body.parents) ? (body.parents as string[]) : [] });
+      return j({ sha }, 201);
     }
 
     r = /^\/contents\/(.+)$/.exec(rest);
