@@ -467,3 +467,93 @@ describe("GET", () => {
     expect(issues).toHaveLength(120);
   });
 });
+
+describe('save: "github" (assets branch, no entry files)', () => {
+  const AB = "proompter-assets";
+  const syncGh = async (entry = makeEntry(), session = makeSession(), r = route) => {
+    const res = await post({ session, entry, save: "github" }, {}, r);
+    return { res, body: (await res.json()) as { ok: boolean; issue: string; state: string; save?: string; files: string[] } };
+  };
+  const names = (b: string) => [...(fake.state.branches.get(b)?.keys() ?? [])].sort();
+
+  it("keeps the whole entry in the issue and the screenshots on an orphan assets branch", async () => {
+    const { res, body } = await syncGh();
+    expect(res.status).toBe(200);
+    expect(body).toMatchObject({ ok: true, issue: "1", save: "github" });
+    const issue = fake.state.issues[0]!;
+    const e = makeEntry();
+    for (const part of [e.title, e.description, e.target?.selector, e.route, e.viewport, e.priority]) if (part) expect(issue.body).toContain(String(part));
+    expect(issue.body).toContain(`![snapshot](https://github.com/acme/reviews/blob/${AB}/${base}/assets/005-mobile.png?raw=true)`);
+    expect(names(AB)).toEqual(["README.md", `${base}/assets/005-mobile-full.png`, `${base}/assets/005-mobile.png`, `${base}/session.md`]);
+    expect(fake.state.parents.get(AB)).toEqual([]); // an orphan
+    expect(body.files.sort()).toEqual(["assets/005-mobile-full.png", "assets/005-mobile.png", "session.md"]);
+    for (const [, files] of fake.state.branches) expect([...files.keys()].filter((f) => f.includes("/entries/"))).toEqual([]);
+    expect([...fake.state.branches.keys()]).toEqual(["main", AB]); // no "reviews" branch
+    expect(fake.state.branches.get("main")?.size).toBe(1);
+    expect(parseSession(file(`${base}/session.md`, AB)?.toString("utf8") ?? "").entries.map((x) => x.id)).toEqual(["PRO-5"]);
+  });
+
+  it("re-syncing is idempotent and the closed issue is reported by GET save=github", async () => {
+    const first = await syncGh();
+    const writes = fake.state.writes;
+    const again = await syncGh();
+    expect(again.body).toMatchObject({ issue: first.body.issue, files: [] });
+    expect(fake.state.writes).toBe(writes);
+    expect(fake.state.issues).toHaveLength(1);
+    fake.state.issues[0]!.state = "closed";
+    const res = await get(`?session=${SID}&started=${encodeURIComponent(makeSession().started)}&save=github`);
+    const json = (await res.json()) as { save?: string; issues: { state: string }[] };
+    expect(json.save).toBe("github");
+    expect(json.issues[0]?.state).toBe("closed");
+  });
+
+  it("another review's started is a 409 against the assets branch's session.md", async () => {
+    await syncGh();
+    const other = makeSession({ started: "2026-10-10T18:00:00Z" });
+    expect((await syncGh(makeEntry(), other)).res.status).toBe(409);
+    expect((await get(`?session=${SID}&started=${encodeURIComponent(other.started)}&save=github`)).status).toBe(409);
+    // Without save=github the check reads the reviews branch, which has nothing.
+    expect((await get(`?session=${SID}&started=${encodeURIComponent(other.started)}`)).status).toBe(200);
+  });
+
+  it("uses a custom assetsBranch", async () => {
+    const r = mk({ assetsBranch: "shots" });
+    await syncGh(makeEntry(), makeSession(), r);
+    expect(names("shots")).toContain("README.md");
+    expect(fake.state.branches.has(AB)).toBe(false);
+    expect(fake.state.issues[0]!.body).toContain(`/blob/shots/${base}/assets/005-mobile.png`);
+  });
+
+  it("a bad save value is a 400 on POST and GET, and GitHub is not touched", async () => {
+    for (const save of ["files", "nope", 1, null]) expect((await post({ session: makeSession(), entry: makeEntry(), save })).status).toBe(400);
+    expect((await get(`?session=${SID}&save=both`)).status).toBe(400);
+    expect((await get(`?session=${SID}&save=x`)).status).toBe(400);
+    expect(fake.state.issues).toHaveLength(0);
+    expect(fake.state.log).toEqual([]);
+    expect((await post({ session: makeSession(), entry: makeEntry(), save: "both" })).status).toBe(200);
+  });
+
+  it("a concurrent orphan create (422, branch exists now) is fine", async () => {
+    const racing = mk({
+      fetch: async (input, init) => {
+        const req = new Request(input as string, init);
+        if (req.method === "POST" && new URL(req.url).pathname.endsWith("/git/refs")) {
+          fake.state.branches.set(AB, new Map([["README.md", Buffer.from("x")]]));
+        }
+        return fake.handle(req);
+      },
+    });
+    expect((await syncGh(makeEntry(), makeSession(), racing)).res.status).toBe(200);
+    expect(file(`${base}/session.md`, AB)).toBeDefined();
+  });
+
+  it("refuses at creation an assetsBranch equal to branch", () => {
+    expect(() => mk({ assetsBranch: "reviews" })).toThrow(/assetsBranch/);
+    expect(() => mk({ branch: "shots", assetsBranch: "shots" })).toThrow(/assetsBranch/);
+    expect(() => mk({ branch: "proompter-assets" })).toThrow(/assetsBranch/);
+  });
+
+  it("the default POST has no save in its answer", async () => {
+    expect((await sync()).body).not.toHaveProperty("save");
+  });
+});
