@@ -249,6 +249,13 @@ examples/vite/          → plain React app on Vite 8 with @vitejs/plugin-react 
     and an issue body cannot render base64 images, so the PNGs go to an orphan branch (`proompter-assets`, option
     `assetsBranch`) created through the Git Data API (tree, commit with no parents, ref) and never merged. The
     issue links them with `blob/<branch>/...?raw=true`.
+  - **Issue body (0.2.1):** built by `issueBody` (`src/github/issue-body.ts`), not the entry file, which showed a
+    frontmatter wall and a broken `../assets` link. In order: the quote and description, the element and
+    full-viewport PNGs as absolute links on the target branch, a field table, targets (multi/box), Resolution and
+    Replies, then `<details>` (selector, context summary, session, and the entry file's path in `"both"` mode).
+    It holds no issue number, status or activity, so a re-sync sends no PATCH. The last line is the hidden
+    `<!-- proompter ref: <session>/<PRO-n> -->`, which the visible part is truncated to always keep. `refOf` also
+    matches the frontmatter `ref:` line of 0.1.x and 0.2.0 bodies, so those issues are updated, not duplicated.
   - **Lock:** `reviews/<session>/session.md` on the assets branch is the session lock and index, so the 409 for
     another review works as before. It is not an entry file.
   - **Old routes:** a 0.1.x route ignores `save` and would write entry files. The 0.2.0 route echoes `save:
