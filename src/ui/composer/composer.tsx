@@ -91,6 +91,9 @@ function anchorOf(commit: PickCommit, surface: PickSurface, targets: readonly Re
   );
 }
 
+/** ": <reason>" for a toast, cut to about 80 characters; empty without a reason. */
+const why = (reason?: string) => (reason ? `: ${reason.length > 80 ? `${reason.slice(0, 79)}...` : reason}` : "");
+
 /** Capture must never stop an entry from being filed: a throwing `context()` means "no context". */
 function safeContext(capture: Capture): CaptureContext {
   try {
@@ -265,6 +268,8 @@ export function Composer({
       try {
         const shot = await capture.snapshot(surface, resolved[0]?.el, plugins?.flatMap((p) => p.redactSnapshot ?? []));
         if (shot.redactFailed) toast("Snapshot hidden: it couldn't be redacted.");
+        else if (!shot.element && !shot.viewport) toast(`Saved without a screenshot${why(shot.error)}`);
+        else if (resolved[0]?.el && !shot.element) toast(`Saved without the element screenshot${why(shot.elementError ?? shot.error)}`);
         if (shot.element || shot.viewport) {
           snapshot = { fontsEmbedded: shot.fontsEmbedded, ...(shot.element ? { element: shot.element } : {}), ...(shot.viewport ? { viewport: shot.viewport } : {}) };
         }
