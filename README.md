@@ -428,6 +428,11 @@ here as well: if masking or drawing fails, that picture is dropped, the entry is
 that is not in a field or marked. Still, don't file entries on screens that show production data you don't want
 committed into `reviews/assets/`.
 
+A `<video>` or `<canvas>` the browser won't let the page read (a cross-origin video without CORS, a canvas drawn with
+a cross-origin image) can't be captured. It is replaced by a grey "video" or "canvas" box where it sat, so the rest of
+the screenshot still comes out. If no screenshot can be taken at all, a toast says so; in development the reason is
+also logged as `[proompter] snapshot:...` in the console.
+
 It **fails closed**: if a plugin's `redact` throws or returns a different entry, nothing is stored or
 written, the number isn't used, and the composer says "Plugin <name> failed to redact this entry. Nothing
 was saved."
