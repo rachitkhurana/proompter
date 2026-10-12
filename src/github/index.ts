@@ -19,12 +19,14 @@
  * - The same entry validation and 20 MB body cap as the dev route.
  *
  * ## API
- * - `POST { session, entry }`: upserts the issue, then writes `session.md`, `entries/NNN-slug.md` and the PNGs to
+ * - `POST { session, entry, save? }`: upserts the issue, then writes `session.md`, `entries/NNN-slug.md` and the PNGs to
  *   `reviews/<session>/` on the `reviews` branch (created from the default branch's head when missing).
  *   Unchanged files are skipped (git blob sha), a renamed title deletes the old file. Answers
- *   `{ ok, issue, url, state, files }`.
- * - `GET ?session=ID&started=ISO`: `{ ok, issues: [{ n, issue, state, url }] }`.
- * - Both answer 409 when `reviews/<session>/session.md` on the branch records another review's `started`: two
+ *   `{ ok, issue, url, state, files }` (plus `save: "github"` in that mode, so a 0.1.x route can be told apart). `save: "github"` (0.2.0) writes no entry files: only `session.md` and the
+ *   PNGs, to the `proompter-assets` branch (`assetsBranch`; an orphan branch, created when missing, never merged),
+ *   and the issue body links its snapshot there. `save` is `"both"` or absent otherwise.
+ * - `GET ?session=ID&started=ISO[&save=github]`: `{ ok, issues: [{ n, issue, state, url }] }`.
+ * - Both answer 409 when `reviews/<session>/session.md` on the branch (the assets branch for `save=github`) records another review's `started`: two
  *   reviews sharing a session id would overwrite each other's issues and files. (`started` is optional on GET for
  *   0.1.0 clients.)
  *
@@ -47,6 +49,12 @@ export interface GithubRouteOptions {
   token?: string;
   /** Branch the files land on. Default `reviews`. */
   branch?: string;
+  /**
+   * Orphan branch for `save: "github"` (screenshots and `session.md` only; it shares no history with the code and is
+   * never merged). Created when missing. Default `proompter-assets`. It must be a dedicated branch: never the default
+   * branch or `branch` (creating the route throws when it equals `branch`).
+   */
+  assetsBranch?: string;
   /** Shared secret the client sends as a bearer token. Default `process.env.PROOMPTER_REVIEW_KEY`. */
   reviewKey?: string;
   /**
@@ -89,6 +97,8 @@ const refOf = (i: Issue) => REF_LINE.exec(i.body ?? "")?.[1];
 
 export function createGithubRoute(opts: GithubRouteOptions) {
   const branch = opts.branch ?? "reviews";
+  const assetsBranch = opts.assetsBranch ?? "proompter-assets";
+  if (assetsBranch === branch) throw new Error(`createGithubRoute: assetsBranch and branch are both "${branch}"; the assets branch must be its own branch`);
   const api = (opts.api ?? "https://api.github.com").replace(/\/+$/, "");
   /** `allowedHosts` plus `PROOMPTER_ALLOWED_HOSTS` (as the dev route), read per request. Only used when `allowedHosts` is given. */
   const allowedNow = (): ReadonlySet<string> =>
@@ -151,14 +161,24 @@ export function createGithubRoute(opts: GithubRouteOptions) {
   };
   const expect = async (res: Response, what: string, ...ok: number[]): Promise<Response> => (ok.includes(res.status) ? res : fail(res, what));
 
-  async function ensureBranch(call: Call): Promise<void> {
+  /** `orphan`: the branch starts from a lone README commit (no history), not from the default branch's head. */
+  async function ensureBranch(call: Call, branch: string, orphan: boolean): Promise<void> {
     const ref = `${repoPath}/git/ref/heads/${branchPath(branch)}`;
     const have = await call("GET", ref);
     if (have.ok) return;
     if (have.status !== 404) return void (await fail(have, "reading the branch"));
-    const repo = (await (await expect(await call("GET", repoPath), "reading the repo", 200)).json()) as { default_branch?: string };
-    const base = await expect(await call("GET", `${repoPath}/git/ref/heads/${branchPath(repo.default_branch ?? "main")}`), "reading the default branch", 200);
-    const sha = ((await base.json()) as { object?: { sha?: string } }).object?.sha;
+    let sha: string | undefined;
+    if (orphan) {
+      const readme = "Screenshots for Proompter issues. This branch is never merged.\n";
+      const post = async (path: string, body: unknown, what: string) =>
+        ((await (await expect(await call("POST", `${repoPath}/git/${path}`, body), what, 201)).json()) as { sha?: string }).sha;
+      const tree = await post("trees", { tree: [{ path: "README.md", mode: "100644", type: "blob", content: readme }] }, "creating the assets tree");
+      sha = await post("commits", { message: "proompter: assets branch", tree, parents: [] }, "creating the assets commit");
+    } else {
+      const repo = (await (await expect(await call("GET", repoPath), "reading the repo", 200)).json()) as { default_branch?: string };
+      const base = await expect(await call("GET", `${repoPath}/git/ref/heads/${branchPath(repo.default_branch ?? "main")}`), "reading the default branch", 200);
+      sha = ((await base.json()) as { object?: { sha?: string } }).object?.sha;
+    }
     const made = await call("POST", `${repoPath}/git/refs`, { ref: `refs/heads/${branch}`, sha });
     if (made.status === 422) {
       // Either a concurrent sync made it (fine) or GitHub refused the name or sha (not fine): look again.
@@ -190,14 +210,14 @@ export function createGithubRoute(opts: GithubRouteOptions) {
   }
 
   /** `name -> sha` of the files directly inside `dir` on the branch (none when the folder does not exist). */
-  async function listDir(call: Call, dir: string): Promise<Map<string, string>> {
+  async function listDir(call: Call, branch: string, dir: string): Promise<Map<string, string>> {
     const res = await call("GET", `${repoPath}/contents/${dir}?ref=${encodeURIComponent(branch)}`);
     if (res.status === 404) return new Map();
     const list = (await (await expect(res, "listing files", 200)).json()) as unknown;
     return new Map(Array.isArray(list) ? list.filter((f) => isObj(f) && f.type === "file").map((f) => [String((f as Record<string, unknown>).name), String((f as Record<string, unknown>).sha)] as const) : []);
   }
 
-  async function readText(call: Call, file: string): Promise<{ text: string; sha: string } | null> {
+  async function readText(call: Call, branch: string, file: string): Promise<{ text: string; sha: string } | null> {
     const res = await call("GET", `${repoPath}/contents/${file}?ref=${encodeURIComponent(branch)}`);
     if (res.status === 404) return null;
     const f = (await (await expect(res, "reading a file", 200)).json()) as { content?: string; sha?: string };
@@ -206,7 +226,7 @@ export function createGithubRoute(opts: GithubRouteOptions) {
   }
 
   /** PUT a file unless the branch already holds exactly these bytes. Returns whether it wrote. */
-  async function putFile(call: Call, file: string, data: string | Buffer, have: string | undefined): Promise<boolean> {
+  async function putFile(call: Call, branch: string, file: string, data: string | Buffer, have: string | undefined): Promise<boolean> {
     const bytes = typeof data === "string" ? Buffer.from(data, "utf8") : data;
     if (have === blobSha(bytes)) return false;
     let sha = have;
@@ -226,7 +246,7 @@ export function createGithubRoute(opts: GithubRouteOptions) {
     }
   }
 
-  async function removeFile(call: Call, file: string, sha: string): Promise<void> {
+  async function removeFile(call: Call, branch: string, file: string, sha: string): Promise<void> {
     let current = sha;
     for (let attempt = 0; ; attempt++) {
       const res = await call("DELETE", `${repoPath}/contents/${file}`, { message: `proompter: remove ${file}`, sha: current, branch });
@@ -251,11 +271,11 @@ export function createGithubRoute(opts: GithubRouteOptions) {
     return ours ? issue : null;
   }
 
-  async function upsertIssue(call: Call, session: Session, entry: Entry, markdown: string, image: string | null): Promise<Issue> {
+  async function upsertIssue(call: Call, branch: string, github: boolean, session: Session, entry: Entry, markdown: string, image: string | null): Promise<Issue> {
     const ref = `${session.id}/${entry.id}`;
     const labels = ["proompter", `kind:${entry.kind}`, `priority:${entry.priority}`];
     const imageLine = image ? `\n\n![snapshot](https://github.com/${opts.repo}/blob/${branch}/reviews/${session.id}/assets/${image}?raw=true)\n` : "\n";
-    const body = markdown.length > MAX_ISSUE_BODY ? `${markdown.slice(0, MAX_ISSUE_BODY)}\n\n(truncated, see the file on the branch)` : markdown;
+    const body = markdown.length > MAX_ISSUE_BODY ? `${markdown.slice(0, MAX_ISSUE_BODY)}\n\n${github ? "(truncated)" : "(truncated, see the file on the branch)"}` : markdown;
     const text = defang(`${body}${imageLine}`);
     const title = defang(`${entry.id}: ${entry.title.replace(/\s+/g, " ").trim()}`).slice(0, 250);
     const state = entry.status === "resolved" ? "closed" : "open";
@@ -312,8 +332,8 @@ export function createGithubRoute(opts: GithubRouteOptions) {
   }
 
   /** GET: check only. */
-  async function checkOwner(call: Call, id: string, started: string): Promise<void> {
-    const old = await readText(call, `reviews/${id}/session.md`);
+  async function checkOwner(call: Call, branch: string, id: string, started: string): Promise<void> {
+    const old = await readText(call, branch, `reviews/${id}/session.md`);
     if (old) assertOwner(old.text, id, started);
   }
 
@@ -322,10 +342,10 @@ export function createGithubRoute(opts: GithubRouteOptions) {
    * sha, so GitHub refuses it (422) when the file appeared meanwhile: of two reviews racing for one id (across server
    * instances, where `withLock` does not reach), exactly one gets it and the other is checked against it.
    */
-  async function claimSession(call: Call, session: Session): Promise<void> {
+  async function claimSession(call: Call, branch: string, session: Session): Promise<void> {
     const file = `reviews/${session.id}/session.md`;
     for (let attempt = 0; attempt < 2; attempt++) {
-      const old = await readText(call, file);
+      const old = await readText(call, branch, file);
       if (old) return assertOwner(old.text, session.id, session.started);
       const res = await call("PUT", `${repoPath}/contents/${file}`, {
         message: `proompter: ${file}`,
@@ -338,16 +358,17 @@ export function createGithubRoute(opts: GithubRouteOptions) {
     throw new GithubError("GitHub kept refusing to create session.md");
   }
 
-  async function sync(call: Call, session: Session, input: Entry): Promise<Record<string, unknown>> {
+  async function sync(call: Call, session: Session, input: Entry, github: boolean): Promise<Record<string, unknown>> {
+    const target = github ? assetsBranch : branch;
     // Validate the images and the entry before GitHub sees anything.
     planEntry(session, input);
-    await ensureBranch(call);
-    await claimSession(call, session);
+    await ensureBranch(call, target, github);
+    await claimSession(call, target, session);
     const names = assetNames(input.n, input.viewport);
     const snap = input.snapshot;
     const image = snap?.assets?.element || snap?.element ? names.element : snap?.assets?.viewport || snap?.viewport ? names.viewport : null;
     // The issue body is the entry without its own issue number, so it is stable from the first sync on.
-    const issue = await upsertIssue(call, session, input, planEntry(session, { ...input, issue: null }).markdown, image);
+    const issue = await upsertIssue(call, target, github, session, input, planEntry(session, { ...input, issue: null }).markdown, image);
     // The files carry the issue number, so the next sync finds them unchanged.
     const entry: Entry = { ...input, issue: String(issue.number) };
     const plan = planEntry(session, entry);
@@ -355,29 +376,31 @@ export function createGithubRoute(opts: GithubRouteOptions) {
     const base = `reviews/${session.id}`;
     const changed: string[] = [];
     const put = async (rel: string, data: string | Buffer, have: string | undefined) => {
-      if (await putFile(call, `${base}/${rel}`, data, have)) changed.push(rel);
+      if (await putFile(call, target, `${base}/${rel}`, data, have)) changed.push(rel);
     };
     if (plan.png.size || plan.staleElement) {
-      const have = await listDir(call, `${base}/assets`);
+      const have = await listDir(call, target, `${base}/assets`);
       for (const [rel, bytes] of plan.png) await put(rel, bytes, have.get(rel.slice("assets/".length)));
       // The entry no longer links an element crop: remove the one left over from an earlier version.
       const stale = plan.staleElement ? have.get(plan.staleElement.slice("assets/".length)) : undefined;
       if (plan.staleElement && stale !== undefined) {
-        await removeFile(call, `${base}/${plan.staleElement}`, stale);
+        await removeFile(call, target, `${base}/${plan.staleElement}`, stale);
         changed.push(plan.staleElement);
       }
     }
-    const entries = await listDir(call, `${base}/entries`);
-    await put(plan.rel, plan.markdown, entries.get(plan.rel.slice("entries/".length)));
-    // A renamed title is a new file name: delete the old `NNN-*.md` of the same number.
-    for (const [name, sha] of entries) {
-      if (name.startsWith(`${pad(entry.n)}-`) && ENTRY_FILE.test(`entries/${name}`) && `entries/${name}` !== plan.rel) {
-        await removeFile(call, `${base}/entries/${name}`, sha);
-        changed.push(`entries/${name}`);
+    if (!github) {
+      const entries = await listDir(call, target, `${base}/entries`);
+      await put(plan.rel, plan.markdown, entries.get(plan.rel.slice("entries/".length)));
+      // A renamed title is a new file name: delete the old `NNN-*.md` of the same number.
+      for (const [name, sha] of entries) {
+        if (name.startsWith(`${pad(entry.n)}-`) && ENTRY_FILE.test(`entries/${name}`) && `entries/${name}` !== plan.rel) {
+          await removeFile(call, target, `${base}/entries/${name}`, sha);
+          changed.push(`entries/${name}`);
+        }
       }
     }
     // The index: what is already on the branch, with this entry replaced.
-    const old = await readText(call, `${base}/session.md`);
+    const old = await readText(call, target, `${base}/session.md`);
     let index: { id: string; n: number; status: Entry["status"]; priority: Entry["priority"]; title: string }[] = [];
     try {
       index = old ? parseSession(old.text).entries : [];
@@ -386,7 +409,7 @@ export function createGithubRoute(opts: GithubRouteOptions) {
     }
     index = [...index.filter((e) => e.n !== entry.n), { id: entry.id, n: entry.n, status: entry.status, priority: entry.priority, title: entry.title }];
     await put("session.md", serializeSession(session, index), old?.sha);
-    return { ok: true, issue: String(issue.number), url: issue.html_url, state: issue.state, files: changed };
+    return { ok: true, issue: String(issue.number), url: issue.html_url, state: issue.state, files: changed, ...(github ? { save: "github" } : {}) };
   }
 
   const refuse = (e: unknown): Response => {
@@ -415,8 +438,9 @@ export function createGithubRoute(opts: GithubRouteOptions) {
       if (Number.isNaN(Date.parse(session.started))) throw new Refusal("bad started", 400, "request");
       if (body.entry === undefined) throw new Refusal("missing entry", 400, "request");
       const entry = checkEntry(body.entry, session);
+      if (body.save !== undefined && body.save !== "both" && body.save !== "github") throw new Refusal("bad save", 400, "request");
       // One sync at a time per session in this process: two would race on session.md.
-      const result = await withLock(`github:${opts.repo}:${session.id}`, () => sync(client(s.token), session, entry));
+      const result = await withLock(`github:${opts.repo}:${session.id}`, () => sync(client(s.token), session, entry, body.save === "github"));
       return json(result);
     } catch (e) {
       return refuse(e);
@@ -432,16 +456,18 @@ export function createGithubRoute(opts: GithubRouteOptions) {
       if (sid === null || !SESSION_ID.test(sid)) throw new Refusal("bad session id", 400, "request");
       // `started` (sent since 0.1.1): another review's issue states must not resolve this review's entries.
       const started = new URL(req.url).searchParams.get("started");
+      const save = new URL(req.url).searchParams.get("save");
+      if (save !== null && save !== "github") throw new Refusal("bad save", 400, "request");
       if (started !== null) {
         if (Number.isNaN(Date.parse(started))) throw new Refusal("bad started", 400, "request");
-        await checkOwner(client(s.token), sid, started);
+        await checkOwner(client(s.token), save === "github" ? assetsBranch : branch, sid, started);
       }
       const issues = (await proompterIssues(client(s.token)))
         .map((i) => ({ i, ref: refOf(i) }))
         .filter((x) => x.ref?.startsWith(`${sid}/PRO-`))
         .map(({ i, ref }) => ({ n: Number(/PRO-(\d+)$/.exec(ref ?? "")?.[1]), issue: String(i.number), state: i.state, url: i.html_url }))
         .filter((x) => Number.isInteger(x.n));
-      return json({ ok: true, issues });
+      return json({ ok: true, issues, ...(save === "github" ? { save } : {}) });
     } catch (e) {
       return refuse(e);
     }
