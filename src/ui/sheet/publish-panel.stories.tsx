@@ -18,7 +18,7 @@ const URLS = {
   "PRO-2": "https://github.com/acme/reviews/issues/482",
 };
 
-function Harness({ status, outcome }: { status: GithubStatus; outcome?: GithubSyncOutcome }) {
+function Harness({ status, outcome, githubOnly }: { status: GithubStatus; outcome?: GithubSyncOutcome; githubOnly?: boolean }) {
   const [deps] = useState(() => createFakeDeps({ written: true }));
   const { session } = deps.store.getSnapshot();
   const entries = seedEntries().map((e) => (e.n === 2 ? { ...e, issue: "482" } : e));
@@ -34,6 +34,7 @@ function Harness({ status, outcome }: { status: GithubStatus; outcome?: GithubSy
       selectedId={null}
       onSelect={() => {}}
       onClose={() => {}}
+      onWrite={githubOnly ? undefined : () => Promise.resolve()}
       github={{ status, onSync: () => Promise.resolve(outcome ?? { ok: true, synced: 0, resolved: 0 }) }}
       ticket={{
         serialize: (e) => deps.serialize(e, session),
@@ -65,3 +66,6 @@ export const KeyNeeded: Story = {
 export const NotSetUp: Story = {
   render: () => <Harness status={{ ...base, pending: 4, error: "GitHub sync isn't set up on this server" }} />,
 };
+
+/** `save="github"`: no files sink, so the Files section is gone. */
+export const GithubOnly: Story = { render: () => <Harness status={{ ...base, urls: URLS }} githubOnly /> };
