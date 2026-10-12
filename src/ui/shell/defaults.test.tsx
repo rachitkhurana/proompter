@@ -283,3 +283,48 @@ describe("GitHub sync wiring (D16)", () => {
     }
   });
 });
+
+describe("save option", () => {
+  const idOf = () => vi.mocked(createStore).mock.calls.at(-1)![0].session.id;
+
+  it('"github" makes no request to the files endpoint and the store has no write', async () => {
+    const fetchSpy = vi.fn(async (_input: unknown) => new Response("{}", { status: 404 }));
+    vi.stubGlobal("fetch", fetchSpy);
+    vi.stubEnv("NODE_ENV", "development");
+    try {
+      const deps = createDefaultDeps({ save: "github", github: { endpoint: "/gh" } });
+      expect(deps.store.write).toBeUndefined();
+      expect(deps.store.syncGithub).toBeTypeOf("function");
+      expect(idOf()).toMatch(/-[a-z0-9]{6}$/);
+      await deps.store.getSnapshot();
+      await new Promise((r) => setTimeout(r, 20));
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('"files" with the github prop has no syncGithub and a session id without the tag', () => {
+    const deps = createDefaultDeps({ save: "files", session: { title: "Manual test pass" }, github: {} });
+    expect(deps.store.write).toBeTypeOf("function");
+    expect(deps.store.syncGithub).toBeUndefined();
+    expect(deps.store.getSnapshot().github).toBeUndefined();
+    expect(idOf()).toBeUndefined();
+  });
+
+  it("the default with the github prop is both", () => {
+    const deps = createDefaultDeps({ github: {} });
+    expect(deps.store.write).toBeTypeOf("function");
+    expect(deps.store.syncGithub).toBeTypeOf("function");
+  });
+
+  it('"github" without the github prop falls back to files', () => {
+    for (const save of ["github", "both"] as const) {
+      const deps = createDefaultDeps({ save });
+      expect(deps.store.write).toBeTypeOf("function");
+      expect(deps.store.syncGithub).toBeUndefined();
+      expect(idOf()).toBeUndefined();
+    }
+  });
+});
