@@ -171,7 +171,9 @@ optional when you use that path). Without the prop nothing changes.
   `reviews/<session>/session.md`, `entries/NNN-slug.md` and `assets/*.png`, the same layout and serializer as the
   local files. A file that has not changed is not rewritten, and a renamed title deletes the old file.
 - One issue per entry, titled `PRO-n: <title>`, labelled `proompter`, `kind:<kind>` and `priority:<priority>`
-  (created when missing). The body is the entry markdown with its snapshot linked from the branch. The issue
+  (created when missing). The body is written to be read: the note first, then the element and full-viewport screenshots (linked from
+  the branch), a table of the fields, and the rest (selector, console and network summary, session) folded into
+  "Details". The last line is a hidden `proompter ref` comment that finds the issue again. The issue
   number is stored in the entry's `issue` field and shown as a link in the Publish tab.
 
 **One session per browser.** With the `github` prop, the session id gets a random tag kept in this browser
@@ -215,7 +217,7 @@ Without the `github` prop, every value acts as `"files"`.
 | Local `reviews/` files | yes | yes | no |
 | `reviews` branch files (entries, `session.md`, PNGs) | no | yes | no |
 | `proompter-assets` branch (`session.md`, PNGs) | no | no | yes |
-| Issues | no | yes | yes (body is the whole entry) |
+| Issues | no | yes | yes (body: note, screenshots, source, route, viewport, component, intent, tags, task and test plan, context summary; kind and priority are labels, status is the open or closed state) |
 | PNG snapshots | local | `reviews` branch | `proompter-assets` branch |
 
 GitHub has no public API to attach an image to an issue, so with `"github"` the screenshots go to an orphan
