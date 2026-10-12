@@ -238,6 +238,24 @@ examples/vite/          → plain React app on Vite 8 with @vitejs/plugin-react 
     arguments come back as results with `isError: true`.
   - It is a thin wrapper over the CLI core.
   - **Run it with:** `npx -y @rachitkay/proompter mcp`. The unscoped `proompter` on npm is someone else's package.
+- **D21. Where reviews are saved (0.2.0).** The `save` prop picks the destination: `"files"` (./reviews/ through the
+  dev route), `"github"` (issues only) or `"both"`. The default is `"both"` with the `github` prop and `"files"`
+  without; `"github"` and `"both"` without the prop fall back to files.
+  - **`"files"`:** no GitHub sink, and the session id has no browser tag, even when `github` is set.
+  - **`"github"`:** no files sink at all, so no dev-route requests, no rehydrate and no wait before a new entry.
+    The route is told with `save: "github"` (POST body, `&save=github` on GET). It writes no `entries/*.md`: the
+    issue body is the whole entry.
+  - **Assets branch:** the screenshots still need a URL. GitHub has no public API to attach images to an issue,
+    and an issue body cannot render base64 images, so the PNGs go to an orphan branch (`proompter-assets`, option
+    `assetsBranch`) created through the Git Data API (tree, commit with no parents, ref) and never merged. The
+    issue links them with `blob/<branch>/...?raw=true`.
+  - **Lock:** `reviews/<session>/session.md` on the assets branch is the session lock and index, so the 409 for
+    another review works as before. It is not an entry file.
+  - **Old routes:** a 0.1.x route ignores `save` and would write entry files. The 0.2.0 route echoes `save:
+    "github"` in its GET and POST answers, and the sink refuses a GET answer without it before posting anything.
+  - **Issue size:** an issue body is capped at about 60,000 characters (GitHub's limit is 65,536). With `"github"`
+    a longer entry (a large console or network section) is cut and marked "(truncated)", and there is no other copy.
+  - **CLI and MCP** read ./reviews/ only, so they are files-only for now.
 - **v1 gaps (T17):**
   - `isProompterFrame()` export, for apps that double-mount providers in device frames.
   - Esc during the composer's exit animation goes to the Esc ladder.
