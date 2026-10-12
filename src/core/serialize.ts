@@ -128,7 +128,7 @@ function trimBlankLines(s: string): string {
  * looks like one gets an extra leading backslash on write, and loses one on read.
  */
 const SECTION_LINE = /^(\\*)(## (?:Resolution|Replies|Targets))$/;
-const escapeSections = (lines: string[]): string[] => lines.map((l) => (SECTION_LINE.test(l) ? `\\${l}` : l));
+export const escapeSections = (lines: string[]): string[] => lines.map((l) => (SECTION_LINE.test(l) ? `\\${l}` : l));
 const unescapeSections = (s: string): string =>
   s
     .split("\n")
