@@ -31,6 +31,7 @@ function sheet(status: GithubStatus, onSync: (key?: string) => Promise<GithubSyn
     selectedId: null,
     onSelect: vi.fn(),
     onClose: vi.fn(),
+    onWrite: vi.fn(() => Promise.resolve()),
     github: { status, onSync },
     ticket: {
       serialize: (e) => fakeSerialize(e, SEED_SESSION),
@@ -54,6 +55,15 @@ describe("Publish tab with GitHub sync", () => {
     await mount(<Sheet {...sheet(base, vi.fn())} github={undefined} />);
     expect(q("#pm-pub-issues")?.textContent).toContain("v2");
     expect(button("Sync to GitHub")).toBeUndefined();
+  });
+
+  it("has no Files section in GitHub-only mode (no onWrite), and keeps it with both", async () => {
+    await mount(<Sheet {...sheet(base, vi.fn())} onWrite={undefined} />);
+    expect(q("#pm-pub-files")).toBeNull();
+    expect(button("Sync to GitHub")).toBeDefined();
+    await m.unmount();
+    await mount(<Sheet {...sheet(base, vi.fn())} />);
+    expect(q("#pm-pub-files")).not.toBeNull();
   });
 
   it("shows each entry's issue as a link when the url is known", async () => {
