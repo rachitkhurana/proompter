@@ -200,6 +200,38 @@ Things to know before you turn it on:
   titles and bodies have `@` broken with a zero-width space, so a synced entry cannot ping people or teams;
   the files on the branch are unchanged.
 
+## Where reviews are saved
+
+The `save` prop picks the destination:
+
+- `save="files"`: `./reviews/` only (dev server). No GitHub sync, even with the `github` prop.
+- `save="both"`: files and GitHub. This is the default when you set `github`.
+- `save="github"`: GitHub only. Nothing is written locally, and the Publish tab has no Files section.
+
+Without the `github` prop, every value acts as `"files"`.
+
+| | `files` | `both` | `github` |
+|---|---|---|---|
+| Local `reviews/` files | yes | yes | no |
+| `reviews` branch files (entries, `session.md`, PNGs) | no | yes | no |
+| `proompter-assets` branch (`session.md`, PNGs) | no | no | yes |
+| Issues | no | yes | yes (body is the whole entry) |
+| PNG snapshots | local | `reviews` branch | `proompter-assets` branch |
+
+GitHub has no public API to attach an image to an issue, so with `"github"` the screenshots go to an orphan
+`proompter-assets` branch (set `assetsBranch` on the route to rename it). It is never merged. The CLI and MCP read
+`./reviews/` only, so they do not see `"github"` reviews.
+
+```tsx
+<Proompter github={{ endpoint: "/api/proompter/github" }} save="github" />
+```
+
+An issue body is capped at about 60,000 characters (GitHub's limit is 65,536). With `save="github"` a longer entry
+(a large console or network section) is cut and marked "(truncated)", and there is no other copy of it.
+
+`save="github"` needs the client and the route both at 0.2.0 or later. An older route is refused with "The GitHub
+route is older than 0.2.0 and can't save to GitHub only", before anything is sent.
+
 ## CLI
 
 `proompter` works the `reviews/` folder from the terminal, with no UI. Run it in your repo (or pass `--dir <path>`).
