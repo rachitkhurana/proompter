@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0
+
+- **`save` prop:** pick where reviews are saved: `"files"`, `"github"` or `"both"`. The default is unchanged (`"both"`
+  with the `github` prop, else `"files"`).
+  - `save="github"` keeps no local files: no dev-route requests, and the Publish tab has no Files section. The issue
+    body holds the whole entry, and the screenshots go to an orphan `proompter-assets` branch (route option
+    `assetsBranch`) that is never merged. `session.md` stays the session lock, on that branch.
+  - It needs the route and the client both at 0.2.0 or later. An older route is refused with a message before
+    anything is sent.
+  - The CLI and MCP read ./reviews/ only, so they see nothing in this mode.
+
 ## 0.1.1 (2026-10-11)
 
 - **GitHub sync, two reviewers on one day:** both browsers used the session id `<date>_review`, so the second
