@@ -230,6 +230,52 @@ describe("github sink", () => {
   });
 });
 
+describe("save option", () => {
+  const urls = (kept: string[]) => (input: string | URL | Request, init?: RequestInit) => {
+    kept.push(`${init?.method ?? "GET"} ${String(input)}`);
+    return routeFetch(input, init);
+  };
+
+  it('"github" sends save in the POST body and on the GET url; the default sends neither', async () => {
+    for (const save of [undefined, "github"] as const) {
+      const sent: string[] = [];
+      const bodies: string[] = [];
+      const store = createStore({ session: { title: "Manual test pass", reviewer: "rachit", id: SID }, idb: null });
+      await store.ready;
+      await store.create(draft());
+      const f: typeof fetch = (i, n) => {
+        if (n?.body) bodies.push(String(n.body));
+        return urls(sent)(i, n);
+      };
+      const sink = createGithubSink({ endpoint: "/api/proompter/github", store, key: () => key, fetch: f, ...(save ? { save } : {}) });
+      expect(await sink.sync()).toMatchObject({ ok: true, synced: 1 });
+      const sid = encodeURIComponent(SID);
+      const startedAt = encodeURIComponent(store.getState().session.started);
+      expect(sent[0]).toBe(`GET /api/proompter/github?session=${sid}&started=${startedAt}${save ? "&save=github" : ""}`);
+      expect(JSON.parse(bodies[0]!).save).toBe(save);
+      expect(Object.keys(JSON.parse(bodies[0]!))).toEqual(save ? ["session", "entry", "save"] : ["session", "entry"]);
+      fake.reset();
+    }
+  });
+
+  it("an older route (no save in the GET answer) is refused before anything is posted", async () => {
+    const store = createStore({ session: { title: "Manual test pass", reviewer: "rachit", id: SID }, idb: null });
+    await store.ready;
+    await store.create(draft());
+    const old: typeof fetch = async (i, n) => {
+      const res = await routeFetch(i, n);
+      if ((n?.method ?? "GET") !== "GET") return res;
+      const { save: _save, ...rest } = (await res.json()) as Record<string, unknown>;
+      return new Response(JSON.stringify(rest), { status: res.status, headers: { "content-type": "application/json" } });
+    };
+    const sink = createGithubSink({ endpoint: "/api/proompter/github", store, key: () => key, fetch: old, save: "github" });
+    const r = await sink.sync();
+    expect(r).toMatchObject({ ok: false, error: "The GitHub route is older than 0.2.0 and can't save to GitHub only. Update @rachitkay/proompter on the server." });
+    expect(posts()).toBe(0);
+    expect(fake.state.issues).toHaveLength(0);
+  });
+});
+
 describe("client bundle hygiene", () => {
   it("the sink imports nothing from src/github or src/server, and never names the token", () => {
     const src = readFileSync(new URL("./github.ts", import.meta.url), "utf8");
