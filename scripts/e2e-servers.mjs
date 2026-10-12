@@ -5,7 +5,9 @@
 //      `vite dev` with the flag on at :3102
 //   4. production build with the flag ON into .next-preview, served on BASE+4 (D15 preview mode)
 //   5. the fake GitHub API (test/github/fake.ts, node:http) on BASE+5, for the GitHub sync route (D16)
-//   6. `next dev` with NEXT_PUBLIC_PROOMPTER=true on :3100 (everything else)
+//   6. a "foreign origin" media server on BASE+6 (node:http) that sends NO CORS headers: a cross-origin video and
+//      image for the media-taint spec (e2e/snapshot-media.spec.ts). The spec PUTs a recorded WebM to it.
+//   7. `next dev` with NEXT_PUBLIC_PROOMPTER=true on :3100 (everything else)
 // :3100 is the URL Playwright waits for, and it starts last, so once it answers both servers are up.
 import { spawn, spawnSync } from "node:child_process";
 import http from "node:http";
@@ -22,6 +24,7 @@ const VITE_DEV_PORT = BASE + 2;
 const VITE_PREVIEW_PORT = BASE + 3;
 const PREVIEW_PORT = BASE + 4;
 const GITHUB_PORT = BASE + 5;
+const MEDIA_PORT = BASE + 6;
 
 const children = [];
 const stop = () => {
@@ -100,6 +103,63 @@ const fakeServer = http.createServer(async (req, res) => {
 });
 await new Promise((resolve, reject) => fakeServer.once("error", reject).listen(GITHUB_PORT, "127.0.0.1", resolve));
 process.on("exit", () => fakeServer.close());
+
+// A second origin with no CORS headers. Drawing its video or image onto a canvas taints it, as a CDN would.
+// PUT /clip.webm stores the bytes (the spec records them in the browser); GET serves them.
+const media = new Map([
+  [
+    "/pic.svg",
+    {
+      type: "image/svg+xml",
+      body: Buffer.from(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90"><rect width="160" height="90" fill="#e11"/></svg>',
+      ),
+    },
+  ],
+]);
+const MEDIA_MAX = 5 * 1024 * 1024;
+const mediaServer = http.createServer(async (req, res) => {
+  try {
+    const path = (req.url ?? "/").split("?")[0];
+    if (req.method === "PUT") {
+      if (path !== "/clip.webm") return void res.writeHead(404).end();
+      const chunks = [];
+      let size = 0;
+      for await (const c of req) {
+        size += c.length;
+        if (size > MEDIA_MAX) return void res.writeHead(413).end();
+        chunks.push(c);
+      }
+      media.set(path, { type: "video/webm", body: Buffer.concat(chunks) });
+      return void res.writeHead(204).end();
+    }
+    const hit = media.get(path);
+    if (!hit) return void res.writeHead(404).end();
+    const len = hit.body.length;
+    // Range support: Chromium's media stack asks for byte ranges. `bytes=-N` is the last N bytes.
+    const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? "");
+    if (range && (range[1] || range[2])) {
+      let start = range[1] ? Number(range[1]) : Math.max(0, len - Number(range[2]));
+      const end = range[1] && range[2] ? Math.min(Number(range[2]), len - 1) : len - 1;
+      if (start >= len || start > end) return void res.writeHead(416, { "content-range": `bytes */${len}` }).end();
+      start = Math.max(0, start);
+      res.writeHead(206, {
+        "content-type": hit.type,
+        "accept-ranges": "bytes",
+        "content-range": `bytes ${start}-${end}/${len}`,
+        "content-length": end - start + 1,
+      });
+      return void res.end(hit.body.subarray(start, end + 1));
+    }
+    res.writeHead(200, { "content-type": hit.type, "accept-ranges": "bytes", "content-length": len });
+    res.end(hit.body);
+  } catch {
+    res.destroy(); // an aborted request must not take the e2e servers down
+  }
+});
+mediaServer.on("clientError", (_e, socket) => socket.destroy());
+await new Promise((resolve, reject) => mediaServer.once("error", reject).listen(MEDIA_PORT, "127.0.0.1", resolve));
+process.on("exit", () => mediaServer.close());
 
 // Truly unset, not "": Next only inlines NEXT_PUBLIC_* variables that exist, so "" would hide a leak (D13).
 const prodEnv = { NEXT_PUBLIC_PROOMPTER: undefined, PLAYGROUND_DIST_DIR: DIST };
