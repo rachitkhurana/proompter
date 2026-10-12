@@ -155,28 +155,35 @@ export function sessionStart(id: string): string | undefined {
 }
 
 export function createDefaultDeps(options: ProompterProps): ProompterDeps {
+  const save = options.save ?? (options.github ? "both" : "files");
+  const toGithub = !!options.github && save !== "files";
+  const toFiles = save !== "github" || !options.github;
   // A new entry is numbered only after the disk has been read (`sink.hydrated`), so it can never take a number
   // that already exists in `reviews/`. Capped at 2 s in case the route hangs.
-  // eslint-disable-next-line prefer-const -- assigned after the store exists; the store's beforeCreate closure reads it
   let sink: FilesSink | undefined;
   const core = createStore({
     session: {
       title: options.session?.title ?? "Review",
       reviewer: options.session?.reviewer ?? "reviewer",
-      ...(options.github ? githubSession(options.session?.title ?? "Review") : {}),
+      ...(toGithub ? githubSession(options.session?.title ?? "Review") : {}),
     },
     plugins: options.plugins,
     onWriteError: () => toast("Couldn't save locally. The entry is kept until you close this tab."),
     beforeCreate: () => (sink ? Promise.race([sink.hydrated, new Promise<void>((r) => setTimeout(r, HYDRATE_WAIT_MS))]) : undefined),
   });
   // Outside dev there is no route: `enabled: false` skips the GET (no failing request in the host's console).
-  sink = createFilesSink({
-    endpoint: options.endpoint ?? DEFAULT_ENDPOINT,
-    store: core,
-    enabled: process.env.NODE_ENV === "development",
-  });
-  void sink.rehydrate();
-  const github = options.github ? createGithubSink({ ...(options.github.endpoint ? { endpoint: options.github.endpoint } : {}), store: core, key: loadKey }) : undefined;
+  if (toFiles) {
+    sink = createFilesSink({
+      endpoint: options.endpoint ?? DEFAULT_ENDPOINT,
+      store: core,
+      enabled: process.env.NODE_ENV === "development",
+    });
+    void sink.rehydrate();
+  }
+  const github =
+    toGithub && options.github
+      ? createGithubSink({ ...(options.github.endpoint ? { endpoint: options.github.endpoint } : {}), store: core, key: loadKey, ...(save === "github" ? { save } : {}) })
+      : undefined;
   return {
     store: adaptStore(core, sink, github),
     serialize: (entry, session) => serialize(entry, session),
