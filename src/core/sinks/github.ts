@@ -25,12 +25,15 @@ export const REVIEW_KEY_STORAGE = "proompter:review-key";
 /** Must match `PROOMPTER_HEADER` in `src/server/validate.ts` (kept apart so this chunk never imports node code). */
 const HEADER = "x-proompter";
 const NOT_SET_UP = "GitHub sync isn't set up on this server";
+const OLD_ROUTE = "The GitHub route is older than 0.2.0 and can't save to GitHub only. Update @rachitkay/proompter on the server.";
 
 export interface GithubSinkOptions {
   endpoint?: string;
   store: EntryStore;
   /** The review key, read for every request. */
   key: () => string | null;
+  /** `"github"`: the route keeps no entry files (`save: "github"` on the wire). Default `"both"`: nothing new is sent. */
+  save?: "github" | "both";
   fetch?: typeof fetch;
 }
 
@@ -151,7 +154,7 @@ export function createGithubSink(opts: GithubSinkOptions): GithubSink {
 
   async function postOne(e: Entry): Promise<Outcome> {
     try {
-      const res = await doFetch(endpoint, { method: "POST", headers: headers(true), body: JSON.stringify({ session: store.getState().session, entry: slim(e) }) });
+      const res = await doFetch(endpoint, { method: "POST", headers: headers(true), body: JSON.stringify({ session: store.getState().session, entry: slim(e), ...(opts.save === "github" ? { save: "github" } : {}) }) });
       if (!res.ok) {
         const f = await failure(res);
         return f.scope === "entry" ? { kind: "skip", error: f.error } : { kind: "stop", status: f.status, error: f.error };
@@ -176,13 +179,15 @@ export function createGithubSink(opts: GithubSinkOptions): GithubSink {
       const { id: sid, started } = store.getState().session;
 
       // 1. Issues closed on GitHub resolve their entries (only this review's: `started` tells it from another one).
-      const res = await doFetch(`${endpoint}?session=${encodeURIComponent(sid)}&started=${encodeURIComponent(started)}`, { headers: headers(false) });
+      const res = await doFetch(`${endpoint}?session=${encodeURIComponent(sid)}&started=${encodeURIComponent(started)}${opts.save === "github" ? "&save=github" : ""}`, { headers: headers(false) });
       if (!res.ok) {
         const f = await failure(res);
         return stop(f.status, f.error);
       }
       const listing = await readJson(res);
       if (listing?.ok !== true || !Array.isArray(listing.issues)) return stop(res.status, NOT_SET_UP);
+      // A 0.1.x route ignores `save` and would write entry files: stop before anything is posted.
+      if (opts.save === "github" && listing.save !== "github") return stop(res.status, OLD_ROUTE);
       const nextUrls = { ...urlMap };
       for (const raw of listing.issues as unknown[]) {
         if (typeof raw !== "object" || raw === null) continue;
