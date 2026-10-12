@@ -281,6 +281,28 @@ describe("<Composer> saving with ⌘↵", () => {
     expect(store.getState().entries[0]?.snapshot).toBeUndefined();
   });
 
+  it("says so when the capture yields no picture, with a short reason", async () => {
+    const capture = createStubCapture({ snapshot: () => Promise.resolve({ fontsEmbedded: true, error: `SecurityError ${"x".repeat(200)}` }) });
+    await open({ capture });
+    await fileEntry();
+    const t = qa(".toast").map((x) => x.textContent ?? "")[0] ?? "";
+    expect(t).toMatch(/^Saved without a screenshot: SecurityError x+\.\.\.$/);
+    expect(t.length).toBeLessThan(120);
+  });
+
+  it("says which picture is missing when only the element crop failed", async () => {
+    const snapshot = () => Promise.resolve({ fontsEmbedded: true, viewport: "data:image/png;base64,V", elementError: "crop broke", error: "other" });
+    await open({ capture: createStubCapture({ snapshot }) });
+    await fileEntry();
+    expect(qa(".toast").map((x) => x.textContent)).toEqual(["Saved without the element screenshot: crop broke"]);
+  });
+
+  it("a picture, or a redaction failure, gets no 'Saved without a screenshot' toast", async () => {
+    await open({ capture: createStubCapture({ snapshot: () => Promise.resolve({ fontsEmbedded: true, redactFailed: true }) }) });
+    await fileEntry();
+    expect(qa(".toast").map((x) => x.textContent)).toEqual(["Snapshot hidden: it couldn't be redacted."]);
+  });
+
   it("a text selection files its quote; a page note files no target", async () => {
     const text = await open({
       commit: { kind: "text", quote: "Clutched a 1v4", target: resolveTarget(page.els.text), rect: { left: 1, top: 1, width: 10, height: 10 } },
