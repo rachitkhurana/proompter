@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.2
+
+- **Screenshots on pages with cross-origin video or tainted canvases:** a cross-origin `<video>` without CORS, or a
+  `<canvas>` drawn with a cross-origin image, made the whole snapshot fail, so many entries were saved with no
+  screenshot. Such media is now left out and shown as a grey "video" or "canvas" box; the rest of the page is
+  captured as before.
+  - A toast says "Saved without a screenshot" (with the reason) when no picture could be taken, and in development
+    the reason is logged to the console.
+
 ## 0.2.1
 
 - **Readable issue bodies:** note and screenshots first, a field table, details collapsed. Fixed a broken image link
