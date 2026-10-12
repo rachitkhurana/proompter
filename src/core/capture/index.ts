@@ -16,6 +16,9 @@ import type {
 
 const RING_CAP = 50;
 
+// Bound once, when the module loads: before any capture patches the console, so our own warning is never recorded as page output.
+const warn = console.warn.bind(console);
+
 /** Keeps the last `RING_CAP` items. */
 function createRing<T>() {
   const items: T[] = [];
@@ -41,7 +44,9 @@ export function createCapture(opts: CaptureOptions): Capture {
   let enabled = false;
 
   const fail = (where: string, e: unknown): void => {
-    errorRing.push({ timestamp: Date.now(), where, message: e instanceof Error ? e.message : String(e) });
+    const message = e instanceof Error ? e.message : String(e);
+    errorRing.push({ timestamp: Date.now(), where, message });
+    if (process.env.NODE_ENV === "development") warn(`[proompter] ${where}: ${message}`);
   };
 
   const applyHook = <T extends CaptureEntry>(entry: T): T | null => {
