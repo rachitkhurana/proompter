@@ -222,6 +222,9 @@ function Kit({ options, box, onToggleKit }: ShellProps) {
   const pulseEntry = (entry: Entry) =>
     window.setTimeout(() => setPulse((p) => ({ id: entry.n, nonce: (p?.nonce ?? 0) + 1 })), 40);
 
+  // GitHub only (no files sink): there is no file to point at, so show the issue, or the entry's ref until it has one.
+  const whereSaved = (e: Entry) =>
+    store.write || !store.syncGithub ? entryPath(e, session) : (github?.urls[e.id] ?? `${session.id}/${e.id}`);
   const onCreated = (entry: Entry) => {
     setDraft(null);
     engine.clearMulti();
@@ -229,7 +232,7 @@ function Kit({ options, box, onToggleKit }: ShellProps) {
     toast(
       <>
         <b style={{ fontWeight: 500 }}>{entry.id}</b> saved on {viewportLabel(entry.viewport).toLowerCase()} ·{" "}
-        <span className="mono">{tailPath(entryPath(entry, session))}</span>
+        <span className="mono">{tailPath(whereSaved(entry))}</span>
       </>,
     );
     pulseEntry(entry);
@@ -365,7 +368,7 @@ function Kit({ options, box, onToggleKit }: ShellProps) {
   const issue = store.openIssue;
   const ticket: SheetTicketProps = {
     serialize: (e) => serialize(e, session),
-    entryPath: (e) => entryPath(e, session),
+    entryPath: whereSaved,
     tagOptions: DEFAULT_TAGS,
     planOptions,
     canOpenIssue: !!issue,
