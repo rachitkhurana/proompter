@@ -263,6 +263,24 @@ describe("hooks and adapters", () => {
     expect(ctx.internalErrors[0]?.where).toBe("redact-hook");
   });
 
+  it("warns in development when an internal error is recorded, and stays quiet otherwise", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.resetModules();
+    const { createCapture: fresh } = await import("./index.ts"); // the module binds console.warn when it loads
+    for (const [env, calls] of [["development", 1], ["production", 0]] as const) {
+      vi.stubEnv("NODE_ENV", env);
+      warn.mockClear();
+      const win = makeWin();
+      const cap = fresh({ win, redact: () => { throw new Error("hook bug"); } });
+      cap.enable();
+      win.console.error("x");
+      expect(warn).toHaveBeenCalledTimes(calls);
+      if (calls) expect(warn).toHaveBeenCalledWith("[proompter] redact-hook: hook bug");
+    }
+    vi.unstubAllEnvs();
+    warn.mockRestore();
+  });
+
   it("returns the queries snapshot and survives a throwing adapter", () => {
     const win = makeWin();
     const ok = createCapture({ win, queries: () => [{ key: ["a"], status: "success", updatedAt: 1 }] });
