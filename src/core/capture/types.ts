@@ -61,7 +61,10 @@ export interface SnapshotResult {
   viewport?: string;
   /** False when font embedding failed (e.g. CORS) and system fonts were used instead. */
   fontsEmbedded: boolean;
+  /** Why capture failed (the last failure, element or viewport). */
   error?: string;
+  /** Why the element crop failed, when it did. */
+  elementError?: string;
   /** True when masking a PNG failed: that PNG was dropped (fails closed, D17). */
   redactFailed?: boolean;
 }
