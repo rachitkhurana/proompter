@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 // E2E_PORT_BASE (default 3100) lets two checkouts run e2e at once without sharing servers. The servers script
-// reads the same variable: base = Next dev, +1 Next prod, +2 Vite dev, +3 Vite preview, +4 Next preview build.
+// reads the same variable: base = Next dev, +1 Next prod, +2 Vite dev, +3 Vite preview, +4 Next preview build, +5 fake GitHub, +6 no-CORS media origin.
 const BASE = Number(process.env.E2E_PORT_BASE ?? 3100);
 const DEV_PORT = BASE; // playground in dev with NEXT_PUBLIC_PROOMPTER=true
 const PROD_PORT = BASE + 1; // production build with the flag unset (DESIGN 11.1)
