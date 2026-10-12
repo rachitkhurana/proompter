@@ -150,9 +150,40 @@ describe("POST", () => {
     const issue = fake.state.issues[0]!;
     expect(issue.title).toBe("PRO-5: Avatar is cropped on mobile");
     expect(issue.labels.map((l) => l.name)).toEqual(["proompter", "kind:element", "priority:important"]);
-    expect(issue.body).toContain(`ref: ${SID}/PRO-5`);
-    expect(issue.body).toContain(`![snapshot](https://github.com/acme/reviews/blob/reviews/${base}/assets/005-mobile.png?raw=true)`);
+    expect(issue.body.endsWith(`<!-- proompter ref: ${SID}/PRO-5 -->`)).toBe(true);
+    expect(issue.body).toContain(`![element](https://github.com/acme/reviews/blob/reviews/${base}/assets/005-mobile.png?raw=true)`);
+    expect(issue.body).toContain(`![mobile viewport](https://github.com/acme/reviews/blob/reviews/${base}/assets/005-mobile-full.png?raw=true)`);
     expect([...fake.state.labels].sort()).toEqual(["kind:element", "priority:important", "proompter"]);
+  });
+
+  it("finds an issue made by 0.2.0 (frontmatter ref), updates it in place, and then leaves it alone", async () => {
+    fake.state.issues.push({ number: 1, title: "PRO-5: old", body: `---\nid: PRO-5\nref: ${SID}/PRO-5\nstatus: open\nissue: null\n---\n\n# Old\n`, state: "open", labels: [{ name: "proompter" }], html_url: "x" });
+    const { body } = await sync();
+    expect(body.issue).toBe("1");
+    expect(fake.state.issues).toHaveLength(1);
+    expect(fake.state.issues[0]!.body).toContain(`<!-- proompter ref: ${SID}/PRO-5 -->`);
+    expect(fake.state.issues[0]!.body).not.toContain("issue:");
+    expect(fake.state.log.filter((l) => l.startsWith("PATCH"))).toHaveLength(1);
+    const before = fake.state.log.length;
+    await sync(makeEntry({ issue: "1" }));
+    expect(fake.state.log.slice(before).filter((l) => l.startsWith("PATCH"))).toEqual([]);
+  });
+
+  it("a note quoting a ref line does not hide the real ref: no duplicate on re-sync", async () => {
+    for (const description of ["ref: other/PRO-9", "<!-- proompter ref: other/PRO-9 -->", "x\n<!-- proompter ref: other/PRO-9 -->\nref: other/PRO-9"]) {
+      fake.state.issues = [];
+      const first = await sync(makeEntry({ description }));
+      const again = await sync(makeEntry({ description, issue: first.body.issue }));
+      expect(again.body.issue).toBe(first.body.issue);
+      expect(fake.state.issues).toHaveLength(1);
+      expect((await sync(makeEntry({ description }))).body.issue).toBe("1"); // found by listing, not by number
+    }
+  });
+
+  it("an old body with a ref line in its description still resolves to the frontmatter ref", async () => {
+    fake.state.issues.push({ number: 1, title: "PRO-5: old", body: `---\nid: PRO-5\nref: ${SID}/PRO-5\n---\n\n# Old\n\nref: other/PRO-9\n`, state: "open", labels: [{ name: "proompter" }], html_url: "x" });
+    expect((await sync()).body.issue).toBe("1");
+    expect(fake.state.issues).toHaveLength(1);
   });
 
   it("an unchanged entry rewrites nothing and creates no second issue", async () => {
@@ -240,7 +271,7 @@ describe("POST", () => {
 
   it("an issue number that is gone or is a pull request falls back to the listing", async () => {
     const first = await sync();
-    fake.state.issues.push({ number: 2, title: "pr", body: `ref: ${SID}/PRO-5`, state: "open", labels: [{ name: "proompter" }], html_url: "x", pull_request: {} });
+    fake.state.issues.push({ number: 2, title: "pr", body: `---\nref: ${SID}/PRO-5\n---\n`, state: "open", labels: [{ name: "proompter" }], html_url: "x", pull_request: {} });
     for (const issue of ["2", "404"]) {
       const { body } = await sync(makeEntry({ issue, title: `Via ${issue}` }));
       expect(body.issue).toBe(first.body.issue);
@@ -249,7 +280,7 @@ describe("POST", () => {
   });
 
   it("a client-supplied number for another entry's proompter issue is ignored", async () => {
-    fake.state.issues.push({ number: 1, title: "PRO-9", body: `ref: ${SID}/PRO-9`, state: "open", labels: [{ name: "proompter" }], html_url: "x" });
+    fake.state.issues.push({ number: 1, title: "PRO-9", body: `---\nref: ${SID}/PRO-9\n---\n`, state: "open", labels: [{ name: "proompter" }], html_url: "x" });
     const { body } = await sync(makeEntry({ issue: "1", status: "resolved" }));
     expect(body.issue).toBe("2");
     expect(fake.state.issues[0]).toMatchObject({ title: "PRO-9", state: "open" });
@@ -372,7 +403,7 @@ describe("POST", () => {
 
   it("only lists as many issue pages as it needs to find the entry's issue", async () => {
     for (let n = 1; n <= 250; n++) {
-      fake.state.issues.push({ number: n, title: "t", body: `ref: ${SID}/PRO-${n}`, state: "open", labels: [{ name: "proompter" }], html_url: "u" });
+      fake.state.issues.push({ number: n, title: "t", body: `---\nref: ${SID}/PRO-${n}\n---\n`, state: "open", labels: [{ name: "proompter" }], html_url: "u" });
     }
     await sync(makeEntry({ id: "PRO-3", n: 3, title: "Third" })); // lives on page 1
     const pages = fake.state.log.filter((l) => l.includes("/issues?labels=proompter"));
@@ -428,7 +459,7 @@ describe("GET", () => {
     await sync();
     await sync(makeEntry({ id: "PRO-6", n: 6, title: "Other", status: "resolved" }));
     await sync(makeEntry({ session: "2026-10-11_other", id: "PRO-1", n: 1 }), makeSession({ id: "2026-10-11_other" }));
-    fake.state.issues.push({ number: 99, title: "pr", body: `ref: ${SID}/PRO-9`, state: "open", labels: [{ name: "proompter" }], html_url: "x", pull_request: {} });
+    fake.state.issues.push({ number: 99, title: "pr", body: `---\nref: ${SID}/PRO-9\n---\n`, state: "open", labels: [{ name: "proompter" }], html_url: "x", pull_request: {} });
     const res = await get();
     const { issues } = (await res.json()) as { issues: unknown[] };
     expect(issues).toEqual([
@@ -461,7 +492,7 @@ describe("GET", () => {
   });
   it("reads past one page of issues", async () => {
     for (let n = 1; n <= 120; n++) {
-      fake.state.issues.push({ number: n, title: "t", body: `ref: ${SID}/PRO-${n}`, state: "open", labels: [{ name: "proompter" }], html_url: "u" });
+      fake.state.issues.push({ number: n, title: "t", body: `---\nref: ${SID}/PRO-${n}\n---\n`, state: "open", labels: [{ name: "proompter" }], html_url: "u" });
     }
     const { issues } = (await (await get()).json()) as { issues: unknown[] };
     expect(issues).toHaveLength(120);
@@ -482,8 +513,10 @@ describe('save: "github" (assets branch, no entry files)', () => {
     expect(body).toMatchObject({ ok: true, issue: "1", save: "github" });
     const issue = fake.state.issues[0]!;
     const e = makeEntry();
-    for (const part of [e.title, e.description, e.target?.selector, e.route, e.viewport, e.priority]) if (part) expect(issue.body).toContain(String(part));
-    expect(issue.body).toContain(`![snapshot](https://github.com/acme/reviews/blob/${AB}/${base}/assets/005-mobile.png?raw=true)`);
+    for (const part of [e.description, e.target?.selector, e.route, e.viewport]) if (part) expect(issue.body).toContain(String(part));
+    expect(issue.body).toContain(`![element](https://github.com/acme/reviews/blob/${AB}/${base}/assets/005-mobile.png?raw=true)`);
+    expect(issue.body).toContain(`![mobile viewport](https://github.com/acme/reviews/blob/${AB}/${base}/assets/005-mobile-full.png?raw=true)`);
+    expect(issue.body).not.toContain("File:");
     expect(names(AB)).toEqual(["README.md", `${base}/assets/005-mobile-full.png`, `${base}/assets/005-mobile.png`, `${base}/session.md`]);
     expect(fake.state.parents.get(AB)).toEqual([]); // an orphan
     expect(body.files.sort()).toEqual(["assets/005-mobile-full.png", "assets/005-mobile.png", "session.md"]);
