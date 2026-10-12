@@ -75,7 +75,7 @@ test("files an entry, asks for the key once, and syncs it: files on the reviews 
   expect(s.issues).toHaveLength(1);
   expect(s.issues[0]).toMatchObject({ number: 1, title: `PRO-1: ${TITLE}`, state: "open" });
   expect(s.issues[0]?.labels.map((l) => l.name)).toEqual(["proompter", "kind:element", "priority:important"]);
-  expect(s.issues[0]?.body).toMatch(/!\[snapshot\]\(https:\/\/github\.com\/acme\/reviews\/blob\/reviews\/[^)]+\/assets\/001-responsive\.png\?raw=true\)/);
+  expect(s.issues[0]?.body).toMatch(/!\[element\]\(https:\/\/github\.com\/acme\/reviews\/blob\/reviews\/[^)]+\/assets\/001-responsive\.png\?raw=true\)/);
   const branch = Object.keys(s.files.reviews ?? {}).filter((f) => f.startsWith("reviews/"));
   expect(branch.some((f) => /^reviews\/[^/]+\/session\.md$/.test(f))).toBe(true);
   expect(branch.some((f) => /\/entries\/001-card-needs-more-padding\.md$/.test(f))).toBe(true);
