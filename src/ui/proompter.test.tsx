@@ -3,7 +3,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "./primitives/toast";
 import { Proompter } from "./proompter";
-import type { ProompterProps } from "./proompter-deps";
+import type { ProompterProps, StoreState } from "./proompter-deps";
 import { createFakeDeps, type FakeDeps } from "./shell/fake";
 import "./test-utils"; // act environment and the layout APIs happy-dom lacks
 
@@ -491,6 +491,30 @@ describe("default dependencies (T07's store)", () => {
     await press("e");
     expect(sq(".empty")?.textContent).toContain("No entries yet");
     expect(sq(".sh-hd b")?.textContent).toBe("Smoke pass");
+  });
+});
+
+describe("GitHub only (save=\"github\")", () => {
+  /** The fake store as a github-only one: no `write`, a `syncGithub`, and these issue urls. */
+  const githubOnly = (urls: Record<string, string>): FakeDeps => {
+    const fake = createFakeDeps();
+    const snap: StoreState = { ...fake.store.getSnapshot(), github: { pending: 0, error: null, needsKey: false, urls } };
+    return { ...fake, store: { ...fake.store, write: undefined, syncGithub: async () => ({ ok: true, synced: 0, resolved: 0 }), getSnapshot: () => snap } };
+  };
+  const ticketPath = async () => {
+    await press("e");
+    await act(async () => sq<HTMLElement>('.row[data-entry="PRO-1"]')!.click());
+    return sq(".tk-title") && sq(".tk-file .hint.mono, .hint.mono")?.textContent;
+  };
+
+  it("the ticket shows the entry ref until it has an issue, then the issue link; never a reviews/ path", async () => {
+    await openKit({ deps: githubOnly({}) });
+    expect(await ticketPath()).toMatch(/^[^/]+\/PRO-1$/);
+  });
+
+  it("shows the issue link once known", async () => {
+    await openKit({ deps: githubOnly({ "PRO-1": "https://github.com/acme/reviews/issues/481" }) });
+    expect(await ticketPath()).toBe("https://github.com/acme/reviews/issues/481");
   });
 });
 
