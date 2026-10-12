@@ -153,6 +153,12 @@ export interface ProompterProps {
    * mounted `createGithubRoute` (default `/api/proompter/github`).
    */
   github?: { endpoint?: string };
+  /**
+   * Where reviews are saved: `"files"` (./reviews/ through the dev route), `"github"` (issues, with screenshots on
+   * an orphan assets branch; no entry files anywhere) or `"both"`. Default `"both"` when `github` is set, else
+   * `"files"`; `"github"` and `"both"` need the `github` prop. `"github"` needs the route at 0.2.0 or later.
+   */
+  save?: "files" | "github" | "both";
   /** Inject the store, serializer and composer (stories, tests, fixtures). Defaults to the real ones. */
   deps?: ProompterDeps;
   /** Start with the kit shown. By default it stays hidden until `⌘⇧.` or `window.__proompter.open()`. */
