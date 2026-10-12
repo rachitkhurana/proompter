@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+- **Readable issue bodies:** note and screenshots first, a field table, details collapsed. Fixed a broken image link
+  in every issue (since 0.1.0); the full-viewport screenshot is now shown too.
+  - Issues made by earlier versions are found by their old `ref:` line and updated in place.
+
 ## 0.2.0
 
 - **`save` prop:** pick where reviews are saved: `"files"`, `"github"` or `"both"`. The default is unchanged (`"both"`
