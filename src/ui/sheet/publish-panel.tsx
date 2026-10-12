@@ -52,30 +52,33 @@ export function PublishPanel({ session, entries, pending, onWrite, github }: Pub
 
   return (
     <div className="pub">
-      <section aria-labelledby="pm-pub-files">
-        <div>
-          <h3 id="pm-pub-files">Files</h3>
-          <p>Each entry is a markdown file in the repo, one folder per session. Commit them with your branch.</p>
-        </div>
-        {/* Focusable: long paths scroll sideways, and a scrollable region must be reachable by keyboard (axe). */}
-        <div className="tree" role="list" aria-label="Pending files" tabIndex={0}>
-          {files > 0 ? (
-            pending.map((f) => (
-              <div key={f.path} role="listitem" className={f.change === "add" ? "a" : "m"}>
-                {f.change === "add" ? "+" : "~"} {f.path}
-              </div>
-            ))
-          ) : (
-            <div>Everything is written. Nothing new to commit.</div>
-          )}
-        </div>
-        <div>
-          <Button variant="pri" disabled={!canWrite} onClick={() => void write()}>
-            <Icon name="file" size="s" />
-            Write {files} file{files === 1 ? "" : "s"}
-          </Button>
-        </div>
-      </section>
+      {/* GitHub only (`save="github"`): there is no files sink, so no Files section. */}
+      {onWrite || !github ? (
+        <section aria-labelledby="pm-pub-files">
+          <div>
+            <h3 id="pm-pub-files">Files</h3>
+            <p>Each entry is a markdown file in the repo, one folder per session. Commit them with your branch.</p>
+          </div>
+          {/* Focusable: long paths scroll sideways, and a scrollable region must be reachable by keyboard (axe). */}
+          <div className="tree" role="list" aria-label="Pending files" tabIndex={0}>
+            {files > 0 ? (
+              pending.map((f) => (
+                <div key={f.path} role="listitem" className={f.change === "add" ? "a" : "m"}>
+                  {f.change === "add" ? "+" : "~"} {f.path}
+                </div>
+              ))
+            ) : (
+              <div>Everything is written. Nothing new to commit.</div>
+            )}
+          </div>
+          <div>
+            <Button variant="pri" disabled={!canWrite} onClick={() => void write()}>
+              <Icon name="file" size="s" />
+              Write {files} file{files === 1 ? "" : "s"}
+            </Button>
+          </div>
+        </section>
+      ) : null}
 
       {github ? (
         <GithubSection entries={entries} github={github} />
