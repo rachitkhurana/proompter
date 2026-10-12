@@ -96,6 +96,23 @@ describe("snapshot", () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
+  /** Makes drawing any of `bad` onto a probe canvas taint it (toDataURL then throws), and records the placeholder fills. */
+  function taint(...bad: unknown[]) {
+    let tainted = false;
+    const fills: number[][] = [];
+    const texts: string[] = [];
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation((() => ({
+      drawImage: (src: unknown) => void (tainted = bad.includes(src)),
+      fillRect: (...a: number[]) => fills.push(a),
+      fillText: (t: string) => texts.push(t),
+    })) as never);
+    vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockImplementation(() => {
+      if (tainted) throw new DOMException("tainted", "SecurityError");
+      return PNG;
+    });
+    return { fills, texts };
+  }
+
   it("returns masked element and viewport PNGs from the surface document, drawn at the device pixel ratio", async () => {
     mockToSvg.mockResolvedValue(toUrl(FIXTURE));
     const { s, el, doc } = surface();
@@ -112,6 +129,145 @@ describe("snapshot", () => {
       [248, 128],
       [1600, 1200],
     ]);
+  });
+
+  describe("unreadable media", () => {
+    /** The filter html-to-image was given, applied to `node`. */
+    const verdict = (call: number, node: Node) => (mockToSvg.mock.calls[call]?.[1]?.filter as (n: Node) => boolean)(node);
+    const rect = (l: number, t: number, w: number, h: number) => () => ({ left: l, top: t, right: l + w, bottom: t + h, width: w, height: h }) as DOMRect;
+    const style = (over: (e: Element) => Record<string, string | undefined> = () => ({})) =>
+      vi.spyOn(window, "getComputedStyle").mockImplementation(
+        (e: Element) => ({ visibility: "visible", opacity: "1", overflowX: "visible", overflowY: "visible", ...over(e) }) as never,
+      );
+
+    it("drops a tainted canvas and an unreadable video, keeps readable ones and the kit UI out", async () => {
+      mockToSvg.mockResolvedValue(toUrl(FIXTURE));
+      const { s, el, doc } = surface();
+      const mk = (tag: string) => {
+        const n = doc.createElement(tag) as HTMLCanvasElement;
+        if (tag === "video") {
+          Object.defineProperty(n, "currentSrc", { value: "https://cdn.example/a.mp4" });
+          Object.defineProperty(n, "readyState", { value: 4 }); // has a frame, so the probe decides
+        }
+        n.width = n.height = 10;
+        el.appendChild(n);
+        return n;
+      };
+      const [badCanvas, okCanvas, badVideo, okVideo] = [mk("canvas"), mk("canvas"), mk("video"), mk("video")];
+      taint(badCanvas, badVideo);
+      const noSrc = doc.createElement("video"); // no currentSrc: html-to-image doesn't draw it, so neither do we
+      await createCapture({ win: s.win }).snapshot(s, el);
+      expect([badCanvas, okCanvas, badVideo, okVideo, noSrc].map((n) => verdict(0, n))).toEqual([false, true, false, true, true]);
+      expect(verdict(0, doc.createElement("proompter-root"))).toBe(false);
+      expect(verdict(0, doc.createTextNode("x"))).toBe(true);
+    });
+
+    /** A tainted canvas in `box` in the capture root (crop region 200x100 at 0,0; canvas at 10,10, 60x40). */
+    function scene() {
+      const { s, el, doc } = surface();
+      const box = doc.createElement("div");
+      const cv = doc.createElement("canvas");
+      cv.width = cv.height = 10;
+      el.appendChild(box);
+      box.appendChild(cv);
+      el.getBoundingClientRect = rect(0, 0, 200, 100);
+      box.getBoundingClientRect = rect(0, 0, 200, 100);
+      cv.getBoundingClientRect = rect(10, 10, 60, 40);
+      style();
+      const seen = taint(cv);
+      mockToSvg.mockImplementation(async (_n, o) => {
+        o?.filter?.(cv);
+        return toUrl(FIXTURE);
+      });
+      return { s, el, box, cv, ...seen };
+    }
+
+    it("draws a placeholder over each dropped element, in image pixels, scaled by the device pixel ratio", async () => {
+      const { s, el, cv, fills, texts } = scene();
+      el.getBoundingClientRect = rect(100, 50, 100, 40);
+      cv.getBoundingClientRect = rect(110, 60, 30, 20);
+      await createCapture({ win: s.win }).snapshot(s, el);
+      // crop: (110-100+12, 60-50+12) = (22, 22), 30x20, at 2x. Viewport: (110, 60) is inside 800x600.
+      expect(fills).toEqual([
+        [44, 44, 60, 40],
+        [220, 120, 60, 40],
+      ]);
+      expect(texts).toEqual(["canvas", "canvas"]);
+    });
+
+    it("clips each placeholder to the ancestors that clip overflow, and drops it when nothing is left", async () => {
+      const { s, el, box, fills } = scene();
+      style((e) => (e === box ? { overflowX: "hidden", overflowY: "hidden" } : {}));
+      box.getBoundingClientRect = rect(0, 0, 40, 100); // clips the canvas (x 10..70) to 10..40
+      await createCapture({ win: s.win }).snapshot(s, el);
+      expect(fills[0]).toEqual([(10 + 12) * 2, (10 + 12) * 2, 30 * 2, 40 * 2]); // the crop, 2x
+      fills.length = 0;
+      box.getBoundingClientRect = rect(100, 0, 40, 100); // the canvas is entirely outside its clipping parent
+      await createCapture({ win: s.win }).snapshot(s, el);
+      expect(fills).toEqual([]);
+    });
+
+    it("draws nothing for media that is hidden, or under an ancestor at opacity 0", async () => {
+      for (const [who, css] of [["cv", { visibility: "hidden" }], ["box", { opacity: "0" }]] as const) {
+        const { s, el, box, cv, fills } = scene();
+        style((e) => (e === (who === "cv" ? cv : box) ? css : {}));
+        await createCapture({ win: s.win }).snapshot(s, el);
+        expect(fills).toEqual([]);
+      }
+    });
+
+    it("treats a canvas with no size as readable", async () => {
+      const { s, el, cv } = scene();
+      cv.width = 0;
+      await createCapture({ win: s.win }).snapshot(s, el);
+      expect(verdict(0, cv)).toBe(true);
+    });
+
+    it("a cross-origin video with no frame yet is unreadable, unless it has crossorigin", async () => {
+      mockToSvg.mockResolvedValue(toUrl(FIXTURE));
+      const { s, el } = surface();
+      const mk = (readyState: number, attrs: Record<string, string> = {}) => {
+        const v = document.createElement("video");
+        Object.defineProperty(v, "currentSrc", { value: "https://cdn.example.test/a.mp4" });
+        Object.defineProperty(v, "readyState", { value: readyState });
+        for (const [k, val] of Object.entries(attrs)) v.setAttribute(k, val);
+        return v;
+      };
+      await createCapture({ win: s.win }).snapshot(s, el);
+      expect(verdict(0, mk(0))).toBe(false);
+      expect(verdict(0, mk(0, { crossorigin: "anonymous" }))).toBe(true);
+      expect(verdict(0, mk(4))).toBe(true); // has a frame: the probe decides, and it passes here
+    });
+
+    it("probes each element once, however many renders ask", async () => {
+      const { s, el, cv } = scene();
+      let probes = 0;
+      vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation((() => ({
+        drawImage: (src: unknown) => void (src === cv && probes++),
+        fillRect: () => {},
+        fillText: () => {},
+      })) as never);
+      await createCapture({ win: s.win }).snapshot(s, el); // an element render and a viewport render
+      verdict(0, cv);
+      verdict(1, cv);
+      expect(mockToSvg.mock.calls[1]?.[1]?.filter).toBe(mockToSvg.mock.calls[0]?.[1]?.filter);
+      expect(probes).toBe(1);
+    });
+
+    it("a picked video or canvas that is unreadable is not rendered: its element PNG is the placeholder alone", async () => {
+      mockToSvg.mockResolvedValue(toUrl(FIXTURE));
+      const { s, doc } = surface();
+      const cv = doc.createElement("canvas");
+      cv.width = cv.height = 10;
+      doc.body.appendChild(cv);
+      cv.getBoundingClientRect = rect(20, 30, 50, 40);
+      style();
+      const { fills } = taint(cv);
+      const res = await createCapture({ win: s.win }).snapshot(s, cv);
+      expect(res.element).toBe(PNG);
+      expect(mockToSvg).toHaveBeenCalledTimes(1); // the viewport only
+      expect(fills[0]).toEqual([24, 24, 100, 80]); // 12px padding, 2x
+    });
   });
 
   it("captures only the viewport without an element", async () => {
